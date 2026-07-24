@@ -19,12 +19,9 @@ class Login extends MY_Controller {
 
 	public function index()
 	{
-		$flash = array(
-			'success' => $this->session->flashdata('admin_message_success'),
-			'fail' => $this->session->flashdata('admin_message_fail'),
-		);
-		$this->data['message_success'] = $flash['success'];
-		$this->data['message_fail'] = $flash['fail'];
+		$flash = function_exists('admin_consume_scoped_flash') ? admin_consume_scoped_flash() : null;
+		$this->data['message_success'] = ($flash && $flash['type'] === 'success') ? $flash['message'] : '';
+		$this->data['message_fail'] = ($flash && $flash['type'] === 'fail') ? $flash['message'] : '';
 
 		if ($this->input->post()) {
 			$this->form_validation->set_rules('email', 'Email đăng nhập', 'required|valid_email');

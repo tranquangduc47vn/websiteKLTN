@@ -219,29 +219,203 @@
 		$CI->output->set_header('Expires: Thu, 01 Jan 1970 00:00:00 GMT');
 	}
 
-	if (!function_exists('admin_flash_success')) {
-		function admin_flash_success($message)
+	if (!function_exists('admin_flash_scope_for_controller')) {
+		function admin_flash_scope_for_controller($class = null)
+		{
+			if ($class === null) {
+				$class = strtolower((string) get_instance()->router->class);
+			}
+
+			$map = array(
+				'transaction' => 'orders',
+				'product' => 'products',
+				'inventory' => 'inventory',
+				'stock_receipt' => 'inventory',
+				'stock_movements' => 'inventory',
+				'suppliers' => 'inventory',
+				'ai_assistant' => 'ai',
+				'support_chat' => 'ai',
+				'user' => 'users',
+				'catalog' => 'catalog',
+				'news' => 'posts',
+				'store' => 'store',
+				'admin' => 'staff',
+				'voucher' => 'marketing',
+				'banner' => 'content',
+				'slider' => 'content',
+				'pages' => 'content',
+				'tuyendung' => 'content',
+				'hoptac' => 'content',
+				'vanchuyen' => 'content',
+				'site_branding' => 'branding',
+				'login' => 'auth',
+				'home' => 'dashboard',
+			);
+
+			return isset($map[$class]) ? $map[$class] : 'general';
+		}
+	}
+
+	if (!function_exists('admin_page_scope')) {
+		function admin_page_scope()
 		{
 			$CI =& get_instance();
-			$CI->session->unset_userdata('admin_message_fail');
-			$CI->session->set_flashdata('admin_message_success', $message);
+			$seg2 = $CI->uri->segment(2);
+			if ($seg2 === false || $seg2 === '') {
+				$seg2 = 'home';
+			}
+
+			$map = array(
+				'orders' => 'orders',
+				'products' => 'products',
+				'inventory' => 'inventory',
+				'receipts' => 'inventory',
+				'stock-receipts' => 'inventory',
+				'stock-inventory' => 'inventory',
+				'stock-movements' => 'inventory',
+				'suppliers' => 'inventory',
+				'ai-assistant' => 'ai',
+				'support-chat' => 'ai',
+				'users' => 'users',
+				'catalog' => 'catalog',
+				'posts' => 'posts',
+				'store' => 'store',
+				'branding' => 'branding',
+				'voucher' => 'marketing',
+				'home' => 'dashboard',
+				'login' => 'auth',
+			);
+
+			return isset($map[$seg2]) ? $map[$seg2] : 'general';
+		}
+	}
+
+	if (!function_exists('admin_infer_flash_scope_from_message')) {
+		function admin_infer_flash_scope_from_message($message)
+		{
+			$text = mb_strtolower(trim((string) $message), 'UTF-8');
+			if ($text === '') {
+				return 'general';
+			}
+
+			if (mb_strpos($text, 'đơn đặt hàng') !== false || mb_strpos($text, 'đơn hàng') !== false || mb_strpos($text, 'đơn cần') !== false) {
+				return 'orders';
+			}
+			if (mb_strpos($text, 'trợ lý ai') !== false || mb_strpos($text, 'faq') !== false || mb_strpos($text, 'hội thoại') !== false) {
+				return 'ai';
+			}
+			if (mb_strpos($text, 'tồn kho') !== false || mb_strpos($text, 'nhập kho') !== false || mb_strpos($text, 'phiếu nhập') !== false || mb_strpos($text, 'nhà cung cấp') !== false) {
+				return 'inventory';
+			}
+			if (mb_strpos($text, 'sản phẩm') !== false || mb_strpos($text, 'danh mục') !== false) {
+				return 'products';
+			}
+			if (mb_strpos($text, 'đăng nhập') !== false || mb_strpos($text, 'đăng xuất') !== false) {
+				return 'general';
+			}
+
+			return 'general';
+		}
+	}
+
+	if (!function_exists('admin_flash_scope_matches_page')) {
+		function admin_flash_scope_matches_page($flash_scope, $page_scope = null)
+		{
+			if ($page_scope === null) {
+				$page_scope = admin_page_scope();
+			}
+
+			$flash_scope = (string) $flash_scope;
+			if ($flash_scope === '' || $flash_scope === 'general') {
+				return true;
+			}
+
+			if ($page_scope === 'auth' && in_array($flash_scope, array('auth', 'general'), true)) {
+				return true;
+			}
+
+			return $flash_scope === $page_scope;
+		}
+	}
+
+	if (!function_exists('admin_set_scoped_flash')) {
+		function admin_set_scoped_flash($type, $message, $scope = null)
+		{
+			$CI =& get_instance();
+			$type = in_array($type, array('success', 'fail', 'info'), true) ? $type : 'info';
+			if ($scope === null) {
+				$scope = admin_flash_scope_for_controller();
+			}
+
+			$CI->session->unset_userdata(array('admin_message_success', 'admin_message_fail', 'admin_message'));
+			$CI->session->set_flashdata('admin_flash', array(
+				'type' => $type,
+				'message' => (string) $message,
+				'scope' => (string) $scope,
+			));
+		}
+	}
+
+	if (!function_exists('admin_consume_scoped_flash')) {
+		function admin_consume_scoped_flash()
+		{
+			$CI =& get_instance();
+			$page_scope = admin_page_scope();
+
+			$bundle = $CI->session->flashdata('admin_flash');
+			if (is_array($bundle) && !empty($bundle['message'])) {
+				$scope = isset($bundle['scope']) ? (string) $bundle['scope'] : 'general';
+				if (admin_flash_scope_matches_page($scope, $page_scope)) {
+					return array(
+						'type' => isset($bundle['type']) ? (string) $bundle['type'] : 'info',
+						'message' => (string) $bundle['message'],
+					);
+				}
+				return null;
+			}
+
+			$legacy = array(
+				array('key' => 'admin_message_success', 'type' => 'success'),
+				array('key' => 'admin_message_fail', 'type' => 'fail'),
+				array('key' => 'admin_message', 'type' => 'info'),
+			);
+
+			foreach ($legacy as $item) {
+				$message = $CI->session->flashdata($item['key']);
+				if ($message === null || $message === '') {
+					continue;
+				}
+				$scope = admin_infer_flash_scope_from_message($message);
+				if (admin_flash_scope_matches_page($scope, $page_scope)) {
+					return array(
+						'type' => $item['type'],
+						'message' => (string) $message,
+					);
+				}
+			}
+
+			return null;
+		}
+	}
+
+	if (!function_exists('admin_flash_success')) {
+		function admin_flash_success($message, $scope = null)
+		{
+			admin_set_scoped_flash('success', $message, $scope);
 		}
 	}
 
 	if (!function_exists('admin_flash_fail')) {
-		function admin_flash_fail($message)
+		function admin_flash_fail($message, $scope = null)
 		{
-			$CI =& get_instance();
-			$CI->session->unset_userdata('admin_message_success');
-			$CI->session->set_flashdata('admin_message_fail', $message);
+			admin_set_scoped_flash('fail', $message, $scope);
 		}
 	}
 
 	if (!function_exists('admin_flash_info')) {
-		function admin_flash_info($message)
+		function admin_flash_info($message, $scope = null)
 		{
-			$CI =& get_instance();
-			$CI->session->set_flashdata('admin_message', $message);
+			admin_set_scoped_flash('info', $message, $scope);
 		}
 	}
 

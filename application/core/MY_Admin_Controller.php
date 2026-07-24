@@ -18,7 +18,7 @@ class MY_Admin_Controller extends MY_Controller
 
 		if (!admin_can_access_panel($login)) {
 			$this->session->unset_userdata('login');
-			admin_flash_fail('Tài khoản không có quyền truy cập khu vực quản trị.');
+			admin_flash_fail('Tài khoản không có quyền truy cập khu vực quản trị.', 'auth');
 			redirect(admin_url('login'));
 		}
 

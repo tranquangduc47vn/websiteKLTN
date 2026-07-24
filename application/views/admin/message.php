@@ -1,7 +1,8 @@
 <?php
-$msg_success = $this->session->flashdata('admin_message_success');
-$msg_fail = $this->session->flashdata('admin_message_fail');
-$msg_info = $this->session->flashdata('admin_message');
+$flash = function_exists('admin_consume_scoped_flash') ? admin_consume_scoped_flash() : null;
+$msg_success = ($flash && $flash['type'] === 'success') ? $flash['message'] : '';
+$msg_fail = ($flash && $flash['type'] === 'fail') ? $flash['message'] : '';
+$msg_info = ($flash && $flash['type'] === 'info') ? $flash['message'] : '';
 ?>
 <div class="admin-flash-stack">
 	<?php if ($msg_success) { ?>

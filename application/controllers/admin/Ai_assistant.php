@@ -40,7 +40,6 @@ class Ai_assistant extends MY_Admin_Controller {
 			'welcome_message' => $this->ai_setting_model->get('welcome_message', ''),
 			'working_hours_text' => $this->ai_setting_model->get('working_hours_text', ''),
 		);
-		$this->data['message'] = $this->session->flashdata('message');
 		$this->render_admin('admin/ai_assistant/settings');
 	}
 
@@ -72,7 +71,6 @@ class Ai_assistant extends MY_Admin_Controller {
 	protected function _faq_index()
 	{
 		$this->data['list'] = $this->ai_faq_model->get_list(array('order' => array('sort_order', 'ASC')));
-		$this->data['message'] = $this->session->flashdata('message');
 		$this->render_admin('admin/ai_assistant/faq_index');
 	}
 
