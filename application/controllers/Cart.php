@@ -440,7 +440,7 @@ class Cart extends MY_Frontend_Controller {
 
         $check = $this->product_service->validate_cart_quantity($id, $color, $size, $qty, $existing_qty, false);
         if (!$check['ok']) {
-            $this->session->set_flashdata('message', $check['message']);
+            set_product_flash($check['message']);
             redirect(build_product_url($product));
         }
 

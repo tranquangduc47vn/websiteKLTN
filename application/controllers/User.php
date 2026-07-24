@@ -35,6 +35,10 @@ public function index()
 
 		$this->data['message_success'] = $this->session->flashdata('message_success');
 		$this->data['message_fail'] = $this->session->flashdata('message_fail');
+		$legacy_message = $this->session->flashdata('message');
+		if ($legacy_message !== null && $legacy_message !== '' && empty($this->data['message_success']) && empty($this->data['message_fail'])) {
+			$this->data['message_success'] = $legacy_message;
+		}
 
 		$this->load->model('transaction_model');
 

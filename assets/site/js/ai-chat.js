@@ -347,10 +347,19 @@
 			},
 			body: body,
 		})
-			.then(function (res) { return res.json(); })
+			.then(function (res) {
+				if (!res.ok) {
+					throw new Error('HTTP ' + res.status);
+				}
+				return res.json();
+			})
 			.then(function (data) {
 				hideTyping();
 				sending = false;
+
+				if (typeof window.applyCsrfResponse === 'function') {
+					window.applyCsrfResponse(data);
+				}
 
 				if (!data || !data.ok) {
 					removeLocalMessages();

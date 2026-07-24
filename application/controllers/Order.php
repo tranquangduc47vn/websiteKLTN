@@ -346,7 +346,7 @@ class Order extends MY_Frontend_Controller {
             $transaction_id = $this->uri->segment(3);
         }
         if (empty($transaction_id)) {
-            $this->session->set_flashdata('message', 'Không tìm thấy mã đơn hàng!');
+            set_store_flash('fail', 'Không tìm thấy mã đơn hàng!');
             redirect(base_url());
         }
 
@@ -354,18 +354,18 @@ class Order extends MY_Frontend_Controller {
         $transaction = $this->transaction_model->get_info($transaction_id);
 
         if (empty($transaction)) {
-            $this->session->set_flashdata('message', 'Đơn hàng không tồn tại trên hệ thống!');
+            set_store_flash('fail', 'Đơn hàng không tồn tại trên hệ thống!');
             redirect(base_url());
         }
 
         // Chủ đơn hoặc phiên order_access_ids
         if (!$this->_can_access_order($transaction)) {
-            $this->session->set_flashdata('message', 'Bạn không có quyền xử lý đơn hàng này!');
+            set_store_flash('fail', 'Bạn không có quyền xử lý đơn hàng này!');
             redirect(base_url());
         }
 
         if (!in_array((string) $transaction->status, array('0', '1'), true)) {
-            $this->session->set_flashdata('message', 'Đơn hàng không thể hủy ở trạng thái hiện tại.');
+            $this->session->set_flashdata('message_fail', 'Đơn hàng không thể hủy ở trạng thái hiện tại.');
             redirect(base_url('user'));
         }
 
@@ -385,9 +385,9 @@ class Order extends MY_Frontend_Controller {
                 'reason' => $reason
             ));
 
-            $this->session->set_flashdata('message', 'Hủy đơn hàng thành công! Sản phẩm đã được hoàn lại kho hàng.');
+            $this->session->set_flashdata('message_success', 'Hủy đơn hàng thành công! Sản phẩm đã được hoàn lại kho hàng.');
         } else {
-            $this->session->set_flashdata('message', 'Đơn hàng này đã được hủy từ trước.');
+            $this->session->set_flashdata('message_fail', 'Đơn hàng này đã được hủy từ trước.');
         }
 
         redirect(base_url('user')); 

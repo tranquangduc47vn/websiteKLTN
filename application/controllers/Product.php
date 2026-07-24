@@ -156,8 +156,9 @@ class Product extends MY_Frontend_Controller {
         $this->data['user_already_rated'] = $user_already_rated;
         $this->data['user_review'] = $user_review;
 
-        $this->session->flashdata('stock_notice');
-        $this->data['message'] = $this->session->flashdata('message');
+		$this->session->flashdata('stock_notice');
+		$this->session->flashdata('message');
+		$this->data['message'] = $this->session->flashdata('product_message');
 
         $default_color = '';
         $default_size = '';

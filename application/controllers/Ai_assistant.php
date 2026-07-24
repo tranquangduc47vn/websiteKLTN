@@ -22,10 +22,25 @@ class Ai_assistant extends MY_Frontend_Controller {
 		$userId = ($userLogin && isset($userLogin->id)) ? (int) $userLogin->id : 0;
 		$guestToken = $userId > 0 ? '' : $this->_guest_token();
 
-		$service = new SupportChatService();
-		$result = $service->handleCustomerMessage($message, $conversationId, $userId, $guestToken);
-
-		$this->output->set_output(json_encode($result, JSON_UNESCAPED_UNICODE));
+		try {
+			$service = new SupportChatService();
+			$result = $service->handleCustomerMessage($message, $conversationId, $userId, $guestToken);
+			if (!is_array($result)) {
+				$result = array('ok' => false, 'message' => 'Phản hồi không hợp lệ.');
+			}
+			if (function_exists('csrf_json_meta')) {
+				$result = array_merge($result, csrf_json_meta());
+			}
+			$this->output->set_output(json_encode($result, JSON_UNESCAPED_UNICODE));
+		} catch (Throwable $e) {
+			log_message('error', 'Ai_assistant::send — ' . $e->getMessage());
+			$payload = array('ok' => false, 'message' => 'Lỗi máy chủ khi xử lý tin nhắn.');
+			if (function_exists('csrf_json_meta')) {
+				$payload = array_merge($payload, csrf_json_meta());
+			}
+			$this->output->set_status_header(500);
+			$this->output->set_output(json_encode($payload, JSON_UNESCAPED_UNICODE));
+		}
 	}
 
 	public function history()

@@ -285,10 +285,30 @@
 	function get_store_flash()
 	{
 		$CI =& get_instance();
+		// Legacy key used by cart/checkout; discard here if no controller consumed it yet.
+		$CI->session->flashdata('message');
+
 		return array(
 			'success' => $CI->session->flashdata('store_message_success'),
 			'fail' => $CI->session->flashdata('store_message_fail'),
-			'info' => $CI->session->flashdata('message'),
+			'info' => $CI->session->flashdata('store_message_info'),
 		);
+	}
+
+	function set_product_flash($message)
+	{
+		$CI =& get_instance();
+		$CI->session->set_flashdata('product_message', (string) $message);
+	}
+
+	function load_account_flash_to(array &$data)
+	{
+		$CI =& get_instance();
+		$data['message_success'] = $CI->session->flashdata('message_success');
+		$data['message_fail'] = $CI->session->flashdata('message_fail');
+		$legacy = $CI->session->flashdata('message');
+		if ($legacy !== null && $legacy !== '' && empty($data['message_success']) && empty($data['message_fail'])) {
+			$data['message_success'] = $legacy;
+		}
 	}
 ?>
