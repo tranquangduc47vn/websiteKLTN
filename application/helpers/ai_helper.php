@@ -40,6 +40,9 @@ if (!function_exists('ai_render_widget')) {
 
 		$CI->config->load('ai', true);
 
+		$userLogin = $CI->session->userdata('user');
+		$customerLoggedIn = ($userLogin && isset($userLogin->id) && (int) $userLogin->id > 0);
+
 		$data = array(
 			'ai_enabled' => $settings['ai_enabled'],
 			'staff_support_enabled' => $settings['staff_support_enabled'],
@@ -47,6 +50,9 @@ if (!function_exists('ai_render_widget')) {
 			'welcome_intro' => (string) $CI->config->item('ai_welcome_intro', 'ai'),
 			'quick_replies' => (array) $CI->config->item('ai_quick_replies', 'ai'),
 			'poll_interval_ms' => (int) $CI->config->item('support_poll_interval_ms', 'ai'),
+			'customer_logged_in' => $customerLoggedIn,
+			'login_url' => build_login_url(),
+			'register_url' => build_register_url(),
 		);
 
 		$CI->load->view('site/chat/widget', $data);

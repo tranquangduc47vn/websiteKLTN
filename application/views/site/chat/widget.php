@@ -7,7 +7,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 		<i class="fa-solid fa-comments" aria-hidden="true"></i>
 	</button>
 
-	<div id="support-chat-panel" class="support-chat-panel" hidden>
+	<div id="support-chat-panel" class="support-chat-panel<?php echo empty($customer_logged_in) ? ' is-login-required' : ''; ?>" hidden>
 		<div class="support-chat-panel__header">
 			<div class="support-chat-panel__avatar support-chat-panel__avatar--status" aria-hidden="true">
 				<i class="fa-solid fa-robot"></i>
@@ -16,7 +16,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 				<strong>Hỗ trợ khách hàng</strong>
 				<span id="support-chat-status" class="support-chat-panel__status">
 					<span class="support-chat-panel__dot" aria-hidden="true"></span>
-					<span id="support-chat-status-text">Trợ lý AI đang trực tuyến</span>
+					<span id="support-chat-status-text"><?php echo empty($customer_logged_in) ? 'Yêu cầu đăng nhập' : 'Trợ lý AI đang trực tuyến'; ?></span>
 				</span>
 			</div>
 			<button type="button" id="support-chat-close" class="support-chat-panel__close" aria-label="Đóng hỗ trợ khách hàng">
@@ -24,9 +24,31 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 			</button>
 		</div>
 
-		<div id="support-chat-messages" class="support-chat-panel__messages" role="log" aria-live="polite"></div>
+		<div class="support-chat-panel__body">
+			<div id="support-chat-messages" class="support-chat-panel__messages" role="log" aria-live="polite"<?php echo empty($customer_logged_in) ? ' hidden' : ''; ?>></div>
 
-		<div id="support-chat-quick-replies" class="support-chat-panel__quick-replies">
+			<div id="support-chat-login-gate" class="support-chat-panel__login-gate"<?php echo !empty($customer_logged_in) ? ' hidden' : ''; ?>>
+				<div class="support-chat-login-card">
+					<div class="support-chat-login-card__badge" aria-hidden="true">
+						<i class="fa-solid fa-user-lock"></i>
+					</div>
+					<h3 class="support-chat-login-card__title">Đăng nhập để chat</h3>
+					<p class="support-chat-login-card__text">Đăng nhập tài khoản để nhắn tin với trợ lý AI, tra cứu đơn hàng và kết nối nhân viên hỗ trợ.</p>
+					<div class="support-chat-login-card__actions">
+						<a href="<?php echo htmlspecialchars($login_url, ENT_QUOTES, 'UTF-8'); ?>" class="support-chat-login-card__btn support-chat-login-card__btn--primary">
+							<i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i>
+							<span>Đăng nhập</span>
+						</a>
+						<a href="<?php echo htmlspecialchars($register_url, ENT_QUOTES, 'UTF-8'); ?>" class="support-chat-login-card__btn support-chat-login-card__btn--ghost">
+							<span>Tạo tài khoản mới</span>
+						</a>
+					</div>
+					<p class="support-chat-login-card__hint">Miễn phí · Chỉ mất vài giây</p>
+				</div>
+			</div>
+		</div>
+
+		<div id="support-chat-quick-replies" class="support-chat-panel__quick-replies"<?php echo empty($customer_logged_in) ? ' hidden' : ''; ?>>
 			<?php
 			$quick_replies = isset($quick_replies) ? $quick_replies : array();
 			foreach ($quick_replies as $reply) {
@@ -39,7 +61,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 			<?php } ?>
 		</div>
 
-		<form id="support-chat-form" class="support-chat-panel__form">
+		<form id="support-chat-form" class="support-chat-panel__form"<?php echo empty($customer_logged_in) ? ' hidden' : ''; ?>>
 			<input type="text" id="support-chat-input" class="support-chat-panel__input" placeholder="Nhập tin nhắn..." autocomplete="off" maxlength="500">
 			<button type="submit" class="support-chat-panel__send" aria-label="Gửi">
 				<i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
@@ -58,9 +80,12 @@ window.__SUPPORT_CHAT_CONFIG__ = {
 	pollUrl: <?php echo json_encode(base_url('ai-assistant/poll'), JSON_UNESCAPED_UNICODE); ?>,
 	welcomeMessage: <?php echo json_encode((string) $welcome_message, $json_flags); ?>,
 	welcomeIntro: <?php echo json_encode((string) $welcome_intro, $json_flags); ?>,
-	pollIntervalMs: <?php echo (int) (isset($poll_interval_ms) ? $poll_interval_ms : 1500); ?>
+	pollIntervalMs: <?php echo (int) (isset($poll_interval_ms) ? $poll_interval_ms : 1500); ?>,
+	customerLoggedIn: <?php echo !empty($customer_logged_in) ? 'true' : 'false'; ?>,
+	loginUrl: <?php echo json_encode(isset($login_url) ? $login_url : build_login_url(), JSON_UNESCAPED_UNICODE); ?>,
+	registerUrl: <?php echo json_encode(isset($register_url) ? $register_url : build_register_url(), JSON_UNESCAPED_UNICODE); ?>
 };
 </script>
-<link rel="stylesheet" href="<?php echo site_asset_url('css/ai-chat.css'); ?>">
-<script src="<?php echo site_asset_url('js/ai-chat.js'); ?>?v=4" defer></script>
+<link rel="stylesheet" href="<?php echo site_asset_url('css/ai-chat.css'); ?>?v=2">
+<script src="<?php echo site_asset_url('js/ai-chat.js'); ?>?v=6" defer></script>
 <?php endif; ?>

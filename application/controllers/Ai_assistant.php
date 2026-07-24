@@ -8,6 +8,10 @@ class Ai_assistant extends MY_Frontend_Controller {
 	{
 		$this->output->set_content_type('application/json', 'utf-8');
 
+		if (!$this->_require_customer_login_json()) {
+			return;
+		}
+
 		if (!$this->input->post()) {
 			$this->output->set_output(json_encode(array('ok' => false, 'message' => 'Yêu cầu không hợp lệ.')));
 			return;
@@ -20,11 +24,10 @@ class Ai_assistant extends MY_Frontend_Controller {
 
 		$userLogin = $this->session->userdata('user');
 		$userId = ($userLogin && isset($userLogin->id)) ? (int) $userLogin->id : 0;
-		$guestToken = $userId > 0 ? '' : $this->_guest_token();
 
 		try {
 			$service = new SupportChatService();
-			$result = $service->handleCustomerMessage($message, $conversationId, $userId, $guestToken);
+			$result = $service->handleCustomerMessage($message, $conversationId, $userId, '');
 			if (!is_array($result)) {
 				$result = array('ok' => false, 'message' => 'Phản hồi không hợp lệ.');
 			}
@@ -46,6 +49,10 @@ class Ai_assistant extends MY_Frontend_Controller {
 	{
 		$this->output->set_content_type('application/json', 'utf-8');
 
+		if (!$this->_require_customer_login_json()) {
+			return;
+		}
+
 		$conversationId = (int) $this->input->get('conversation_id');
 		if ($conversationId <= 0) {
 			$this->output->set_output(json_encode(array('ok' => true, 'messages' => array())));
@@ -56,10 +63,9 @@ class Ai_assistant extends MY_Frontend_Controller {
 
 		$userLogin = $this->session->userdata('user');
 		$userId = ($userLogin && isset($userLogin->id)) ? (int) $userLogin->id : 0;
-		$guestToken = $this->session->userdata('ai_guest_token');
 
 		$service = new SupportChatService();
-		$result = $service->historyForCustomer($conversationId, $userId, (string) $guestToken);
+		$result = $service->historyForCustomer($conversationId, $userId, '');
 
 		$this->output->set_output(json_encode($result, JSON_UNESCAPED_UNICODE));
 	}
@@ -69,6 +75,10 @@ class Ai_assistant extends MY_Frontend_Controller {
 	{
 		$this->output->set_content_type('application/json', 'utf-8');
 
+		if (!$this->_require_customer_login_json()) {
+			return;
+		}
+
 		require_once APPPATH . 'services/support/PollingChatSyncService.php';
 
 		$conversationId = (int) $this->input->get('conversation_id');
@@ -76,21 +86,34 @@ class Ai_assistant extends MY_Frontend_Controller {
 
 		$userLogin = $this->session->userdata('user');
 		$userId = ($userLogin && isset($userLogin->id)) ? (int) $userLogin->id : 0;
-		$guestToken = $this->session->userdata('ai_guest_token');
 
 		$sync = new PollingChatSyncService();
-		$result = $sync->pollCustomer($conversationId, $afterId, $userId, (string) $guestToken);
+		$result = $sync->pollCustomer($conversationId, $afterId, $userId, '');
 
 		$this->output->set_output(json_encode($result, JSON_UNESCAPED_UNICODE));
 	}
 
-	protected function _guest_token()
+	protected function _customer_user_id()
 	{
-		$token = $this->session->userdata('ai_guest_token');
-		if (!$token) {
-			$token = function_exists('random_bytes') ? bin2hex(random_bytes(16)) : md5(uniqid('ai', true));
-			$this->session->set_userdata('ai_guest_token', $token);
+		$userLogin = $this->session->userdata('user');
+		return ($userLogin && isset($userLogin->id)) ? (int) $userLogin->id : 0;
+	}
+
+	protected function _require_customer_login_json()
+	{
+		if ($this->_customer_user_id() > 0) {
+			return true;
 		}
-		return $token;
+
+		$payload = array(
+			'ok' => false,
+			'login_required' => true,
+			'message' => 'Bạn cần đăng nhập tài khoản để sử dụng hỗ trợ khách hàng.',
+		);
+		if (function_exists('csrf_json_meta')) {
+			$payload = array_merge($payload, csrf_json_meta());
+		}
+		$this->output->set_output(json_encode($payload, JSON_UNESCAPED_UNICODE));
+		return false;
 	}
 }

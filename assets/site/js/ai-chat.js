@@ -7,6 +7,9 @@
 		return;
 	}
 
+	var customerLoggedIn = cfg.customerLoggedIn !== false && cfg.customerLoggedIn !== 'false';
+	var loginGateEl = document.getElementById('support-chat-login-gate');
+
 	var toggleBtn = document.getElementById('support-chat-toggle');
 	var panel = document.getElementById('support-chat-panel');
 	var closeBtn = document.getElementById('support-chat-close');
@@ -33,7 +36,33 @@
 		conversationId = 0;
 	}
 
-	document.body.classList.add('has-support-chat-widget');
+	function showLoginRequiredMessage() {
+		widget.classList.add('is-login-required');
+		if (loginGateEl) {
+			loginGateEl.hidden = false;
+		}
+		if (messagesEl) {
+			messagesEl.hidden = true;
+		}
+		if (quickRepliesEl) {
+			quickRepliesEl.hidden = true;
+		}
+		if (form) {
+			form.hidden = true;
+		}
+		if (statusTextEl) {
+			statusTextEl.textContent = 'Yêu cầu đăng nhập';
+		}
+		stopPolling();
+	}
+
+	function ensureLoggedIn() {
+		if (customerLoggedIn) {
+			return true;
+		}
+		showLoginRequiredMessage();
+		return false;
+	}
 
 	function escapeHtml(str) {
 		var div = document.createElement('div');
@@ -289,10 +318,15 @@
 			});
 	}
 
+	document.body.classList.add('has-support-chat-widget');
+
 	function openPanel() {
 		widget.classList.add('is-open');
 		panel.hidden = false;
 		toggleBtn.setAttribute('aria-expanded', 'true');
+		if (!ensureLoggedIn()) {
+			return;
+		}
 		if (!historyLoaded) {
 			loadHistory();
 		}
@@ -348,6 +382,9 @@
 		if (!text || sending || !cfg.sendUrl) {
 			return;
 		}
+		if (!ensureLoggedIn()) {
+			return;
+		}
 
 		appendMessage({ sender_type: 'customer', content: text, created: Math.floor(Date.now() / 1000), _local: true });
 		if (input) {
@@ -385,6 +422,11 @@
 
 				if (!data || !data.ok) {
 					removeLocalMessages();
+					if (data && data.login_required) {
+						customerLoggedIn = false;
+						showLoginRequiredMessage();
+						return;
+					}
 					var errMsg = (data && data.message)
 						? data.message
 						: 'Xin lỗi, có lỗi xảy ra. Vui lòng thử lại.';
