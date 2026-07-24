@@ -1,7 +1,7 @@
 <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12 clearpaddingr jm-pdp-lux">
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12 clearpadding">
         
-        <link rel="stylesheet" href="<?php echo site_asset_url('css/style-detail.css'); ?>?v=15" type="text/css">
+        <link rel="stylesheet" href="<?php echo site_asset_url('css/style-detail.css'); ?>?v=16" type="text/css">
         <link rel="stylesheet" href="<?php echo site_asset_url('css/stock-notice-modal.css'); ?>?v=1" type="text/css">
 
         <script src="<?php echo site_asset_url('js/product-detail.js'); ?>?v=3" type="text/javascript"></script>
@@ -343,6 +343,39 @@
                                 return { id: 0, stock: 0, color: color, size: size };
                             }
 
+                            function hasVariantMap() {
+                                return Object.keys(variantStocks).length > 0;
+                            }
+
+                            function isSizeAvailable(color, size) {
+                                if (!hasVariantMap()) {
+                                    return legacyProductStock > 0;
+                                }
+                                return (parseInt(resolveVariant(color, size).stock, 10) || 0) > 0;
+                            }
+
+                            function updateSizeAvailability(color) {
+                                $('#size-select .style2-square-box').each(function() {
+                                    var size = $(this).attr('data-value');
+                                    $(this).toggleClass('is-unavailable', !isSizeAvailable(color, size));
+                                });
+                            }
+
+                            function selectFirstAvailableSize() {
+                                var $sizes = $('#size-select .style2-square-box');
+                                var $active = $sizes.filter('.active');
+                                if ($active.length && !$active.hasClass('is-unavailable')) {
+                                    return;
+                                }
+                                var $first = $sizes.not('.is-unavailable').first();
+                                if (!$first.length) {
+                                    return;
+                                }
+                                $sizes.removeClass('active');
+                                $first.addClass('active');
+                                $('#input-size').val($first.attr('data-value'));
+                            }
+
                             function showStockNotice(color, size, stock) {
                                 if (!userInitiated) {
                                     return;
@@ -363,6 +396,9 @@
 
                             function refreshVariantStock() {
                                 var color = $('#input-color').val();
+                                updateSizeAvailability(color);
+                                selectFirstAvailableSize();
+
                                 var size = $('#input-size').val();
                                 var variant = resolveVariant(color, size);
                                 maxStock = parseInt(variant.stock, 10) || 0;
@@ -391,6 +427,9 @@
                             });
 
                             $('#size-select .style2-square-box').click(function() {
+                                if ($(this).hasClass('is-unavailable')) {
+                                    return false;
+                                }
                                 $('#size-select .style2-square-box').removeClass('active');
                                 $(this).addClass('active');
                                 $('#input-size').val($(this).attr('data-value'));

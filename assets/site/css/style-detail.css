@@ -415,6 +415,23 @@ div.col-md-3:has(form) {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
+.style2-square-box.is-unavailable {
+    opacity: 0.45 !important;
+    cursor: not-allowed !important;
+    pointer-events: none !important;
+    text-decoration: line-through !important;
+    color: #999 !important;
+    border-color: #ddd !important;
+    background: #f5f5f5 !important;
+    box-shadow: none !important;
+}
+
+.style2-square-box.is-unavailable.active {
+    background: #f5f5f5 !important;
+    color: #999 !important;
+    border-color: #ddd !important;
+}
+
 /* ==========================================================================
    5. SỐ LƯỢNG & NÚT THÊM GIỎ HÀNG
    ========================================================================== */
