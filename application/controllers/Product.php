@@ -56,7 +56,7 @@ class Product extends MY_Frontend_Controller {
         $id = intval($id);
         $product = $this->product_model->get_info($id);
         if (empty($product)) {
-            $this->session->set_flashdata('message_fail', 'Sản phẩm không tồn tại');
+            set_store_flash('fail', 'Sản phẩm không tồn tại');
             redirect(base_url());
         }
 
@@ -155,7 +155,22 @@ class Product extends MY_Frontend_Controller {
         $this->data['review_breakdown'] = $review_breakdown;
         $this->data['user_already_rated'] = $user_already_rated;
         $this->data['user_review'] = $user_review;
-        
+
+        $this->session->flashdata('stock_notice');
+        $this->data['message'] = $this->session->flashdata('message');
+
+        $default_color = '';
+        $default_size = '';
+        foreach ($this->data['variant_stock_map'] as $variant_row) {
+            if (!empty($variant_row['stock'])) {
+                $default_color = (string) $variant_row['color'];
+                $default_size = (string) $variant_row['size'];
+                break;
+            }
+        }
+        $this->data['default_variant_color'] = $default_color;
+        $this->data['default_variant_size'] = $default_size;
+
         $this->render_frontend_sub('site/product/view');
     }
 
@@ -776,21 +791,18 @@ class Product extends MY_Frontend_Controller {
 
         if ($id <= 0 || $score < 1 || $score > 5) {
             $result['msg'] = 'Dữ liệu đánh giá không hợp lệ';
-            echo json_encode($result);
-            exit();
+            $this->_json_raty_response($result);
         }
 
         $product = $this->product_model->get_info($id);
         if (!$product) {
             $result['msg'] = 'Sản phẩm không tồn tại';
-            echo json_encode($result);
-            exit();
+            $this->_json_raty_response($result);
         }
 
         if (!$this->db->table_exists('product_review')) {
             $result['msg'] = 'Chưa cấu hình bảng lưu đánh giá. Vui lòng chạy file SQL product_review.sql';
-            echo json_encode($result);
-            exit();
+            $this->_json_raty_response($result);
         }
 
         $user_login = $this->session->userdata('user');
@@ -803,8 +815,7 @@ class Product extends MY_Frontend_Controller {
             if ((int) $existing->stars === $score) {
                 $result['complete'] = TRUE;
                 $result['msg'] = 'Bạn đang đánh giá ' . $score . ' sao';
-                echo json_encode($result);
-                exit();
+                $this->_json_raty_response($result);
             }
 
             $this->product_review_model->update($existing->id, array(
@@ -817,8 +828,7 @@ class Product extends MY_Frontend_Controller {
             $result['complete'] = TRUE;
             $result['updated'] = TRUE;
             $result['msg'] = 'Đã cập nhật đánh giá thành ' . $score . ' sao';
-            echo json_encode($result);
-            exit();
+            $this->_json_raty_response($result);
         }
 
         $review_data = array(
@@ -832,16 +842,14 @@ class Product extends MY_Frontend_Controller {
 
         if (!$this->product_review_model->create($review_data)) {
             $result['msg'] = 'Không lưu được đánh giá, vui lòng thử lại';
-            echo json_encode($result);
-            exit();
+            $this->_json_raty_response($result);
         }
 
         $this->product_review_model->sync_product_stats($id);
 
         $result['complete'] = TRUE;
         $result['msg'] = 'Cảm ơn bạn đã đánh giá ' . $score . ' sao';
-        echo json_encode($result);
-        exit();
+        $this->_json_raty_response($result);
     }
 
     public function raty_undo()
@@ -851,21 +859,18 @@ class Product extends MY_Frontend_Controller {
 
         if ($id <= 0) {
             $result['msg'] = 'Dữ liệu không hợp lệ';
-            echo json_encode($result);
-            exit();
+            $this->_json_raty_response($result);
         }
 
         if (!$this->db->table_exists('product_review')) {
             $result['msg'] = 'Chưa cấu hình bảng lưu đánh giá';
-            echo json_encode($result);
-            exit();
+            $this->_json_raty_response($result);
         }
 
         $product = $this->product_model->get_info($id);
         if (!$product) {
             $result['msg'] = 'Sản phẩm không tồn tại';
-            echo json_encode($result);
-            exit();
+            $this->_json_raty_response($result);
         }
 
         $user_login = $this->session->userdata('user');
@@ -874,15 +879,23 @@ class Product extends MY_Frontend_Controller {
 
         if (!$this->product_review_model->delete_user_review($id, $user_id, $session_token)) {
             $result['msg'] = 'Bạn chưa đánh giá sản phẩm này';
-            echo json_encode($result);
-            exit();
+            $this->_json_raty_response($result);
         }
 
         $this->product_review_model->sync_product_stats($id);
 
         $result['complete'] = TRUE;
         $result['msg'] = 'Đã hoàn tác đánh giá. Bạn có thể đánh giá lại.';
-        echo json_encode($result);
+        $this->_json_raty_response($result);
+    }
+
+    private function _json_raty_response(array $result)
+    {
+        if ($this->config->item('csrf_protection') === TRUE) {
+            $this->load->helper('csrf');
+            $result = array_merge($result, csrf_json_meta());
+        }
+        echo json_encode($result, JSON_UNESCAPED_UNICODE);
         exit();
     }
 

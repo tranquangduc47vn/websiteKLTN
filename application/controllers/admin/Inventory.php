@@ -15,7 +15,7 @@ class Inventory extends MY_Admin_Controller {
 		$this->currentUser = $this->session->userdata('login');
 
 		if (!admin_can('inventory.view', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có quyền xem tồn kho.');
+			admin_flash_fail( 'Bạn không có quyền xem tồn kho.');
 			redirect(admin_url('home'));
 		}
 	}
@@ -44,7 +44,6 @@ class Inventory extends MY_Admin_Controller {
 		$this->data['catalog'] = $this->_list_catalog();
 		$this->data['can_adjust'] = admin_can('inventory.adjust', $this->currentUser);
 		$this->data['message'] = $this->session->flashdata('message');
-		$this->data['message_fail'] = $this->session->flashdata('message_fail');
 
 		$this->render_admin('admin/inventory/index');
 	}
@@ -65,7 +64,7 @@ class Inventory extends MY_Admin_Controller {
 			}
 			$variant = $this->product_variant_model->get_info($variant_id);
 			if (!$variant) {
-				$this->session->set_flashdata('message_fail', 'Biến thể không tồn tại.');
+				admin_flash_fail( 'Biến thể không tồn tại.');
 				redirect(admin_url('inventory'));
 			}
 			$this->db->select('product.name AS product_name');
@@ -80,7 +79,7 @@ class Inventory extends MY_Admin_Controller {
 		}
 
 		if (!admin_can('inventory.adjust', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có quyền kiểm kê tồn kho.');
+			admin_flash_fail( 'Bạn không có quyền kiểm kê tồn kho.');
 			redirect(admin_url('inventory'));
 		}
 
@@ -96,9 +95,9 @@ class Inventory extends MY_Admin_Controller {
 		);
 
 		if ($result['ok']) {
-			$this->session->set_flashdata('message', $result['message']);
+			admin_flash_info( $result['message']);
 		} else {
-			$this->session->set_flashdata('message_fail', $result['message']);
+			admin_flash_fail( $result['message']);
 		}
 		redirect(admin_url('inventory'));
 	}

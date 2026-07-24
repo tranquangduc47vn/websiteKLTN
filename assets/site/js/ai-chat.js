@@ -218,6 +218,12 @@
 		if (!Array.isArray(messages)) {
 			return;
 		}
+		var hasServerCustomer = messages.some(function (m) {
+			return m && m.sender_type === 'customer' && m.id;
+		});
+		if (hasServerCustomer) {
+			removeLocalMessages();
+		}
 		messages.forEach(function (m) {
 			appendMessage(m);
 		});
@@ -240,23 +246,26 @@
 
 	function pollOnce() {
 		if (!conversationId || !cfg.pollUrl) {
-			return;
+			return Promise.resolve(null);
 		}
 		var url = cfg.pollUrl + '?conversation_id=' + encodeURIComponent(conversationId)
 			+ '&after_id=' + encodeURIComponent(lastMessageId || 0);
 
-		fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+		return fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
 			.then(function (res) { return res.json(); })
 			.then(function (data) {
 				if (!data || !data.ok) {
-					return;
+					return data;
 				}
 				if (data.status) {
 					updateStatus(data.status, data.staff_name);
 				}
 				ingestMessages(data.messages);
+				return data;
 			})
-			.catch(function () {});
+			.catch(function () {
+				return null;
+			});
 	}
 
 	function openPanel() {
@@ -325,6 +334,9 @@
 		}
 
 		var body = 'message=' + encodeURIComponent(text) + '&conversation_id=' + encodeURIComponent(conversationId || 0);
+		if (window.CI_CSRF) {
+			body += '&' + encodeURIComponent(window.CI_CSRF.name) + '=' + encodeURIComponent(window.CI_CSRF.hash);
+		}
 
 		fetch(cfg.sendUrl, {
 			method: 'POST',
@@ -339,9 +351,9 @@
 			.then(function (data) {
 				hideTyping();
 				sending = false;
-				removeLocalMessages();
 
 				if (!data || !data.ok) {
+					removeLocalMessages();
 					appendMessage({ sender_type: 'ai', content: 'Xin lỗi, có lỗi xảy ra. Vui lòng thử lại.', created: Math.floor(Date.now() / 1000) });
 					return;
 				}
@@ -358,19 +370,20 @@
 					updateStatus(data.status, data.staff_name);
 				}
 
-				if (data.content) {
-					appendMessage({ sender_type: 'ai', content: data.content, created: Math.floor(Date.now() / 1000) });
+				if (data.handoff || data.connecting) {
+					updateStatus('waiting_staff');
 				}
 
 				if (Array.isArray(data.products) && data.products.length) {
 					renderProducts(data.products);
 				}
 
-				if (data.handoff || data.connecting) {
-					updateStatus('waiting_staff');
-				}
-
-				pollOnce();
+				return pollOnce().then(function (pollData) {
+					var gotMessages = pollData && Array.isArray(pollData.messages) && pollData.messages.length > 0;
+					if (!gotMessages && data.content) {
+						appendMessage({ sender_type: 'ai', content: data.content, created: Math.floor(Date.now() / 1000) });
+					}
+				});
 			})
 			.catch(function () {
 				hideTyping();

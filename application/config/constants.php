@@ -92,3 +92,9 @@ defined('ROLE_USER')  OR define('ROLE_USER', 2);
 /** Tên thương hiệu storefront (đổi một chỗ áp dụng toàn site). */
 defined('SHOP_NAME') OR define('SHOP_NAME', 'qD Design');
 defined('SHOP_NAME_UPPER') OR define('SHOP_NAME_UPPER', 'QD DESIGN');
+
+/**
+ * Encryption key for CodeIgniter Encryption library (32 chars).
+ * Override on production via environment-specific config if needed.
+ */
+defined('APP_ENCRYPTION_KEY') OR define('APP_ENCRYPTION_KEY', 'xK9mP2vL7nQ4wR8jT5yU3hF6gD1sA0b');

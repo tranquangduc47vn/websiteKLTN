@@ -4,7 +4,7 @@
         <div style="position:relative;display:inline-block;max-width:100%;">
         <?php echo product_discount_badge_html($product_data, 'jm-badge-discount'); ?>
         <a href="<?php echo build_product_url($product_data); ?>">
-            <img src="<?php echo base_url('upload/product/'.$product_data->image_link); ?>" 
+            <img src="<?php echo product_image_url($product_data->image_link); ?>" 
                  alt="<?php echo htmlspecialchars(product_display_name($product_data->name), ENT_QUOTES, 'UTF-8'); ?>" 
                  style="max-height: 150px; object-fit: contain; margin-bottom: 10px;">
         </a>

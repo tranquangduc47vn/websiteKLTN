@@ -205,6 +205,22 @@
 		});
 	}
 
+	window.adminPromptPost = function (formId, promptText) {
+		var reason = window.prompt(promptText);
+		if (reason === null || String(reason).trim() === '') {
+			return;
+		}
+		var form = document.getElementById(formId);
+		if (!form) {
+			return;
+		}
+		var input = form.querySelector('input[name="reason"]');
+		if (input) {
+			input.value = reason;
+		}
+		form.submit();
+	};
+
 	document.addEventListener('DOMContentLoaded', function () {
 		initLogout();
 		initSidebarAutoClose();

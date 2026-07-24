@@ -104,4 +104,4 @@ window.__SUPPORT_ADMIN_CHAT__ = {
 	pollIntervalMs: 1500
 };
 </script>
-<script src="<?php echo base_url('assets/admin/js/support-chat.js'); ?>"></script>
+<script src="<?php echo base_url('assets/admin/js/support-chat.js?v=2'); ?>"></script>

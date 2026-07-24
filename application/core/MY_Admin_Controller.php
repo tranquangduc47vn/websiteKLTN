@@ -18,11 +18,12 @@ class MY_Admin_Controller extends MY_Controller
 
 		if (!admin_can_access_panel($login)) {
 			$this->session->unset_userdata('login');
-			$this->session->set_flashdata('message_fail', 'Tài khoản không có quyền truy cập khu vực quản trị.');
+			admin_flash_fail('Tài khoản không có quyền truy cập khu vực quản trị.');
 			redirect(admin_url('login'));
 		}
 
 		$this->data['login'] = $login;
+		admin_discard_storefront_flash();
 	}
 
 	protected function render_admin($view, array $data = array())

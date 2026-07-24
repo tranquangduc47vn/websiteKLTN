@@ -12,13 +12,6 @@ $status_label = $this->stock_service->status_label($receipt->status);
 	</nav>
 </div>
 
-<?php if (!empty($message)) { ?>
-	<div class="alert alert-success"><?php echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8'); ?></div>
-<?php } ?>
-<?php if (!empty($message_fail)) { ?>
-	<div class="alert alert-danger"><?php echo htmlspecialchars($message_fail, ENT_QUOTES, 'UTF-8'); ?></div>
-<?php } ?>
-
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
 	<div>
 		<h1 class="h4 mb-1"><?php echo htmlspecialchars($receipt->receipt_code, ENT_QUOTES, 'UTF-8'); ?></h1>

@@ -15,6 +15,7 @@ class SupportChatService {
 	{
 		$logger = new ConversationLogger();
 		$conversation = $logger->resolveConversation($userId, $guestToken, $conversationId);
+		$this->attachUserToConversation($conversation, $userId);
 		$status = $this->normalizeStatus($conversation->status);
 
 		if ($status === self::STATUS_CLOSED) {
@@ -343,13 +344,30 @@ class SupportChatService {
 			return null;
 		}
 		$userId = (int) $userId;
+		$guestToken = (string) $guestToken;
 		if ($userId > 0 && (int) $conversation->user_id === $userId) {
 			return $conversation;
 		}
-		if ($userId === 0 && $guestToken !== '' && $conversation->guest_token === $guestToken) {
+		if ($guestToken !== '' && (string) $conversation->guest_token === $guestToken) {
 			return $conversation;
 		}
 		return null;
+	}
+
+	protected function attachUserToConversation($conversation, $userId)
+	{
+		if (!$conversation) {
+			return;
+		}
+		$userId = (int) $userId;
+		if ($userId <= 0 || (int) $conversation->user_id === $userId) {
+			return;
+		}
+
+		$CI =& get_instance();
+		$CI->load->model('ai_conversation_model');
+		$CI->ai_conversation_model->update((int) $conversation->id, array('user_id' => $userId));
+		$conversation->user_id = $userId;
 	}
 
 	protected function formatConversationRow($conversation)

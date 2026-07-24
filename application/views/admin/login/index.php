@@ -30,6 +30,7 @@
 				</header>
 
 				<form class="admin-form admin-login-form" method="post" novalidate>
+					<?php echo csrf_field(); ?>
 					<div class="mb-3">
 						<label class="form-label" for="email">E-mail</label>
 						<div class="admin-login-input-wrap">

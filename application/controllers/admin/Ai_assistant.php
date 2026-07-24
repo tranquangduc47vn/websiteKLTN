@@ -2,7 +2,7 @@
 defined('BASEPATH') OR exit('No direct script access allowed');
 
 // Admin cấu hình trợ lý, FAQ, lịch sử hội thoại (quyền ai.manage)
-class AiAssistant extends MY_Admin_Controller {
+class Ai_assistant extends MY_Admin_Controller {
 
 	protected $currentUser;
 
@@ -12,7 +12,7 @@ class AiAssistant extends MY_Admin_Controller {
 		$this->load->helper('permission');
 		$this->currentUser = $this->session->userdata('login');
 		if (!admin_can('ai.manage', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có quyền quản lý Trợ lý AI.');
+			admin_flash_fail( 'Bạn không có quyền quản lý Trợ lý AI.');
 			redirect(admin_url('home'));
 		}
 		$this->load->model('ai_setting_model');
@@ -29,7 +29,7 @@ class AiAssistant extends MY_Admin_Controller {
 				'welcome_message' => trim((string) $this->input->post('welcome_message')),
 				'working_hours_text' => trim((string) $this->input->post('working_hours_text')),
 			));
-			$this->session->set_flashdata('message', 'Đã lưu cấu hình Trợ lý AI.');
+			admin_flash_info( 'Đã lưu cấu hình Trợ lý AI.');
 			redirect(admin_url('ai-assistant/settings'));
 		}
 
@@ -41,7 +41,6 @@ class AiAssistant extends MY_Admin_Controller {
 			'working_hours_text' => $this->ai_setting_model->get('working_hours_text', ''),
 		);
 		$this->data['message'] = $this->session->flashdata('message');
-		$this->data['message_fail'] = $this->session->flashdata('message_fail');
 		$this->render_admin('admin/ai_assistant/settings');
 	}
 
@@ -74,7 +73,6 @@ class AiAssistant extends MY_Admin_Controller {
 	{
 		$this->data['list'] = $this->ai_faq_model->get_list(array('order' => array('sort_order', 'ASC')));
 		$this->data['message'] = $this->session->flashdata('message');
-		$this->data['message_fail'] = $this->session->flashdata('message_fail');
 		$this->render_admin('admin/ai_assistant/faq_index');
 	}
 
@@ -82,7 +80,7 @@ class AiAssistant extends MY_Admin_Controller {
 	{
 		$faq = $id > 0 ? $this->ai_faq_model->get_info($id) : null;
 		if ($id > 0 && !$faq) {
-			$this->session->set_flashdata('message_fail', 'FAQ không tồn tại.');
+			admin_flash_fail( 'FAQ không tồn tại.');
 			redirect(admin_url('ai-assistant/faq'));
 		}
 
@@ -97,28 +95,28 @@ class AiAssistant extends MY_Admin_Controller {
 			);
 
 			if ($data['question'] === '' || $data['answer'] === '') {
-				$this->session->set_flashdata('message_fail', 'Vui lòng nhập đủ câu hỏi và câu trả lời.');
+				admin_flash_fail( 'Vui lòng nhập đủ câu hỏi và câu trả lời.');
 			} else {
 				if ($id > 0) {
 					$this->ai_faq_model->update($id, $data);
-					$this->session->set_flashdata('message', 'Đã cập nhật FAQ.');
+					admin_flash_info( 'Đã cập nhật FAQ.');
 				} else {
 					$this->ai_faq_model->create($data);
-					$this->session->set_flashdata('message', 'Đã thêm FAQ.');
+					admin_flash_info( 'Đã thêm FAQ.');
 				}
 				redirect(admin_url('ai-assistant/faq'));
 			}
 		}
 
 		$this->data['faq'] = $faq;
-		$this->data['message_fail'] = $this->session->flashdata('message_fail');
 		$this->render_admin('admin/ai_assistant/faq_form');
 	}
 
 	protected function _faq_delete($id)
 	{
+		admin_require_post();
 		if ($id > 0 && $this->ai_faq_model->delete($id)) {
-			$this->session->set_flashdata('message', 'Đã xóa FAQ.');
+			admin_flash_info( 'Đã xóa FAQ.');
 		}
 		redirect(admin_url('ai-assistant/faq'));
 	}
@@ -139,12 +137,13 @@ class AiAssistant extends MY_Admin_Controller {
 		$this->ai_faq_model->update($id, array('is_active' => $newActive));
 
 		if ($this->input->is_ajax_request()) {
+			$this->load->helper('csrf');
 			$this->output->set_content_type('application/json', 'utf-8')
-				->set_output(json_encode(array(
+				->set_output(json_encode(array_merge(array(
 					'ok' => true,
 					'is_active' => $newActive,
 					'label' => $newActive ? 'Đang bật' : 'Tắt',
-				)));
+				), csrf_json_meta()), JSON_UNESCAPED_UNICODE));
 			return;
 		}
 
@@ -167,7 +166,7 @@ class AiAssistant extends MY_Admin_Controller {
 
 		$conversation = $this->ai_conversation_model->get_info($id);
 		if (!$conversation) {
-			$this->session->set_flashdata('message_fail', 'Hội thoại không tồn tại.');
+			admin_flash_fail( 'Hội thoại không tồn tại.');
 			redirect(admin_url('ai-assistant/conversations'));
 		}
 

@@ -32,18 +32,6 @@ class News extends MY_Admin_Controller {
 
 	{
 
-		$message_success = $this->session->flashdata('message_success');
-
-		$this->data['message_success'] = $message_success;
-
-
-
-		$message_fail = $this->session->flashdata('message_fail');
-
-		$this->data['message_fail'] = $message_fail;
-
-
-
 		$input = array();
 
 		$input['order'] = array('id' , 'DESC');
@@ -118,13 +106,13 @@ class News extends MY_Admin_Controller {
 
 				if ($this->news_model->create($data)) {
 
-					$this->session->set_flashdata('message_success', 'Thêm tin tức thành công');
+					admin_flash_success( 'Thêm tin tức thành công');
 
 				} else {
 
 					$this->db->insert('news', $data);
 
-					$this->session->set_flashdata('message_success', 'Thêm tin tức thành công');
+					admin_flash_success( 'Thêm tin tức thành công');
 
 				}
 
@@ -152,7 +140,7 @@ class News extends MY_Admin_Controller {
 
 		if (empty($news)) {
 
-			$this->session->set_flashdata('message_fail', 'Bài viết không tồn tại');
+			admin_flash_fail( 'Bài viết không tồn tại');
 
 			redirect(admin_url('news'));
 
@@ -216,11 +204,11 @@ class News extends MY_Admin_Controller {
 
 				if ($this->news_model->update($id, $data)) {
 
-					$this->session->set_flashdata('message_success', 'Cập nhật tin tức thành công');
+					admin_flash_success( 'Cập nhật tin tức thành công');
 
 				} else {
 
-					$this->session->set_flashdata('message_fail', 'Cập nhật tin tức thất bại');
+					admin_flash_fail( 'Cập nhật tin tức thất bại');
 
 				}
 
@@ -242,6 +230,8 @@ class News extends MY_Admin_Controller {
 
 	{
 
+		admin_require_post();
+
 		$id = $this->uri->segment(4);
 
 		$news = $this->news_model->get_info($id);
@@ -250,7 +240,7 @@ class News extends MY_Admin_Controller {
 
 		if (empty($news)) {
 
-			$this->session->set_flashdata('message_fail', 'Bài viết không tồn tại');
+			admin_flash_fail( 'Bài viết không tồn tại');
 
 			redirect(admin_url('news'));
 
@@ -268,11 +258,11 @@ class News extends MY_Admin_Controller {
 
 			}
 
-			$this->session->set_flashdata('message_success', 'Xóa bài viết thành công');
+			admin_flash_success( 'Xóa bài viết thành công');
 
 		} else {
 
-			$this->session->set_flashdata('message_fail', 'Xóa bài viết thất bại');
+			admin_flash_fail( 'Xóa bài viết thất bại');
 
 		}
 

@@ -20,8 +20,6 @@
 		</div>
 	</div>
 	<div class="admin-card-body">
-		<?php if (!empty($message_success)) { ?><div class="alert alert-success"><?php echo $message_success; ?></div><?php } ?>
-		<?php if (!empty($message_fail)) { ?><div class="alert alert-danger"><?php echo $message_fail; ?></div><?php } ?>
 		<div class="table-responsive">
 			<table class="table table-hover admin-table" id="newsListTable">
 				<thead>
@@ -43,7 +41,7 @@
 								<td class="text-center"><?php echo date('d/m/Y H:i', strtotime($row->created)); ?></td>
 								<td class="text-center">
 									<a class="btn btn-sm btn-outline-primary me-1" href="<?php echo admin_url('news/edit/' . $row->id); ?>"><i class="fa-solid fa-pen"></i></a>
-									<a class="btn btn-sm btn-outline-danger" href="<?php echo admin_url('news/del/' . $row->id); ?>" onclick="return confirm('Bạn chắc chắn muốn xóa bài viết này?')"><i class="fa-solid fa-trash"></i></a>
+									<?php echo admin_csrf_post_button(admin_url('news/del/' . $row->id), '<i class="fa-solid fa-trash"></i>', array('confirm' => 'Bạn chắc chắn muốn xóa bài viết này?')); ?>
 								</td>
 							</tr>
 						<?php } ?>

@@ -22,12 +22,14 @@ class Order extends MY_Frontend_Controller {
 
         $sanitize = $this->_sanitize_cart($carts);
         $carts = $sanitize['cart'];
-        if (!empty($sanitize['removed'])) {
+        if (!empty($sanitize['removed']) || !empty($sanitize['changed'])) {
             $this->session->set_userdata('custom_cart', $carts);
-            $this->session->set_flashdata(
-                'message',
-                'Một số sản phẩm không còn bán (' . implode(', ', $sanitize['removed']) . ') và đã được xóa khỏi giỏ hàng.'
-            );
+            if (!empty($sanitize['removed'])) {
+                $this->session->set_flashdata(
+                    'message',
+                    'Một số sản phẩm không còn bán (' . implode(', ', $sanitize['removed']) . ') và đã được xóa khỏi giỏ hàng.'
+                );
+            }
             if (empty($carts)) {
                 redirect(build_cart_url());
             }
@@ -71,6 +73,9 @@ class Order extends MY_Frontend_Controller {
                         'Không thể đặt hàng: sản phẩm "' . implode('", "', $sanitize['removed']) . '" không còn tồn tại. Vui lòng kiểm tra lại giỏ hàng.'
                     );
                     redirect(build_cart_url());
+                }
+                if (!empty($sanitize['changed'])) {
+                    $this->session->set_userdata('custom_cart', $carts);
                 }
                 if (empty($carts)) {
                     $this->session->set_flashdata('message', 'Giỏ hàng trống, không thể đặt hàng.');
@@ -221,7 +226,7 @@ class Order extends MY_Frontend_Controller {
 
         $subtotal = $this->_cart_subtotal();
         if ($subtotal <= 0) {
-            echo json_encode(array('ok' => false, 'message' => 'Giỏ hàng trống.'));
+            echo json_encode(array_merge(array('ok' => false, 'message' => 'Giỏ hàng trống.'), csrf_json_meta()));
             return;
         }
 
@@ -230,7 +235,7 @@ class Order extends MY_Frontend_Controller {
             $user_id = (int) $this->session->userdata('user')->id;
         }
         if ($user_id <= 0) {
-            echo json_encode(array('ok' => false, 'message' => 'Vui lòng đăng nhập để dùng voucher.'));
+            echo json_encode(array_merge(array('ok' => false, 'message' => 'Vui lòng đăng nhập để dùng voucher.'), csrf_json_meta()));
             return;
         }
 
@@ -240,7 +245,7 @@ class Order extends MY_Frontend_Controller {
 
         if ($code === '') {
             $this->session->unset_userdata('checkout_voucher');
-            echo json_encode(array(
+            echo json_encode(array_merge(array(
                 'ok' => true,
                 'cleared' => true,
                 'message' => 'Đã bỏ mã voucher.',
@@ -249,14 +254,14 @@ class Order extends MY_Frontend_Controller {
                 'final' => $subtotal,
                 'subtotal_fmt' => $this->_money_fmt($subtotal),
                 'final_fmt' => $this->_money_fmt($subtotal),
-            ));
+            ), csrf_json_meta()));
             return;
         }
 
         $check = $this->voucher_model->validate_for_checkout($code, $user_id, $subtotal);
         if (!$check['ok']) {
             $this->session->unset_userdata('checkout_voucher');
-            echo json_encode(array('ok' => false, 'message' => $check['message']));
+            echo json_encode(array_merge(array('ok' => false, 'message' => $check['message']), csrf_json_meta()));
             return;
         }
 
@@ -276,7 +281,7 @@ class Order extends MY_Frontend_Controller {
         }
         $msg .= '.';
 
-        echo json_encode(array(
+        echo json_encode(array_merge(array(
             'ok' => true,
             'message' => $msg,
             'subtotal' => $subtotal,
@@ -285,7 +290,7 @@ class Order extends MY_Frontend_Controller {
             'subtotal_fmt' => $this->_money_fmt($subtotal),
             'discount_fmt' => $this->_money_fmt($discount),
             'final_fmt' => $this->_money_fmt($final),
-        ));
+        ), csrf_json_meta()));
     }
 
     public function checkout_qr()
@@ -331,7 +336,15 @@ class Order extends MY_Frontend_Controller {
     }
     public function cancel()
     {
-        $transaction_id = $this->uri->segment(3);
+        if ($this->input->method() !== 'post') {
+            show_404();
+            return;
+        }
+
+        $transaction_id = $this->input->post('transaction_id');
+        if (empty($transaction_id)) {
+            $transaction_id = $this->uri->segment(3);
+        }
         if (empty($transaction_id)) {
             $this->session->set_flashdata('message', 'Không tìm thấy mã đơn hàng!');
             redirect(base_url());
@@ -356,8 +369,8 @@ class Order extends MY_Frontend_Controller {
             redirect(base_url('user'));
         }
 
-        $reason = $this->input->get('reason');
-        $reason = !empty($reason) ? trim(urldecode($reason)) : "Khách hàng tự hủy đơn";
+        $reason = $this->input->post('reason');
+        $reason = !empty($reason) ? trim((string) $reason) : 'Khách hàng tự hủy đơn';
 
         // Hoàn kho + loyalty; status 4 = đã hủy
         if ($transaction->status != '4') {
@@ -416,8 +429,12 @@ class Order extends MY_Frontend_Controller {
         if (!is_array($carts)) {
             return 0;
         }
+        $sanitize = $this->_sanitize_cart($carts);
+        if (!empty($sanitize['changed']) || !empty($sanitize['removed'])) {
+            $this->session->set_userdata('custom_cart', $sanitize['cart']);
+        }
         $total = 0;
-        foreach ($carts as $value) {
+        foreach ($sanitize['cart'] as $value) {
             $total += (int) $value['subtotal'];
         }
         return $total;
@@ -466,25 +483,72 @@ class Order extends MY_Frontend_Controller {
     {
         $clean = array();
         $removed = array();
+        $changed = FALSE;
 
         foreach ($carts as $rowid => $item) {
             $product_id = isset($item['id']) ? (int) $item['id'] : 0;
             if ($product_id <= 0) {
+                $changed = TRUE;
                 continue;
             }
 
             $product = $this->product_model->get_info($product_id);
             if (empty($product)) {
                 $removed[] = !empty($item['name']) ? $item['name'] : ('#' . $product_id);
+                $changed = TRUE;
                 continue;
+            }
+
+            $size = isset($item['options']['size']) ? (string) $item['options']['size'] : '';
+            $color = isset($item['options']['color']) ? (string) $item['options']['color'] : '';
+            $qty = max(1, (int) (isset($item['qty']) ? $item['qty'] : 1));
+
+            $check = $this->product_service->validate_cart_quantity($product_id, $color, $size, $qty, 0, FALSE);
+            if (!$check['ok']) {
+                $removed[] = (string) $product->name;
+                $changed = TRUE;
+                continue;
+            }
+
+            $price = floatval($product->price);
+            if ($product->discount > 0) {
+                $price = floatval($product->price - $product->discount);
+            }
+            if ($price <= 0) {
+                $price = 1000;
+            }
+
+            $subtotal = $price * $qty;
+            if (!isset($item['options']) || !is_array($item['options'])) {
+                $item['options'] = array();
+            }
+
+            $item['price'] = $price;
+            $item['qty'] = $qty;
+            $item['subtotal'] = $subtotal;
+            $item['variant_id'] = (int) $check['variant_id'];
+            $item['name'] = $product->name;
+            $item['options']['size'] = $check['size'];
+            $item['options']['color'] = $check['color'];
+
+            if (!isset($carts[$rowid])
+                || (float) $carts[$rowid]['price'] !== $price
+                || (float) $carts[$rowid]['subtotal'] !== $subtotal
+                || (int) (isset($carts[$rowid]['variant_id']) ? $carts[$rowid]['variant_id'] : 0) !== (int) $check['variant_id']) {
+                $changed = TRUE;
             }
 
             $clean[$rowid] = $item;
         }
 
+        if (count($clean) !== count($carts)) {
+            $changed = TRUE;
+        }
+
         return array(
             'cart' => $clean,
             'removed' => $removed,
+            'changed' => $changed,
         );
     }
 }

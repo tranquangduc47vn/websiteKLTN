@@ -128,9 +128,11 @@
 									
 									<?php if ($transaction->status == '0') { ?>
 										<td class="text-center" style="vertical-align: middle;">
-											<a href="<?php echo admin_url('transaction/deldetail/'.$value->order_id) ?>" title="Xóa sản phẩm này khỏi đơn" class="btn btn-sm btn-outline-danger" onclick="return confirm('Bạn chắc chắn muốn xóa sản phẩm này?')">
-												<i class="fa-solid fa-trash"></i>
-											</a>
+											<?php echo admin_csrf_post_button(
+												admin_url('transaction/deldetail/' . $value->order_id),
+												'<i class="fa-solid fa-trash"></i>',
+												array('title' => 'Xóa sản phẩm này khỏi đơn', 'confirm' => 'Bạn chắc chắn muốn xóa sản phẩm này?')
+											); ?>
 										</td> 
 									<?php } ?>
 								</tr>
@@ -143,13 +145,13 @@
 			<h4 class="h6 fw-bold mb-3">Thao tác xử lý đơn hàng</h4>
 			<?php if ($transaction->status == '0') { ?>
 				<a href="<?php echo admin_url('transaction/accept/'.$transaction->id); ?>" class="btn btn-success"><i class="fa-solid fa-check me-1"></i> Xác nhận đơn hàng này</a>
-				<a href="#" class="btn btn-danger" onclick="var reason = prompt('Nhập lý do hủy đơn hàng này:'); if(reason != null && reason != '') { window.location.href = '<?php echo admin_url('transaction/cancel/'.$transaction->id); ?>?reason=' + encodeURIComponent(reason); } return false;"><i class="fa-solid fa-ban me-1"></i> Hủy bỏ đơn</a>
+				<?php echo admin_prompt_post_button(admin_url('transaction/cancel/' . $transaction->id), '<i class="fa-solid fa-ban me-1"></i> Hủy bỏ đơn', 'Nhập lý do hủy đơn hàng này:'); ?>
 			<?php } elseif ($transaction->status == '1') { ?>
 				<a href="<?php echo admin_url('transaction/ship/'.$transaction->id); ?>" class="btn btn-primary"><i class="fa-solid fa-truck me-1"></i> Bàn giao cho Shipper giao hàng</a>
-				<a href="#" class="btn btn-danger" onclick="var reason = prompt('Nhập lý do hủy đơn hàng này:'); if(reason != null && reason != '') { window.location.href = '<?php echo admin_url('transaction/cancel/'.$transaction->id); ?>?reason=' + encodeURIComponent(reason); } return false;"><i class="fa-solid fa-ban me-1"></i> Hủy bỏ đơn</a>
+				<?php echo admin_prompt_post_button(admin_url('transaction/cancel/' . $transaction->id), '<i class="fa-solid fa-ban me-1"></i> Hủy bỏ đơn', 'Nhập lý do hủy đơn hàng này:'); ?>
 			<?php } elseif ($transaction->status == '2') { ?>
 				<a href="<?php echo admin_url('transaction/complete/'.$transaction->id); ?>" class="btn btn-success"><i class="fa-solid fa-circle-check me-1"></i> Xác nhận: Khách đã nhận hàng thành công</a>
-				<a href="#" class="btn btn-warning" onclick="var reason = prompt('Nhập lý do khách trả hàng / bùng hàng:'); if(reason != null && reason != '') { window.location.href = '<?php echo admin_url('transaction/cancel/'.$transaction->id); ?>?reason=' + encodeURIComponent(reason); } return false;"><i class="fa-solid fa-rotate-left me-1"></i> Khách bùng hàng (Hoàn đơn)</a>
+				<?php echo admin_prompt_post_button(admin_url('transaction/cancel/' . $transaction->id), '<i class="fa-solid fa-rotate-left me-1"></i> Khách bùng hàng (Hoàn đơn)', 'Nhập lý do khách trả hàng / bùng hàng:', array('class' => 'btn btn-warning')); ?>
 			<?php } elseif ($transaction->status == '3') { ?>
 				<div class="alert alert-success mb-0"><i class="fa-solid fa-circle-check me-1"></i> <strong>Đơn hàng hoàn tất:</strong> Đơn hàng đã được giao thành công và hệ thống đã ghi nhận doanh thu cùng số lượng sản phẩm bán ra.</div>
 			<?php } elseif ($transaction->status == '4') { ?>

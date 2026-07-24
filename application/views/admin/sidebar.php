@@ -37,13 +37,14 @@ $admin_menu_info = array(
 	array('slug' => 'posts', 'url' => admin_url('posts'), 'icon' => 'fa-solid fa-newspaper', 'label' => 'Quản lý tin tức'),
 	array('slug' => 'page', 'url' => admin_url('page'), 'icon' => 'fa-solid fa-file-lines', 'label' => 'Quản lý trang'),
 	array('slug' => 'banner', 'url' => admin_url('banner'), 'icon' => 'fa-solid fa-panorama', 'label' => 'Banner danh mục'),
+	array('slug' => 'branding', 'url' => admin_url('branding'), 'icon' => 'fa-solid fa-image', 'label' => 'Logo website'),
 	array('slug' => 'store', 'url' => admin_url('store'), 'icon' => 'fa-solid fa-map-location-dot', 'label' => 'Quản lý bản đồ'),
 	array('slug' => 'tuyendung', 'url' => admin_url('tuyendung'), 'icon' => 'fa-solid fa-briefcase', 'label' => 'Tuyển dụng'),
 	array('slug' => 'hoptac', 'url' => admin_url('hoptac'), 'icon' => 'fa-solid fa-handshake', 'label' => 'Quản lý hợp tác'),
 	array('slug' => 'vanchuyen', 'url' => admin_url('vanchuyen'), 'icon' => 'fa-solid fa-truck', 'label' => 'Chính sách vận chuyển'),
 );
 
-$info_slugs = array('catalog', 'posts', 'page', 'banner', 'store', 'tuyendung', 'hoptac', 'vanchuyen');
+$info_slugs = array('catalog', 'posts', 'page', 'banner', 'branding', 'store', 'tuyendung', 'hoptac', 'vanchuyen');
 $info_section_open = in_array($current, $info_slugs, true);
 ?>
 

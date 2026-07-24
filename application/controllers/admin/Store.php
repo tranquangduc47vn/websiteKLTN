@@ -38,9 +38,7 @@ class Store extends MY_Admin_Controller {
 
     public function index() {
 
-        $this->data['message_success'] = $this->session->flashdata('message_success');
 
-        $this->data['message_fail']    = $this->session->flashdata('message_fail');
 
         $this->data['list_stores']     = $this->store_model->get_all();
 
@@ -74,7 +72,7 @@ class Store extends MY_Admin_Controller {
 
             if ($this->store_model->add($insert_data)) {
 
-                $this->session->set_flashdata('message_success', 'Thêm mới cửa hàng thành công!');
+                admin_flash_success( 'Thêm mới cửa hàng thành công!');
 
                 redirect(base_url('admin/store'));
 
@@ -98,7 +96,7 @@ class Store extends MY_Admin_Controller {
 
         if (!$store) {
 
-            $this->session->set_flashdata('message_fail', 'Không tồn tại cửa hàng này!');
+            admin_flash_fail( 'Không tồn tại cửa hàng này!');
 
             redirect(base_url('admin/store'));
 
@@ -126,7 +124,7 @@ class Store extends MY_Admin_Controller {
 
             if ($this->store_model->update($id, $update_data)) {
 
-                $this->session->set_flashdata('message_success', 'Cập nhật thông tin thành công!');
+                admin_flash_success( 'Cập nhật thông tin thành công!');
 
                 redirect(base_url('admin/store'));
 
@@ -147,14 +145,14 @@ class Store extends MY_Admin_Controller {
 
 
     public function delete($id) {
-
+        admin_require_post();
         $store = $this->store_model->get_by_id($id);
 
         if ($store) {
 
             $this->store_model->delete($id);
 
-            $this->session->set_flashdata('message_success', 'Xóa cửa hàng thành công!');
+            admin_flash_success( 'Xóa cửa hàng thành công!');
 
         }
 

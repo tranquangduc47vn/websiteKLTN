@@ -38,7 +38,7 @@ if (!function_exists('render_bestseller_card')) {
     {
         $product_link = build_product_url($value);
         $name = product_display_name($value->name);
-        $img = base_url('upload/product/' . $value->image_link);
+        $img = product_image_url($value->image_link);
         $in_stock = product_is_in_stock($value);
         ?>
         <li class="jm-bs-card<?php echo $in_stock ? '' : ' jm-bs-card--out-of-stock'; ?>">

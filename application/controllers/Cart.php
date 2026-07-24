@@ -15,8 +15,8 @@ class Cart extends MY_Frontend_Controller {
     {
         if (!$this->session->userdata('user')) {
             $this->session->set_userdata('redirect_back', current_url());
-            $this->session->set_flashdata('message', 'Bạn cần đăng nhập tài khoản để thực hiện chức năng này!');
-            redirect(base_url('user/login'));
+            set_auth_flash('fail', 'Bạn cần đăng nhập để thêm sản phẩm vào giỏ hàng.');
+            redirect(build_login_url());
         }
     }
 
@@ -102,6 +102,90 @@ class Cart extends MY_Frontend_Controller {
         return $items;
     }
 
+    private function _recalculate_cart_prices($carts)
+    {
+        if (!is_array($carts) || empty($carts)) {
+            return array(
+                'cart' => array(),
+                'removed' => array(),
+                'changed' => FALSE,
+            );
+        }
+
+        $clean = array();
+        $removed = array();
+        $changed = FALSE;
+
+        foreach ($carts as $rowid => $item) {
+            $product_id = isset($item['id']) ? (int) $item['id'] : 0;
+            if ($product_id <= 0) {
+                $changed = TRUE;
+                continue;
+            }
+
+            $product = $this->product_model->get_info($product_id);
+            if (empty($product)) {
+                $removed[] = !empty($item['name']) ? (string) $item['name'] : ('#' . $product_id);
+                $changed = TRUE;
+                continue;
+            }
+
+            $size = isset($item['options']['size']) ? (string) $item['options']['size'] : '';
+            $color = isset($item['options']['color']) ? (string) $item['options']['color'] : '';
+            $qty = max(1, (int) (isset($item['qty']) ? $item['qty'] : 1));
+
+            $check = $this->product_service->validate_cart_quantity($product_id, $color, $size, $qty, 0, FALSE);
+            if (!$check['ok']) {
+                $removed[] = (string) $product->name;
+                $changed = TRUE;
+                continue;
+            }
+
+            $price = floatval($product->price);
+            if ($product->discount > 0) {
+                $price = floatval($product->price - $product->discount);
+            }
+            if ($price <= 0) {
+                $price = 1000;
+            }
+
+            $subtotal = $price * $qty;
+            if (!isset($item['options']) || !is_array($item['options'])) {
+                $item['options'] = array();
+            }
+
+            $item['price'] = $price;
+            $item['qty'] = $qty;
+            $item['subtotal'] = $subtotal;
+            $item['variant_id'] = (int) $check['variant_id'];
+            $item['name'] = $product->name;
+            $item['options']['size'] = $check['size'];
+            $item['options']['color'] = $check['color'];
+            if (empty($item['options']['image_link']) && !empty($product->image_link)) {
+                $item['options']['image_link'] = $product->image_link;
+            }
+
+            if (!isset($carts[$rowid])
+                || (float) $carts[$rowid]['price'] !== $price
+                || (float) $carts[$rowid]['subtotal'] !== $subtotal
+                || (int) $carts[$rowid]['variant_id'] !== (int) $check['variant_id']) {
+                $changed = TRUE;
+            }
+
+            $clean[$rowid] = $item;
+        }
+
+        if (count($clean) !== count($carts)) {
+            $changed = TRUE;
+        }
+
+        return array(
+            'cart' => $clean,
+            'removed' => $removed,
+            'changed' => $changed,
+        );
+    }
+
     private function _sanitize_cart_session()
     {
         $carts = $this->session->userdata('custom_cart');
@@ -129,6 +213,9 @@ class Cart extends MY_Frontend_Controller {
 
     private function _json_response($payload, $status = 200)
     {
+        if ($this->config->item('csrf_protection') === TRUE) {
+            $payload = array_merge($payload, csrf_json_meta());
+        }
         $this->output
             ->set_status_header((int) $status)
             ->set_content_type('application/json', 'utf-8')
@@ -166,12 +253,62 @@ class Cart extends MY_Frontend_Controller {
             return null;
         }
 
-        return array(
+        $payload = array(
             'product_name' => isset($extra['product_name']) ? (string) $extra['product_name'] : '',
             'size' => isset($extra['size']) ? (string) $extra['size'] : '',
             'color' => isset($extra['color']) ? (string) $extra['color'] : '',
             'stock' => (int) $extra['stock'],
         );
+
+        if (isset($extra['product_id'])) {
+            $payload['product_id'] = (int) $extra['product_id'];
+        }
+        if (!empty($extra['rowid'])) {
+            $payload['rowid'] = (string) $extra['rowid'];
+        }
+
+        return $payload;
+    }
+
+    private function _stock_notice_applies_to_cart($notice, $carts)
+    {
+        if (!is_array($notice) || empty($carts) || !is_array($carts)) {
+            return false;
+        }
+
+        if (!empty($notice['rowid']) && isset($carts[$notice['rowid']])) {
+            return true;
+        }
+
+        if (empty($notice['product_id'])) {
+            return false;
+        }
+
+        $product_id = (int) $notice['product_id'];
+        $notice_size = isset($notice['size']) ? (string) $notice['size'] : '';
+        $notice_color = isset($notice['color']) ? (string) $notice['color'] : '';
+
+        foreach ($carts as $item) {
+            $item_id = isset($item['id']) ? (int) $item['id'] : 0;
+            if ($item_id !== $product_id) {
+                continue;
+            }
+
+            if ($notice_size !== '' || $notice_color !== '') {
+                $item_size = isset($item['options']['size']) ? (string) $item['options']['size'] : '';
+                $item_color = isset($item['options']['color']) ? (string) $item['options']['color'] : '';
+                if ($notice_size !== '' && $notice_size !== $item_size) {
+                    continue;
+                }
+                if ($notice_color !== '' && $notice_color !== $item_color) {
+                    continue;
+                }
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     private function _cart_fail($message, $extra = array())
@@ -188,12 +325,7 @@ class Cart extends MY_Frontend_Controller {
             return true;
         }
 
-        $stock_notice = $this->_cart_stock_notice_payload($extra);
-        if ($stock_notice !== null) {
-            $this->session->set_flashdata('stock_notice', $stock_notice);
-        } else {
-            $this->session->set_flashdata('message', $message);
-        }
+        $this->session->set_flashdata('message', $message);
         redirect(build_cart_url());
         return true;
     }
@@ -225,7 +357,7 @@ class Cart extends MY_Frontend_Controller {
         }
         $this->session->set_userdata('redirect_back', current_url());
         $this->session->set_flashdata('message', 'Bạn cần đăng nhập tài khoản để thực hiện chức năng này!');
-        redirect(base_url('user/login'));
+        redirect(build_login_url());
         return false;
     }
 
@@ -234,8 +366,9 @@ class Cart extends MY_Frontend_Controller {
         $this->_check_login();
 
         $this->data['message'] = $this->session->flashdata('message');
-        $this->data['stock_notice'] = $this->session->flashdata('stock_notice');
-        
+        // Cart never auto-shows stock_notice from flash (stale notices from failed add elsewhere).
+        $this->session->flashdata('stock_notice');
+
         $carts = $this->session->userdata('custom_cart');
         if (!is_array($carts)) { 
             $carts = array(); 
@@ -245,6 +378,18 @@ class Cart extends MY_Frontend_Controller {
         $carts = $this->session->userdata('custom_cart');
         if (!is_array($carts)) {
             $carts = array();
+        }
+
+        $recalc = $this->_recalculate_cart_prices($carts);
+        $carts = $recalc['cart'];
+        if ($recalc['changed']) {
+            $this->session->set_userdata('custom_cart', $carts);
+        }
+        if (!empty($recalc['removed'])) {
+            $this->session->set_flashdata(
+                'message',
+                'Một số sản phẩm đã được cập nhật giá hoặc không còn khả dụng: ' . implode(', ', $recalc['removed'])
+            );
         }
         
         $this->data['carts'] = $this->_enrich_cart_items($carts);
@@ -295,13 +440,8 @@ class Cart extends MY_Frontend_Controller {
 
         $check = $this->product_service->validate_cart_quantity($id, $color, $size, $qty, $existing_qty, false);
         if (!$check['ok']) {
-            $this->session->set_flashdata('stock_notice', array(
-                'product_name' => (string) $product->name,
-                'size' => $check['size'],
-                'color' => $check['color'],
-                'stock' => isset($check['stock']) ? (int) $check['stock'] : 0,
-            ));
-            redirect(build_cart_url());
+            $this->session->set_flashdata('message', $check['message']);
+            redirect(build_product_url($product));
         }
 
         $variant_id = (int) $check['variant_id'];
@@ -401,6 +541,7 @@ class Cart extends MY_Frontend_Controller {
             $this->_cart_fail($check['message'], array(
                 'action' => 'options',
                 'rowid' => $rowid,
+                'product_id' => (int) $item['id'],
                 'product_name' => (string) $product->name,
                 'size' => $check['size'],
                 'color' => $check['color'],
@@ -445,12 +586,22 @@ class Cart extends MY_Frontend_Controller {
 
     public function update()
     {
+        if ($this->input->method() !== 'post') {
+            show_404();
+            return;
+        }
+
         if (!$this->_require_login_for_cart()) {
             return;
         }
 
-        $rowid = $this->uri->segment(3);
-        $action = $this->uri->segment(4);
+        $rowid = trim((string) $this->input->post('rowid'));
+        $action = trim((string) $this->input->post('action'));
+
+        if ($rowid === '' || $action === '') {
+            $this->_cart_fail('Yêu cầu không hợp lệ');
+            return;
+        }
         
         $current_cart = $this->session->userdata('custom_cart');
         if (!is_array($current_cart)) { 
@@ -482,6 +633,7 @@ class Cart extends MY_Frontend_Controller {
                 $this->_cart_fail($check['message'], array(
                     'action' => 'qty',
                     'rowid' => $rowid,
+                    'product_id' => (int) $item['id'],
                     'product_name' => $product_name,
                     'size' => $check['size'],
                     'color' => $check['color'],
@@ -529,11 +681,17 @@ class Cart extends MY_Frontend_Controller {
 
     public function del()
     {
+        if ($this->input->method() !== 'post') {
+            show_404();
+            return;
+        }
+
         if (!$this->_require_login_for_cart()) {
             return;
         }
 
-        $rowid = $this->uri->segment(3);
+        $rowid = trim((string) $this->input->post('rowid'));
+
         $current_cart = $this->session->userdata('custom_cart');
         if (!is_array($current_cart)) { 
             $current_cart = array(); 

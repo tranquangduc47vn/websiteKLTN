@@ -18,7 +18,7 @@ $carts = (isset($carts) && is_array($carts)) ? $carts : array();
 		<ul class="jm-cart-mini-list">
 			<?php foreach ($carts as $items) { ?>
 				<li>
-					<img src="<?php echo base_url('upload/product/' . ($items['options']['image_link'] ?? 'no-image.jpg')); ?>" alt="">
+					<img src="<?php echo product_image_url($items['options']['image_link'] ?? ''); ?>" alt="">
 					<div>
 						<span class="jm-cart-mini-name"><?php echo htmlspecialchars(product_display_name($items['name']), ENT_QUOTES, 'UTF-8'); ?></span>
 						<span class="jm-cart-mini-meta"><?php echo (int) $items['qty']; ?> × <?php echo number_format($items['subtotal']); ?>đ</span>

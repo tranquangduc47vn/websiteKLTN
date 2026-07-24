@@ -54,6 +54,15 @@ class MY_Controller extends CI_Controller {
 				$user = $this->session->userdata('user');
 				$this->data['user']=$user;
 
+				$user_order_badge = 0;
+				if (!empty($user)) {
+					$this->load->model('transaction_model');
+					$uid = isset($user->id) ? (int) $user->id : 0;
+					$email = isset($user->email) ? (string) $user->email : '';
+					$user_order_badge = $this->transaction_model->count_active_for_user($uid, $email);
+				}
+				$this->data['user_order_badge'] = $user_order_badge;
+
 				$carts = $this->session->userdata('custom_cart');
 				if (!is_array($carts)) {
 					$carts = array();

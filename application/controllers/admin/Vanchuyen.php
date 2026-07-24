@@ -47,7 +47,7 @@ class Vanchuyen extends MY_Admin_Controller {
                 );
 
                 if($this->vanchuyen_model->create($data)) {
-                    $this->session->set_flashdata('message', 'Thêm mới chính sách vận chuyển thành công!');
+                    admin_flash_info( 'Thêm mới chính sách vận chuyển thành công!');
                 }
                 redirect(admin_url('vanchuyen'));
             }
@@ -60,7 +60,7 @@ class Vanchuyen extends MY_Admin_Controller {
         $id = $this->uri->rsegment(3);
         $info = $this->vanchuyen_model->get_info($id);
         if(!$info) {
-            $this->session->set_flashdata('message', 'Không tồn tại bài viết này.');
+            admin_flash_info( 'Không tồn tại bài viết này.');
             redirect(admin_url('vanchuyen'));
         }
         $this->data['info'] = $info;
@@ -94,7 +94,7 @@ class Vanchuyen extends MY_Admin_Controller {
                 }
 
                 if($this->vanchuyen_model->update($id, $data)) {
-                    $this->session->set_flashdata('message', 'Cập nhật chính sách thành công!');
+                    admin_flash_info( 'Cập nhật chính sách thành công!');
                 }
                 redirect(admin_url('vanchuyen'));
             }
@@ -104,10 +104,11 @@ class Vanchuyen extends MY_Admin_Controller {
     }
 
     public function delete() {
+        admin_require_post();
         $id = $this->uri->rsegment(3);
         $info = $this->vanchuyen_model->get_info($id);
         if(!$info) {
-            $this->session->set_flashdata('message', 'Không tồn tại dữ liệu.');
+            admin_flash_info( 'Không tồn tại dữ liệu.');
             redirect(admin_url('vanchuyen'));
         }
         
@@ -115,7 +116,7 @@ class Vanchuyen extends MY_Admin_Controller {
             if(file_exists('./upload/'.$info->image) && $info->image != '') {
                 unlink('./upload/'.$info->image);
             }
-            $this->session->set_flashdata('message', 'Xóa chính sách thành công!');
+            admin_flash_info( 'Xóa chính sách thành công!');
         }
         redirect(admin_url('vanchuyen'));
     }

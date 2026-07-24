@@ -12,7 +12,7 @@
 			  			<div class="product_item">
 			  				<p class="product_name" ><a href="<?php echo build_product_url($value); ?>" ><?php echo product_display_name($value->name); ?></a></p>
 			  				<div class="product-image">
-			  					<a href="<?php echo build_product_url($value); ?>"><img src="<?php echo base_url(); ?>upload/product/<?php echo $value->image_link; ?>" alt="" class=""></a>
+			  					<a href="<?php echo build_product_url($value); ?>"><img src="<?php echo product_image_url($value->image_link); ?>" alt="" class=""></a>
 			  				</div>
 			  				<?php if ($value->discount>0) { 
 			  					$new_price = $value->price - $value->discount; ?>

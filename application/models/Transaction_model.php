@@ -56,4 +56,26 @@ class Transaction_model extends MY_Model {
 
 		return true;
 	}
+
+	/**
+	 * Đơn đang chờ xác nhận / xử lý / giao (status 0,1,2) — không tính hoàn thành (3) hay hủy (4).
+	 */
+	public function count_active_for_user($user_id, $user_email = '')
+	{
+		$user_id = (int) $user_id;
+		$user_email = trim((string) $user_email);
+		if ($user_id <= 0 && $user_email === '') {
+			return 0;
+		}
+
+		$this->db->from($this->table);
+		if ($user_id > 0) {
+			$this->db->where('user_id', $user_id);
+		} else {
+			$this->db->where('user_email', $user_email);
+		}
+		$this->db->where_in('status', array('0', '1', '2'));
+
+		return (int) $this->db->count_all_results();
+	}
 }

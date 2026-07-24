@@ -39,7 +39,7 @@
 							<td class="text-center">
 								<a class="btn btn-sm btn-outline-primary me-1" href="<?php echo admin_url('user/view/' . $value->id); ?>" title="Xem thông tin"><i class="fa-solid fa-eye"></i></a>
 								<a class="btn btn-sm btn-outline-secondary me-1" href="<?php echo admin_url('user/order/' . $value->id); ?>" title="Đơn hàng"><i class="fa-solid fa-list"></i></a>
-								<a class="btn btn-sm btn-outline-danger" href="<?php echo admin_url('user/del/' . $value->id); ?>" title="Xóa" onclick="return confirm('Bạn chắc chắn muốn xóa')"><i class="fa-solid fa-trash"></i></a>
+								<?php echo admin_csrf_post_button(admin_url('user/del/' . $value->id), '<i class="fa-solid fa-trash"></i>', array('title' => 'Xóa', 'confirm' => 'Bạn chắc chắn muốn xóa')); ?>
 							</td>
 						</tr>
 					<?php } ?>

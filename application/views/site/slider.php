@@ -31,8 +31,14 @@
 
                 <div class="item <?php echo ($i == 0) ? 'active' : ''; ?>">
 
-                    <a href="<?php echo $value->link; ?>">
-                        <img src="<?php echo base_url('upload/slider/'.$value->image_link); ?>"
+                    <?php
+                        $slider_href = trim((string) $value->link);
+                        if ($slider_href !== '' && strpos($slider_href, 'http') !== 0) {
+                            $slider_href = base_url(ltrim($slider_href, '/'));
+                        }
+                    ?>
+                    <a href="<?php echo htmlspecialchars($slider_href, ENT_QUOTES, 'UTF-8'); ?>">
+                        <img src="<?php echo upload_image_url($value->image_link, 'slider'); ?>"
                              alt="<?php echo htmlspecialchars($value->name ?? '', ENT_QUOTES, 'UTF-8'); ?>">
                     </a>
 

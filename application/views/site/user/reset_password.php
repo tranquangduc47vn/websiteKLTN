@@ -32,6 +32,7 @@
 				</p>
 			<?php } else { ?>
 				<form class="jm-auth-form" method="post" action="<?php echo base_url('dat-lai-mat-khau/' . htmlspecialchars($reset_token, ENT_QUOTES, 'UTF-8')); ?>" novalidate>
+					<?php echo csrf_field(); ?>
 					<input type="hidden" name="token" value="<?php echo htmlspecialchars($reset_token, ENT_QUOTES, 'UTF-8'); ?>">
 
 					<div class="jm-auth-field">

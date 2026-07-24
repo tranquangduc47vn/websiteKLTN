@@ -23,7 +23,8 @@
 				<div class="jm-auth-alert jm-auth-alert-error"><?php echo htmlspecialchars($message_fail, ENT_QUOTES, 'UTF-8'); ?></div>
 			<?php } ?>
 
-			<form class="jm-auth-form" method="post" action="<?php echo base_url('user/register'); ?>" novalidate>
+			<form class="jm-auth-form" method="post" action="<?php echo site_url('dang-ky'); ?>" novalidate>
+				<?php echo csrf_field(); ?>
 				<div class="jm-auth-field">
 					<label for="regName">Họ tên</label>
 					<input type="text" class="jm-auth-input" id="regName" name="name"

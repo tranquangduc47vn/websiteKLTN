@@ -105,6 +105,7 @@ class Transaction extends MY_Admin_Controller {
 
 	public function del()
 	{
+		admin_require_post();
 		// URI segment 3 hoặc 4 tùy route
 		$id = $this->uri->segment(4);
 		if (empty($id)) {
@@ -166,6 +167,7 @@ class Transaction extends MY_Admin_Controller {
 
 	public function deldetail()
 	{
+		admin_require_post();
 		$id = $this->uri->segment(4);
 		$where = array();
 		$where = array('id' => $id);
@@ -268,6 +270,7 @@ class Transaction extends MY_Admin_Controller {
 
 	public function cancel()
 	{
+		admin_require_post();
 		$id = $this->uri->segment(4);
 
 		$transaction = $this->transaction_model->get_info($id);
@@ -281,7 +284,10 @@ class Transaction extends MY_Admin_Controller {
 			redirect(admin_url('transaction/detail/' . $id));
 		}
 
-		$reason = $this->input->get('reason');
+		$reason = $this->input->post('reason');
+		if (empty($reason)) {
+			$reason = $this->input->get('reason');
+		}
 		if (empty($reason)) {
 			$reason = 'Hủy do Admin hoặc lý do khách quan khác.';
 		}

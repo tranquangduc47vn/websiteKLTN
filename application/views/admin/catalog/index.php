@@ -29,20 +29,6 @@
 	</div>
 	<div class="admin-card-body">
 
-		<?php if (!empty($message_success)) { ?>
-			<div class="alert alert-success" role="alert">
-				<i class="fa-solid fa-circle-check me-2"></i>
-				<strong>Thành công!</strong> <?php echo $message_success; ?>
-			</div>
-		<?php } ?>
-
-		<?php if (!empty($message_fail)) { ?>
-			<div class="alert alert-danger" role="alert">
-				<i class="fa-solid fa-triangle-exclamation me-2"></i>
-				<strong>Lỗi!</strong> <?php echo $message_fail; ?>
-			</div>
-		<?php } ?>
-
 		<div class="table-responsive">
 			<table class="table table-hover admin-table" id="catalogListTable">
 				<thead>
@@ -68,12 +54,14 @@
 									<i class="fa-solid fa-pen"></i>
 								</a>
 								<?php if ($this->session->userdata('login')->level == ROLE_ADMIN) { ?>
-									<a class="btn btn-sm btn-outline-danger"
-										href="<?php echo admin_url('catalog/del/' . $value->id); ?>"
-										title="Xóa"
-										onclick="return confirm('Bạn chắc chắn muốn xóa danh mục này? Việc này có thể ảnh hưởng đến các sản phẩm bên trong!')">
-										<i class="fa-solid fa-trash"></i>
-									</a>
+									<?php echo admin_csrf_post_button(
+										admin_url('catalog/del/' . $value->id),
+										'<i class="fa-solid fa-trash"></i>',
+										array(
+											'title' => 'Xóa',
+											'confirm' => 'Bạn chắc chắn muốn xóa danh mục này? Việc này có thể ảnh hưởng đến các sản phẩm bên trong!',
+										)
+									); ?>
 								<?php } ?>
 							</td>
 						</tr>

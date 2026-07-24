@@ -45,7 +45,7 @@
 								<td class="text-center text-muted small"><?php echo date('d/m/Y H:i', strtotime($row->created_at)); ?></td>
 								<td class="text-center">
 									<a class="btn btn-sm btn-outline-primary me-1" href="<?php echo admin_url('vanchuyen/edit/' . $row->id); ?>"><i class="fa-solid fa-pen"></i></a>
-									<a class="btn btn-sm btn-outline-danger" href="<?php echo admin_url('vanchuyen/delete/' . $row->id); ?>" onclick="return confirm('Xóa chính sách này?')"><i class="fa-solid fa-trash"></i></a>
+									<?php echo admin_csrf_post_button(admin_url('vanchuyen/delete/' . $row->id), '<i class="fa-solid fa-trash"></i>', array('confirm' => 'Xóa chính sách này?')); ?>
 								</td>
 							</tr>
 						<?php } ?>

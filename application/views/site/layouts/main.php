@@ -8,6 +8,7 @@
 	<?php $this->load->view('site/layouts/header', $this->data); ?>
 
 	<div class="container">
+		<?php $this->load->view('site/message.php'); ?>
 		<?php $this->load->view('site/layouts/slider', $this->data); ?>
 		<?php $this->load->view($temp, $this->data); ?>
 	</div>

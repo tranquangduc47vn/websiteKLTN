@@ -2,7 +2,7 @@
 defined('BASEPATH') OR exit('No direct script access allowed');
 
 // Admin chat khách hàng (quyền order.chat)
-class SupportChat extends MY_Admin_Controller {
+class Support_chat extends MY_Admin_Controller {
 
 	protected $currentUser;
 
@@ -12,7 +12,7 @@ class SupportChat extends MY_Admin_Controller {
 		$this->load->helper('permission');
 		$this->currentUser = $this->session->userdata('login');
 		if (!admin_can('order.chat', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có quyền hỗ trợ khách hàng.');
+			admin_flash_fail( 'Bạn không có quyền hỗ trợ khách hàng.');
 			redirect(admin_url('home'));
 		}
 		$this->load->model('ai_conversation_model');
@@ -53,7 +53,7 @@ class SupportChat extends MY_Admin_Controller {
 		$conversation = $service->getConversationForStaff($id);
 
 		if (!$conversation) {
-			$this->session->set_flashdata('message_fail', 'Hội thoại không tồn tại.');
+			admin_flash_fail( 'Hội thoại không tồn tại.');
 			redirect(admin_url('support-chat'));
 		}
 
@@ -73,6 +73,7 @@ class SupportChat extends MY_Admin_Controller {
 
 	public function take($id = 0)
 	{
+		admin_require_post();
 		$this->output->set_content_type('application/json', 'utf-8');
 		require_once APPPATH . 'services/support/SupportChatService.php';
 		$service = new SupportChatService();
@@ -81,7 +82,8 @@ class SupportChat extends MY_Admin_Controller {
 			(int) $this->currentUser->id,
 			isset($this->currentUser->name) ? (string) $this->currentUser->name : 'Nhân viên'
 		);
-		$this->output->set_output(json_encode($result, JSON_UNESCAPED_UNICODE));
+		$this->load->helper('csrf');
+		$this->output->set_output(json_encode(array_merge($result, csrf_json_meta()), JSON_UNESCAPED_UNICODE));
 	}
 
 	public function send()
@@ -100,25 +102,33 @@ class SupportChat extends MY_Admin_Controller {
 			isset($this->currentUser->name) ? (string) $this->currentUser->name : 'Nhân viên',
 			(string) $this->input->post('message')
 		);
-		$this->output->set_output(json_encode($result, JSON_UNESCAPED_UNICODE));
+		if (!is_array($result)) {
+			$result = array('ok' => false, 'message' => 'Không gửi được tin nhắn.');
+		}
+		$this->load->helper('csrf');
+		$this->output->set_output(json_encode(array_merge($result, csrf_json_meta()), JSON_UNESCAPED_UNICODE));
 	}
 
 	public function end($id = 0)
 	{
+		admin_require_post();
 		$this->output->set_content_type('application/json', 'utf-8');
 		require_once APPPATH . 'services/support/SupportChatService.php';
 		$service = new SupportChatService();
 		$result = $service->endConversation((int) $id, (int) $this->currentUser->id);
-		$this->output->set_output(json_encode($result, JSON_UNESCAPED_UNICODE));
+		$this->load->helper('csrf');
+		$this->output->set_output(json_encode(array_merge($result, csrf_json_meta()), JSON_UNESCAPED_UNICODE));
 	}
 
 	public function return_ai($id = 0)
 	{
+		admin_require_post();
 		$this->output->set_content_type('application/json', 'utf-8');
 		require_once APPPATH . 'services/support/SupportChatService.php';
 		$service = new SupportChatService();
 		$result = $service->returnToAi((int) $id, (int) $this->currentUser->id);
-		$this->output->set_output(json_encode($result, JSON_UNESCAPED_UNICODE));
+		$this->load->helper('csrf');
+		$this->output->set_output(json_encode(array_merge($result, csrf_json_meta()), JSON_UNESCAPED_UNICODE));
 	}
 
 	public function poll()

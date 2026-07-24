@@ -399,11 +399,9 @@ public function index()
 	{
 		$this->load->helper('vn_address');
 
-		$message_success = $this->session->flashdata('message_success');
-		$this->data['message_success'] = $message_success;
-
-		$message_fail = $this->session->flashdata('message_fail');
-		$this->data['message_fail'] = $message_fail;
+		$flash = get_auth_flash();
+		$this->data['message_success'] = $flash['success'];
+		$this->data['message_fail'] = $flash['fail'];
 
 		$this->form_validation->set_error_delimiters('<span class="jm-auth-field-error">', '</span>');
 		if ($this->input->post()) {
@@ -434,6 +432,16 @@ public function index()
 				);
 				if ($this->user_model->create($data)) {
 					$user_id = (int) $this->db->insert_id();
+
+					$this->load->library('mail_service');
+					$welcome_user = (object) array(
+						'email' => $data['email'],
+						'name' => $data['name'],
+					);
+					if (!$this->mail_service->send_welcome($welcome_user)) {
+						log_message('error', 'Welcome email failed for user_id=' . $user_id . ' email=' . $data['email']);
+					}
+
 					if ($user_id > 0 && $address_line !== '') {
 						$this->user_address_model->create(array(
 							'user_id' => $user_id,
@@ -457,18 +465,10 @@ public function index()
 						));
 					}
 
-					$new_user = $this->user_model->get_info($user_id);
-					if ($new_user) {
-						$this->load->library('mail_service');
-						if (!$this->mail_service->send_welcome($new_user)) {
-							log_message('error', 'Welcome email failed for user_id=' . $user_id);
-						}
-					}
-
-					$this->session->set_flashdata('message_success', 'Đăng ký tài khoản thành công! Vui lòng đăng nhập tại đây.');
+					set_auth_flash('success', 'Đăng ký tài khoản thành công! Vui lòng đăng nhập tại đây.');
 					redirect(base_url('dang-nhap'));
 				}else{
-					$this->session->set_flashdata('message_fail', 'Đăng ký thất bại, vui lòng kiểm tra lại!');
+					set_auth_flash('fail', 'Đăng ký thất bại, vui lòng kiểm tra lại!');
 					redirect(base_url('user/register'));
 				}
 			}
@@ -532,13 +532,17 @@ public function index()
 			redirect($redirect_url);
 		}
 
-		$message_success = $this->session->flashdata('message_success');
-		$this->data['message_success'] = $message_success;
-
-		$message_fail = $this->session->flashdata('message_fail');
-		$this->data['message_fail'] = $message_fail;
+		$flash = get_auth_flash();
+		$this->data['message_success'] = $flash['success'];
+		$this->data['message_fail'] = $flash['fail'];
 
 		if ($this->input->post()) {
+			$this->load->helper('rate_limit');
+			$email = trim((string) $this->input->post('email'));
+			$rate = rate_limit_check($email);
+			if (!empty($rate['locked'])) {
+				$this->data['message_fail'] = rate_limit_message($rate['retry_after']);
+			} else {
 			$this->form_validation->set_rules('email', 'Email đăng nhập', 'required|valid_email');
 			$this->form_validation->set_rules('password', 'Mật khẩu', 'required');
 			
@@ -548,6 +552,7 @@ public function index()
 				$user_data = $this->get_info_user();
 				if($user_data) 
 				{
+					rate_limit_clear($email);
 
 					$this->session->set_userdata('user', $user_data);
 
@@ -558,9 +563,10 @@ public function index()
 				} 
 				else 
 				{
-
+					rate_limit_hit($email);
 					$this->data['message_fail'] = 'Sai thông tin email hoặc mật khẩu, vui lòng thử lại!';
 				}
+			}
 			}
 		}
 		$this->render_frontend_standalone('site/user/login');
@@ -591,8 +597,9 @@ public function index()
 
 	public function forgot_password()
 	{
-		$this->data['message_success'] = $this->session->flashdata('message_success');
-		$this->data['message_fail'] = $this->session->flashdata('message_fail');
+		$flash = get_auth_flash();
+		$this->data['message_success'] = $flash['success'];
+		$this->data['message_fail'] = $flash['fail'];
 		$this->form_validation->set_error_delimiters('<span class="jm-auth-field-error">', '</span>');
 
 		if ($this->input->post()) {
@@ -612,8 +619,8 @@ public function index()
 					}
 				}
 
-				$this->session->set_flashdata(
-					'message_success',
+				set_auth_flash(
+					'success',
 					'Nếu email tồn tại trong hệ thống, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu. Vui lòng kiểm tra hộp thư (và cả thư rác).'
 				);
 				redirect(base_url('quen-mat-khau'));
@@ -626,8 +633,9 @@ public function index()
 	public function reset_password($token = '')
 	{
 		$this->load->model('password_reset_model');
-		$this->data['message_success'] = $this->session->flashdata('message_success');
-		$this->data['message_fail'] = $this->session->flashdata('message_fail');
+		$flash = get_auth_flash();
+		$this->data['message_success'] = $flash['success'];
+		$this->data['message_fail'] = $flash['fail'];
 		$this->form_validation->set_error_delimiters('<span class="jm-auth-field-error">', '</span>');
 
 		$token = trim((string) $token);
@@ -639,7 +647,7 @@ public function index()
 
 		if ($this->input->post()) {
 			if (!$reset_row) {
-				$this->session->set_flashdata('message_fail', 'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.');
+				set_auth_flash('fail', 'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.');
 				redirect(base_url('quen-mat-khau'));
 			}
 
@@ -649,7 +657,7 @@ public function index()
 			if ($this->form_validation->run()) {
 				$reset_row = $this->password_reset_model->find_valid_by_token($token);
 				if (!$reset_row) {
-					$this->session->set_flashdata('message_fail', 'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.');
+					set_auth_flash('fail', 'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.');
 					redirect(base_url('quen-mat-khau'));
 				}
 
@@ -659,7 +667,7 @@ public function index()
 				);
 				$this->password_reset_model->mark_used($reset_row->id);
 
-				$this->session->set_flashdata('message_success', 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập.');
+				set_auth_flash('success', 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập.');
 				redirect(base_url('dang-nhap'));
 			}
 		}

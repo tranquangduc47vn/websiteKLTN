@@ -20,12 +20,6 @@
 		</div>
 	</div>
 	<div class="admin-card-body">
-		<?php if (!empty($message_success)) { ?>
-			<div class="alert alert-success"><strong>Thành công!</strong> <?php echo $message_success; ?></div>
-		<?php } ?>
-		<?php if (!empty($message_fail)) { ?>
-			<div class="alert alert-danger"><strong>Lỗi!</strong> <?php echo $message_fail; ?></div>
-		<?php } ?>
 		<div class="table-responsive">
 			<table class="table table-hover admin-table" id="adminListTable">
 				<thead>
@@ -52,7 +46,7 @@
 								<div class="admin-table-actions">
 									<a class="btn btn-sm btn-outline-primary" href="<?php echo admin_url('admin/edit/' . $value->id); ?>" title="Sửa"><i class="fa-solid fa-pen"></i></a>
 									<?php if ($value->level != ROLE_ADMIN && (int) $this->session->userdata('login')->level === ROLE_ADMIN) { ?>
-										<a class="btn btn-sm btn-outline-danger" href="<?php echo admin_url('admin/del/' . $value->id); ?>" title="Xóa" onclick="return confirm('Bạn chắc chắn muốn xóa tài khoản này?')"><i class="fa-solid fa-trash"></i></a>
+										<?php echo admin_csrf_post_button(admin_url('admin/del/' . $value->id), '<i class="fa-solid fa-trash"></i>', array('title' => 'Xóa', 'confirm' => 'Bạn chắc chắn muốn xóa tài khoản này?')); ?>
 									<?php } else { ?>
 										<span class="admin-table-actions-slot" aria-hidden="true"></span>
 									<?php } ?>

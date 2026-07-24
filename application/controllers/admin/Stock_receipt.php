@@ -17,7 +17,7 @@ class Stock_receipt extends MY_Admin_Controller {
 		$this->currentUser = $this->session->userdata('login');
 
 		if (!admin_can('stock.view', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có quyền xem phiếu nhập kho.');
+			admin_flash_fail( 'Bạn không có quyền xem phiếu nhập kho.');
 			redirect(admin_url('home'));
 		}
 	}
@@ -50,7 +50,6 @@ class Stock_receipt extends MY_Admin_Controller {
 		$this->data['filter_code'] = $code;
 		$this->data['can_manage'] = admin_can('stock.manage', $this->currentUser);
 		$this->data['message'] = $this->session->flashdata('message');
-		$this->data['message_fail'] = $this->session->flashdata('message_fail');
 
 		$this->render_admin('admin/stock_receipt/index');
 	}
@@ -58,7 +57,7 @@ class Stock_receipt extends MY_Admin_Controller {
 	public function add()
 	{
 		if (!admin_can('stock.manage', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có quyền tạo phiếu nhập.');
+			admin_flash_fail( 'Bạn không có quyền tạo phiếu nhập.');
 			redirect(admin_url('stock-receipts'));
 		}
 
@@ -70,10 +69,10 @@ class Stock_receipt extends MY_Admin_Controller {
 				(int) $this->currentUser->id
 			);
 			if ($result['ok']) {
-				$this->session->set_flashdata('message', 'Đã tạo phiếu nháp ' . $result['receipt_code'] . '.');
+				admin_flash_info( 'Đã tạo phiếu nháp ' . $result['receipt_code'] . '.');
 				redirect(admin_url('stock-receipts/view/' . $result['receipt_id']));
 			}
-			$this->session->set_flashdata('message_fail', $result['message']);
+			admin_flash_fail( $result['message']);
 			redirect(admin_url('stock-receipts/add'));
 		}
 
@@ -84,18 +83,18 @@ class Stock_receipt extends MY_Admin_Controller {
 	public function edit()
 	{
 		if (!admin_can('stock.manage', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có quyền sửa phiếu nhập.');
+			admin_flash_fail( 'Bạn không có quyền sửa phiếu nhập.');
 			redirect(admin_url('stock-receipts'));
 		}
 
 		$id = (int) $this->uri->rsegment(3);
 		$receipt = $this->stock_receipt_model->get_detail($id);
 		if (!$receipt) {
-			$this->session->set_flashdata('message_fail', 'Phiếu nhập không tồn tại.');
+			admin_flash_fail( 'Phiếu nhập không tồn tại.');
 			redirect(admin_url('stock-receipts'));
 		}
 		if ($receipt->status !== 'draft') {
-			$this->session->set_flashdata('message_fail', 'Phiếu đã khóa, không thể sửa.');
+			admin_flash_fail( 'Phiếu đã khóa, không thể sửa.');
 			redirect(admin_url('stock-receipts/view/' . $id));
 		}
 
@@ -107,10 +106,10 @@ class Stock_receipt extends MY_Admin_Controller {
 				$this->_lines_from_post()
 			);
 			if ($result['ok']) {
-				$this->session->set_flashdata('message', 'Đã cập nhật phiếu nháp.');
+				admin_flash_info( 'Đã cập nhật phiếu nháp.');
 				redirect(admin_url('stock-receipts/view/' . $id));
 			}
-			$this->session->set_flashdata('message_fail', $result['message']);
+			admin_flash_fail( $result['message']);
 			redirect(admin_url('stock-receipts/edit/' . $id));
 		}
 
@@ -124,7 +123,7 @@ class Stock_receipt extends MY_Admin_Controller {
 		$id = (int) $this->uri->rsegment(3);
 		$receipt = $this->stock_receipt_model->get_detail($id);
 		if (!$receipt) {
-			$this->session->set_flashdata('message_fail', 'Phiếu nhập không tồn tại.');
+			admin_flash_fail( 'Phiếu nhập không tồn tại.');
 			redirect(admin_url('stock-receipts'));
 		}
 
@@ -132,7 +131,6 @@ class Stock_receipt extends MY_Admin_Controller {
 		$this->data['items'] = $this->stock_receipt_item_model->get_by_receipt($id);
 		$this->data['can_manage'] = admin_can('stock.manage', $this->currentUser);
 		$this->data['message'] = $this->session->flashdata('message');
-		$this->data['message_fail'] = $this->session->flashdata('message_fail');
 
 		$this->render_admin('admin/stock_receipt/view');
 	}
@@ -143,16 +141,16 @@ class Stock_receipt extends MY_Admin_Controller {
 			redirect(admin_url('stock-receipts'));
 		}
 		if (!admin_can('stock.manage', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có quyền xác nhận phiếu.');
+			admin_flash_fail( 'Bạn không có quyền xác nhận phiếu.');
 			redirect(admin_url('stock-receipts'));
 		}
 
 		$id = (int) $this->input->post('receipt_id');
 		$result = $this->stock_service->confirm_receipt($id, (int) $this->currentUser->id);
 		if ($result['ok']) {
-			$this->session->set_flashdata('message', $result['message']);
+			admin_flash_info( $result['message']);
 		} else {
-			$this->session->set_flashdata('message_fail', $result['message']);
+			admin_flash_fail( $result['message']);
 		}
 		redirect(admin_url('stock-receipts/view/' . $id));
 	}
@@ -163,16 +161,16 @@ class Stock_receipt extends MY_Admin_Controller {
 			redirect(admin_url('stock-receipts'));
 		}
 		if (!admin_can('stock.manage', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có quyền hủy phiếu.');
+			admin_flash_fail( 'Bạn không có quyền hủy phiếu.');
 			redirect(admin_url('stock-receipts'));
 		}
 
 		$id = (int) $this->input->post('receipt_id');
 		$result = $this->stock_service->cancel_receipt($id, (int) $this->currentUser->id);
 		if ($result['ok']) {
-			$this->session->set_flashdata('message', $result['message']);
+			admin_flash_info( $result['message']);
 		} else {
-			$this->session->set_flashdata('message_fail', $result['message']);
+			admin_flash_fail( $result['message']);
 		}
 		redirect(admin_url('stock-receipts/view/' . $id));
 	}

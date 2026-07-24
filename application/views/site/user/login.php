@@ -23,7 +23,8 @@
 				<div class="jm-auth-alert jm-auth-alert-error"><?php echo htmlspecialchars($message_fail, ENT_QUOTES, 'UTF-8'); ?></div>
 			<?php } ?>
 
-			<form class="jm-auth-form" method="post" action="<?php echo base_url('user/login'); ?>" novalidate>
+			<form class="jm-auth-form" method="post" action="<?php echo site_url('dang-nhap'); ?>" novalidate>
+				<?php echo csrf_field(); ?>
 				<?php echo form_error('login', '<div class="jm-auth-field-error jm-auth-field-error-block">', '</div>'); ?>
 
 				<div class="jm-auth-field">

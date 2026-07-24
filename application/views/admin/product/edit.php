@@ -289,9 +289,13 @@ $this->load->view('admin/partials/form_open');
 						$.ajax({
 							url: '<?php echo admin_url('product/del'); ?>',
 							type: 'post',
-							data: { id: id },
+							dataType: 'json',
+							data: window.appendCsrf({ id: id }),
 							success: function (response) {
-								if (String(response).trim() === 'success') {
+								if (typeof window.applyCsrfResponse === 'function') {
+									window.applyCsrfResponse(response);
+								}
+								if (response && (response.ok || response.status === 'success')) {
 									window.location.href = '<?php echo admin_url('products'); ?>';
 									return;
 								}

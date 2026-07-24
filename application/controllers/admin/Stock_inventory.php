@@ -15,7 +15,7 @@ class Stock_inventory extends MY_Admin_Controller {
 		$this->currentUser = $this->session->userdata('login');
 
 		if (!admin_can('stock.view', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có quyền xem tồn kho biến thể.');
+			admin_flash_fail( 'Bạn không có quyền xem tồn kho biến thể.');
 			redirect(admin_url('home'));
 		}
 	}

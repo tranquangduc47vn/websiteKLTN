@@ -50,11 +50,11 @@ class Pages extends MY_Admin_Controller {
 
             if ($this->db->insert('pages', $data)) {
 
-                $this->session->set_flashdata('message', 'Thêm trang mới thành công!');
+                admin_flash_info( 'Thêm trang mới thành công!');
 
             } else {
 
-                $this->session->set_flashdata('message', 'Có lỗi xảy ra khi thêm mới.');
+                admin_flash_info( 'Có lỗi xảy ra khi thêm mới.');
 
             }
 
@@ -82,7 +82,7 @@ class Pages extends MY_Admin_Controller {
 
         if (!$page) {
 
-            $this->session->set_flashdata('message', 'Không tồn tại trang này');
+            admin_flash_info( 'Không tồn tại trang này');
 
             redirect(admin_url('pages'));
 
@@ -106,11 +106,11 @@ class Pages extends MY_Admin_Controller {
 
             if ($this->db->update('pages', $data)) {
 
-                $this->session->set_flashdata('message', 'Cập nhật trang thành công!');
+                admin_flash_info( 'Cập nhật trang thành công!');
 
             } else {
 
-                $this->session->set_flashdata('message', 'Có lỗi xảy ra, vui lòng thử lại.');
+                admin_flash_info( 'Có lỗi xảy ra, vui lòng thử lại.');
 
             }
 

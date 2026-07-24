@@ -1,6 +1,8 @@
 <?php
 $site_asset_url = site_asset_url('');
 ?>
+<link rel="stylesheet" type="text/css" href="<?php echo $site_asset_url; ?>css/responsive-2026.css?v=15">
+<?php echo csrf_form_inject_script(); ?>
 <script src="<?php echo $site_asset_url; ?>bootstrap/js/bootstrap.min.js"></script>
 <script src="<?php echo $site_asset_url; ?>js/header-icons.js"></script>
 <script>
@@ -35,15 +37,44 @@ $site_asset_url = site_asset_url('');
 	}
 
 	if (navToggle && navDrawer) {
-		navToggle.addEventListener('click', function () {
-			var open = navDrawer.classList.toggle('is-open');
+		var mobileNavMq = window.matchMedia('(max-width: 991px)');
+
+		function setNavOpen(open) {
+			if (!mobileNavMq.matches) {
+				open = false;
+			}
+			navDrawer.classList.toggle('is-open', open);
 			navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
 			if (rootChrome) rootChrome.classList.toggle('wf-chrome-nav-backdrop', open);
+			if (open && typeof window.jmCatalogCloseFilters === 'function') {
+				window.jmCatalogCloseFilters();
+			}
+		}
+
+		window.wfChromeCloseNav = function () {
+			setNavOpen(false);
+		};
+
+		navToggle.addEventListener('click', function () {
+			if (!mobileNavMq.matches) return;
+			setNavOpen(!navDrawer.classList.contains('is-open'));
 		});
-		var mobileNavMq = window.matchMedia('(max-width: 991px)');
+
+		document.addEventListener('click', function (e) {
+			if (!mobileNavMq.matches || !navDrawer.classList.contains('is-open')) return;
+			if (navDrawer.contains(e.target) || navToggle.contains(e.target)) return;
+			setNavOpen(false);
+		});
+
+		navDrawer.querySelectorAll('a[href]').forEach(function (link) {
+			link.addEventListener('click', function () {
+				if (mobileNavMq.matches) setNavOpen(false);
+			});
+		});
 
 		function clearDesktopSubmenuState() {
 			if (mobileNavMq.matches) return;
+			setNavOpen(false);
 			navDrawer.querySelectorAll('.wf-chrome-menu__item--has-sub.is-open').forEach(function (item) {
 				item.classList.remove('is-open');
 				var t = item.querySelector('.wf-chrome-menu__trigger');
@@ -52,6 +83,9 @@ $site_asset_url = site_asset_url('');
 		}
 
 		clearDesktopSubmenuState();
+		if (!mobileNavMq.matches) {
+			setNavOpen(false);
+		}
 		if (mobileNavMq.addEventListener) {
 			mobileNavMq.addEventListener('change', clearDesktopSubmenuState);
 		} else if (mobileNavMq.addListener) {
@@ -67,6 +101,24 @@ $site_asset_url = site_asset_url('');
 				btn.setAttribute('aria-expanded', item.classList.contains('is-open') ? 'true' : 'false');
 			});
 		});
+
+		window.addEventListener('pagehide', function () {
+			setNavOpen(false);
+		});
+		window.addEventListener('pageshow', function () {
+			setNavOpen(false);
+		});
 	}
+
+	window.addEventListener('pagehide', function () {
+		if (typeof window.jmCatalogCloseFilters === 'function') {
+			window.jmCatalogCloseFilters();
+		}
+	});
+	window.addEventListener('pageshow', function () {
+		if (typeof window.jmCatalogCloseFilters === 'function') {
+			window.jmCatalogCloseFilters();
+		}
+	});
 })();
 </script>

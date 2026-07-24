@@ -116,11 +116,11 @@ class Tuyendung extends MY_Admin_Controller {
 
                 if ($this->tuyendung_model->create($data)) {
 
-                    $this->session->set_flashdata('message', 'Thêm dữ liệu và upload ảnh thành công!');
+                    admin_flash_info( 'Thêm dữ liệu và upload ảnh thành công!');
 
                 } else {
 
-                    $this->session->set_flashdata('message', 'Lưu dữ liệu thất bại.');
+                    admin_flash_info( 'Lưu dữ liệu thất bại.');
 
                 }
 
@@ -146,7 +146,7 @@ class Tuyendung extends MY_Admin_Controller {
 
         if (!$info) {
 
-            $this->session->set_flashdata('message', 'Bài viết tuyển dụng này không tồn tại!');
+            admin_flash_info( 'Bài viết tuyển dụng này không tồn tại!');
 
             redirect(admin_url('tuyendung'));
 
@@ -220,11 +220,11 @@ class Tuyendung extends MY_Admin_Controller {
 
                 if ($this->tuyendung_model->update($id, $data)) {
 
-                    $this->session->set_flashdata('message', 'Cập nhật bài viết thành công!');
+                    admin_flash_info( 'Cập nhật bài viết thành công!');
 
                 } else {
 
-                    $this->session->set_flashdata('message', 'Cập nhật dữ liệu thất bại.');
+                    admin_flash_info( 'Cập nhật dữ liệu thất bại.');
 
                 }
 
@@ -244,13 +244,15 @@ class Tuyendung extends MY_Admin_Controller {
 
     public function delete() {
 
+        admin_require_post();
+
         $id = $this->uri->rsegment(3);
 
         $info = $this->tuyendung_model->get_info($id);
 
         if (!$info) {
 
-            $this->session->set_flashdata('message', 'Bản ghi không tồn tại!');
+            admin_flash_info( 'Bản ghi không tồn tại!');
 
             redirect(admin_url('tuyendung'));
 
@@ -276,7 +278,7 @@ class Tuyendung extends MY_Admin_Controller {
 
 
 
-        $this->session->set_flashdata('message', 'Xóa tin tuyển dụng thành công!');
+        admin_flash_info( 'Xóa tin tuyển dụng thành công!');
 
         redirect(admin_url('tuyendung'));
 

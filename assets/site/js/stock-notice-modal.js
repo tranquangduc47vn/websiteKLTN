@@ -1,6 +1,18 @@
 (function (window) {
 	'use strict';
 
+	function hideStockNoticeModal() {
+		var modal = document.getElementById('qdStockNoticeModal');
+		if (!modal || !window.jQuery || !window.jQuery.fn.modal) {
+			return;
+		}
+		window.jQuery(modal).modal('hide');
+		window.jQuery('body').removeClass('modal-open');
+		window.jQuery('.modal-backdrop').remove();
+		modal.setAttribute('aria-hidden', 'true');
+		modal.style.display = 'none';
+	}
+
 	function showStockNotice(opts) {
 		opts = opts || {};
 		var modal = document.getElementById('qdStockNoticeModal');
@@ -37,10 +49,13 @@
 
 	window.QD = window.QD || {};
 	window.QD.showStockNotice = showStockNotice;
+	window.QD.hideStockNoticeModal = hideStockNoticeModal;
 
 	document.addEventListener('DOMContentLoaded', function () {
-		if (window.JM_STOCK_NOTICE) {
-			showStockNotice(window.JM_STOCK_NOTICE);
-		}
+		hideStockNoticeModal();
+	});
+
+	window.addEventListener('pageshow', function () {
+		hideStockNoticeModal();
 	});
 })(window);

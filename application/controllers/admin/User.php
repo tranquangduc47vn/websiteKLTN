@@ -15,12 +15,6 @@ class User extends MY_Admin_Controller {
 	}
 	public function index()
 	{
-		$message_success = $this->session->flashdata('message_success');
-		$this->data['message_success'] = $message_success;
-
-		$message_fail = $this->session->flashdata('message_fail');
-		$this->data['message_fail'] = $message_fail;
-
 		$user = $this->user_model->get_list();
 		$this->data['user']= $user;
 
@@ -32,7 +26,7 @@ class User extends MY_Admin_Controller {
 		$id = (int) $this->uri->segment(4);
 		$user = $this->user_model->get_info($id);
 		if (!$user) {
-			$this->session->set_flashdata('message_fail', 'Khách hàng không tồn tại');
+			admin_flash_fail( 'Khách hàng không tồn tại');
 			redirect(admin_url('user'));
 		}
 
@@ -50,14 +44,6 @@ class User extends MY_Admin_Controller {
 
 	public function order()
 	{
-		$message_success = $this->session->flashdata('message_success');
-		$this->data['message_success'] = $message_success;
-
-		$message_fail = $this->session->flashdata('message_fail');
-		$this->data['message_fail'] = $message_fail;
-
-		
-
 		$id = $this->uri->segment(4);
 		$input['where'] = array('user_id' => $id);
 		$order = $this->transaction_model->get_list($input);
@@ -72,7 +58,7 @@ class User extends MY_Admin_Controller {
 		$id = $this->uri->segment(4);
 		$transaction = $this->transaction_model->get_info($id);
 		if (empty($transaction)) {
-			$this->session->set_flashdata('message_fail', 'Đơn đặt hàng không tồn tại!');
+			admin_flash_fail( 'Đơn đặt hàng không tồn tại!');
 			redirect(admin_url('user'));
 		}
 		$this->data['transaction'] = $transaction;
@@ -97,46 +83,48 @@ class User extends MY_Admin_Controller {
 		$id = $this->uri->segment(4);
 		$transaction = $this->transaction_model->get_info($id);
 		if (empty($transaction)) {
-			$this->session->set_flashdata('message_fail', 'Đơn đặt hàng không tồn tại!');
+			admin_flash_fail( 'Đơn đặt hàng không tồn tại!');
 			redirect(admin_url('user'));
 		}
 		if ((string) $transaction->status !== '0') {
-			$this->session->set_flashdata('message_fail', 'Chỉ có thể xác nhận đơn đang ở trạng thái chờ xử lý.');
+			admin_flash_fail( 'Chỉ có thể xác nhận đơn đang ở trạng thái chờ xử lý.');
 			redirect(admin_url('user/detail/' . $id));
 		}
 		$this->transaction_model->update($id, array('status' => '1'));
-		$this->session->set_flashdata('message_success', 'Xác nhận đơn đặt hàng thành công');
+		admin_flash_success( 'Xác nhận đơn đặt hàng thành công');
 		redirect(admin_url('user/detail/' . $id));
 	}
 	public function del()
 	{
+		admin_require_post();
 		$id = $this->uri->segment(4);
 		$where = array();
 		$where = array('id' => $id);
 		if (!$this->user_model->check_exists($where)) {
-			$this->session->set_flashdata('message_fail', 'user không tồn tại');
+			admin_flash_fail( 'user không tồn tại');
 			redirect(admin_url('user'));
 		}
 		if ($this->user_model->delete($id)) {
-			$this->session->set_flashdata('message_success', 'Xóa user thành công');
+			admin_flash_success( 'Xóa user thành công');
 		}else{
-			$this->session->set_flashdata('message_fail', 'Xóa user thất bại');
+			admin_flash_fail( 'Xóa user thất bại');
 		}
 		redirect(admin_url('user'));
 	}
 	public function deldetail()
 	{
+		admin_require_post();
 		$id = $this->uri->segment(4);
 		$where = array();
 		$where = array('id' => $id);
 		if (!$this->order_model->check_exists($where)) {
-			$this->session->set_flashdata('message_fail', 'Danh mục không tồn tại');
+			admin_flash_fail( 'Danh mục không tồn tại');
 			redirect(admin_url('transaction'));
 		}
 		if ($this->order_model->delete($id)) {
-			$this->session->set_flashdata('message_success', 'Xóa thành công');
+			admin_flash_success( 'Xóa thành công');
 		}else{
-			$this->session->set_flashdata('message_fail', 'Xóa thất bại');
+			admin_flash_fail( 'Xóa thất bại');
 		}
 		redirect(admin_url('user'));
 		

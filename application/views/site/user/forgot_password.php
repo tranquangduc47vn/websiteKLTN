@@ -24,6 +24,7 @@
 			<?php } ?>
 
 			<form class="jm-auth-form" method="post" action="<?php echo base_url('quen-mat-khau'); ?>" novalidate>
+				<?php echo csrf_field(); ?>
 				<div class="jm-auth-field">
 					<label for="forgotEmail">Email</label>
 					<input type="email" class="jm-auth-input" id="forgotEmail" name="email"

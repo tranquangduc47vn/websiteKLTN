@@ -19,15 +19,13 @@ class Catalog extends MY_Admin_Controller {
 		}
 
 		if (!admin_can('catalog.manage', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có quyền quản lý danh mục sản phẩm!');
+			admin_flash_fail( 'Bạn không có quyền quản lý danh mục sản phẩm!');
 			redirect(admin_url('home'));
 		}
 	}
 
 	public function index()
 	{
-		$this->data['message_success'] = $this->session->flashdata('message_success');
-		$this->data['message_fail'] = $this->session->flashdata('message_fail');
 
 		$input = array();
 		$input['order'] = array('id' , 'ASC');
@@ -57,9 +55,9 @@ class Catalog extends MY_Admin_Controller {
 					'created' => now()
 				);
 				if ($this->catalog_model->create($data)) {
-					$this->session->set_flashdata('message_success', 'Thêm danh mục thành công');
+					admin_flash_success( 'Thêm danh mục thành công');
 				}else{
-					$this->session->set_flashdata('message_fail', 'Thêm danh mục thất bại');
+					admin_flash_fail( 'Thêm danh mục thất bại');
 				}
 				redirect(admin_url('catalog'));
 			}
@@ -73,7 +71,7 @@ class Catalog extends MY_Admin_Controller {
 		$id = $this->uri->segment(4);
 		$catalog = $this->catalog_model->get_info($id);
 		if (empty($catalog)) {
-			$this->session->set_flashdata('message_fail', 'Danh mục không tồn tại');
+			admin_flash_fail( 'Danh mục không tồn tại');
 			redirect(admin_url('catalog'));
 		}
 		$this->data['catalog'] = $catalog;
@@ -88,9 +86,9 @@ class Catalog extends MY_Admin_Controller {
 					'sort_order' => $this->input->post('sort_order')
 				);
 				if ($this->catalog_model->update($id,$data)) {
-					$this->session->set_flashdata('message_success', 'Thay đổi danh mục thành công');
+					admin_flash_success( 'Thay đổi danh mục thành công');
 				}else{
-					$this->session->set_flashdata('message_fail', 'Thay đổi danh mục thất bại');
+					admin_flash_fail( 'Thay đổi danh mục thất bại');
 				}
 				redirect(admin_url('catalog'));
 			}
@@ -106,23 +104,24 @@ class Catalog extends MY_Admin_Controller {
 
 	public function del()
 	{
+		admin_require_post();
 		// Chỉ ADMIN xóa danh mục
 		if (!admin_can('catalog.delete', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có đủ quyền hạn để xóa danh mục sản phẩm!');
+			admin_flash_fail( 'Bạn không có đủ quyền hạn để xóa danh mục sản phẩm!');
 			redirect(admin_url('catalog'));
 		}
 
 		$id = $this->uri->segment(4);
 		$where = array('id' => $id);
 		if (!$this->catalog_model->check_exists($where)) {
-			$this->session->set_flashdata('message_fail', 'Danh mục không tồn tại');
+			admin_flash_fail( 'Danh mục không tồn tại');
 			redirect(admin_url('catalog'));
 		}
 		
 		if ($this->catalog_model->delete($id)) {
-			$this->session->set_flashdata('message_success', 'Xóa danh mục thành công');
+			admin_flash_success( 'Xóa danh mục thành công');
 		}else{
-			$this->session->set_flashdata('message_fail', 'Xóa danh mục thất bại');
+			admin_flash_fail( 'Xóa danh mục thất bại');
 		}
 		redirect(admin_url('catalog'));
 	}

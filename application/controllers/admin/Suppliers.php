@@ -22,7 +22,6 @@ class Suppliers extends MY_Admin_Controller {
 		$this->data['list'] = $list;
 		$this->data['can_manage'] = admin_can('stock.manage', $this->currentUser);
 		$this->data['message'] = $this->session->flashdata('message');
-		$this->data['message_fail'] = $this->session->flashdata('message_fail');
 		$this->render_admin('admin/suppliers/index');
 	}
 
@@ -45,7 +44,7 @@ class Suppliers extends MY_Admin_Controller {
 				'created' => $now,
 				'updated' => $now,
 			));
-			$this->session->set_flashdata('message', 'Đã thêm nhà cung cấp.');
+			admin_flash_info( 'Đã thêm nhà cung cấp.');
 			redirect(admin_url('suppliers'));
 		}
 		$this->render_admin('admin/suppliers/form');

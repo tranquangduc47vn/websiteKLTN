@@ -2,20 +2,47 @@
 defined('BASEPATH') OR exit('No direct script access allowed');
 $wf_cart_total = isset($total_items) ? (int) $total_items : 0;
 $wf_carts = (isset($carts) && is_array($carts)) ? $carts : array();
+$wf_order_badge = isset($user_order_badge) ? (int) $user_order_badge : 0;
 
 $wf_nav_men = base_url('moi');
 $wf_nav_women = base_url('moi');
 $wf_nav_family = base_url('moi');
+$wf_nav_men_id = 0;
+$wf_nav_women_id = 8;
+$wf_nav_family_id = 9;
 if (isset($catalog) && is_array($catalog)) {
 	foreach ($catalog as $parent) {
 		if (isset($parent->name) && $parent->name === 'Thời trang nam') {
 			$wf_nav_men = build_category_url($parent->id);
+			$wf_nav_men_id = (int) $parent->id;
 		}
 		if ((int) $parent->id === 8) {
 			$wf_nav_women = build_category_url($parent->id);
+			$wf_nav_women_id = (int) $parent->id;
 		}
 		if ((int) $parent->id === 9) {
 			$wf_nav_family = build_category_url($parent->id);
+			$wf_nav_family_id = (int) $parent->id;
+		}
+	}
+}
+
+$wf_nav_active = 'home';
+$wf_uri = trim((string) $this->uri->uri_string(), '/');
+if ($wf_uri === '' || $wf_uri === 'home') {
+	$wf_nav_active = 'home';
+} else {
+	$wf_cat_id = (int) $this->uri->segment(3);
+	if ($wf_cat_id === $wf_nav_women_id) {
+		$wf_nav_active = 'women';
+	} elseif ($wf_cat_id === $wf_nav_men_id && $wf_nav_men_id > 0) {
+		$wf_nav_active = 'men';
+	} elseif ($wf_cat_id === $wf_nav_family_id) {
+		$wf_nav_active = 'family';
+	} else {
+		$wf_path = parse_url($wf_nav_women, PHP_URL_PATH);
+		if ($wf_path && strpos('/' . $wf_uri, rtrim($wf_path, '/')) === 0) {
+			$wf_nav_active = 'women';
 		}
 	}
 }
@@ -25,7 +52,7 @@ if (isset($catalog) && is_array($catalog)) {
 		<header class="wf-chrome-header" id="wfChromeHeader" role="banner">
 			<div class="wf-chrome-header__inner">
 				<a href="<?php echo base_url(); ?>" class="wf-chrome-logo" title="Trang chủ">
-					<img src="<?php echo base_url(); ?>upload/logo.png" alt="Logo">
+					<img src="<?php echo site_logo_url(); ?>" alt="<?php echo htmlspecialchars(shop_name(), ENT_QUOTES, 'UTF-8'); ?>">
 				</a>
 
 				<button type="button" class="wf-chrome-nav-toggle" id="wfChromeNavToggle" aria-expanded="false" aria-controls="wfChromeNavDrawer" aria-label="Mở menu">
@@ -34,10 +61,10 @@ if (isset($catalog) && is_array($catalog)) {
 
 				<nav class="wf-chrome-nav" id="wfChromeNavDrawer" aria-label="Menu chính">
 					<ul class="wf-chrome-menu">
-						<li class="wf-chrome-menu__item is-active"><a href="<?php echo base_url(); ?>">HOME</a></li>
-						<li class="wf-chrome-menu__item"><a href="<?php echo htmlspecialchars($wf_nav_men, ENT_QUOTES, 'UTF-8'); ?>">THỜI TRANG NAM</a></li>
-						<li class="wf-chrome-menu__item"><a href="<?php echo htmlspecialchars($wf_nav_women, ENT_QUOTES, 'UTF-8'); ?>">THỜI TRANG NỮ</a></li>
-						<li class="wf-chrome-menu__item"><a href="<?php echo htmlspecialchars($wf_nav_family, ENT_QUOTES, 'UTF-8'); ?>">THỜI TRANG GIA ĐÌNH</a></li>
+						<li class="wf-chrome-menu__item<?php echo ($wf_nav_active === 'home') ? ' is-active' : ''; ?>"><a href="<?php echo base_url(); ?>">HOME</a></li>
+						<li class="wf-chrome-menu__item<?php echo ($wf_nav_active === 'men') ? ' is-active' : ''; ?>"><a href="<?php echo htmlspecialchars($wf_nav_men, ENT_QUOTES, 'UTF-8'); ?>">THỜI TRANG NAM</a></li>
+						<li class="wf-chrome-menu__item<?php echo ($wf_nav_active === 'women') ? ' is-active' : ''; ?>"><a href="<?php echo htmlspecialchars($wf_nav_women, ENT_QUOTES, 'UTF-8'); ?>">THỜI TRANG NỮ</a></li>
+						<li class="wf-chrome-menu__item<?php echo ($wf_nav_active === 'family') ? ' is-active' : ''; ?>"><a href="<?php echo htmlspecialchars($wf_nav_family, ENT_QUOTES, 'UTF-8'); ?>">THỜI TRANG GIA ĐÌNH</a></li>
 					</ul>
 				</nav>
 
@@ -68,8 +95,11 @@ if (isset($catalog) && is_array($catalog)) {
 								<li><a href="<?php echo build_register_url(); ?>">Đăng ký</a></li>
 							</ul>
 						<?php } else { ?>
-							<button type="button" class="jm-icon-btn jm-icon-toggle wf-chrome-icon-btn" title="Tài khoản" aria-label="Tài khoản" aria-expanded="false" aria-haspopup="true">
+							<button type="button" class="jm-icon-btn jm-icon-toggle wf-chrome-icon-btn" title="Tài khoản" aria-label="Tài khoản<?php echo ($wf_order_badge > 0) ? ' — ' . $wf_order_badge . ' đơn đang xử lý' : ''; ?>" aria-expanded="false" aria-haspopup="true">
 								<i class="fa-solid fa-user" aria-hidden="true"></i>
+								<?php if ($wf_order_badge > 0) { ?>
+									<span class="jm-icon-dot wf-chrome-order-badge"><?php echo $wf_order_badge > 99 ? '99+' : $wf_order_badge; ?></span>
+								<?php } ?>
 							</button>
 							<ul class="jm-icon-popover jm-user-popover wf-chrome-popover wf-chrome-popover--menu">
 								<li><a href="<?php echo base_url('user'); ?>">Tài khoản</a></li>
@@ -90,7 +120,7 @@ if (isset($catalog) && is_array($catalog)) {
 								<ul class="jm-cart-mini-list wf-chrome-cart-list">
 									<?php foreach ($wf_carts as $items) { ?>
 										<li>
-											<img src="<?php echo base_url('upload/product/' . ($items['options']['image_link'] ?? 'no-image.jpg')); ?>" alt="">
+											<img src="<?php echo product_image_url($items['options']['image_link'] ?? ''); ?>" alt="">
 											<div>
 												<span class="jm-cart-mini-name"><?php echo htmlspecialchars(product_display_name($items['name']), ENT_QUOTES, 'UTF-8'); ?></span>
 												<span class="jm-cart-mini-meta"><?php echo (int) $items['qty']; ?> × <?php echo number_format($items['subtotal']); ?>đ</span>

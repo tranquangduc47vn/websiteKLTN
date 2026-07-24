@@ -1,7 +1,7 @@
 <?php
 $account_asset = site_asset_url('');
 ?>
-<link rel="stylesheet" href="<?php echo $account_asset; ?>css/account-luxury.css?v=7">
+<link rel="stylesheet" href="<?php echo $account_asset; ?>css/account-luxury.css?v=8">
 
 <div class="col-xs-12 jm-account-lux">
 	<div class="jm-account-lux__inner">
@@ -93,7 +93,7 @@ $account_asset = site_asset_url('');
 							</button>
 						</div>
 					</div>
-					<div class="jm-account-profile__item">
+					<div class="jm-account-profile__item jm-account-profile__item--full">
 						<span class="jm-account-profile__label">Địa chỉ</span>
 						<div class="jm-account-profile__row jm-account-profile__row--address">
 							<span class="jm-account-profile__value jm-account-profile__value--address" id="profileAddressView" title="<?php echo $default_address !== '' ? htmlspecialchars($default_address, ENT_QUOTES, 'UTF-8') : ''; ?>"><?php echo $default_address !== '' ? htmlspecialchars($default_address, ENT_QUOTES, 'UTF-8') : '—'; ?></span>
@@ -602,6 +602,32 @@ function thucHienHuyDon() {
     } else {
         chuoiLyDoCuThe = luaChonRadio;
     }
-    window.location.href = "<?php echo site_url('thanh-toan/cancel'); ?>/" + transactionId + "?reason=" + encodeURIComponent(chuoiLyDoCuThe);
+
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = "<?php echo site_url('thanh-toan/cancel'); ?>/" + encodeURIComponent(transactionId);
+
+    if (window.CI_CSRF) {
+        var csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = window.CI_CSRF.name;
+        csrfInput.value = window.CI_CSRF.hash;
+        form.appendChild(csrfInput);
+    }
+
+    var reasonInput = document.createElement('input');
+    reasonInput.type = 'hidden';
+    reasonInput.name = 'reason';
+    reasonInput.value = chuoiLyDoCuThe;
+    form.appendChild(reasonInput);
+
+    var txInput = document.createElement('input');
+    txInput.type = 'hidden';
+    txInput.name = 'transaction_id';
+    txInput.value = transactionId;
+    form.appendChild(txInput);
+
+    document.body.appendChild(form);
+    form.submit();
 }
 </script>

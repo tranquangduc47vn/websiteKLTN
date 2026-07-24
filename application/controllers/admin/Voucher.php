@@ -14,7 +14,7 @@ class Voucher extends MY_Admin_Controller {
 			redirect(admin_url('login'));
 		}
 		if (!admin_can('voucher.manage', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có quyền quản lý voucher!');
+			admin_flash_fail( 'Bạn không có quyền quản lý voucher!');
 			redirect(admin_url('home'));
 		}
 		$this->load->helper('loyalty');
@@ -26,7 +26,6 @@ class Voucher extends MY_Admin_Controller {
 		$input = array('order' => array('id', 'DESC'));
 		$this->data['list'] = $this->voucher_model->get_list($input);
 		$this->data['message'] = $this->session->flashdata('message');
-		$this->data['message_fail'] = $this->session->flashdata('message_fail');
 		$this->render_admin('admin/voucher/index');
 	}
 
@@ -40,7 +39,7 @@ class Voucher extends MY_Admin_Controller {
 			$data['created'] = time();
 			$data['used_count'] = 0;
 			if ($this->voucher_model->create($data)) {
-				$this->session->set_flashdata('message', 'Tạo voucher thành công.');
+				admin_flash_info( 'Tạo voucher thành công.');
 			}
 			redirect(admin_url('voucher'));
 		}
@@ -53,7 +52,7 @@ class Voucher extends MY_Admin_Controller {
 		$id = (int) $this->uri->rsegment(3);
 		$voucher = $this->voucher_model->get_info($id);
 		if (!$voucher) {
-			$this->session->set_flashdata('message_fail', 'Voucher không tồn tại.');
+			admin_flash_fail( 'Voucher không tồn tại.');
 			redirect(admin_url('voucher'));
 		}
 		if ($this->input->post('submit')) {
@@ -62,7 +61,7 @@ class Voucher extends MY_Admin_Controller {
 				redirect(admin_url('voucher/edit/' . $id));
 			}
 			$this->voucher_model->update($id, $data);
-			$this->session->set_flashdata('message', 'Cập nhật voucher thành công.');
+			admin_flash_info( 'Cập nhật voucher thành công.');
 			redirect(admin_url('voucher'));
 		}
 		$this->data['voucher'] = $voucher;
@@ -71,9 +70,10 @@ class Voucher extends MY_Admin_Controller {
 
 	public function delete()
 	{
+		admin_require_post();
 		$id = (int) $this->uri->rsegment(3);
 		if ($this->voucher_model->delete($id)) {
-			$this->session->set_flashdata('message', 'Đã xóa voucher.');
+			admin_flash_info( 'Đã xóa voucher.');
 		}
 		redirect(admin_url('voucher'));
 	}
@@ -88,7 +88,7 @@ class Voucher extends MY_Admin_Controller {
 					->set_output(json_encode(array('ok' => false, 'message' => 'Voucher không tồn tại.')));
 				return;
 			}
-			$this->session->set_flashdata('message_fail', 'Voucher không tồn tại.');
+			admin_flash_fail( 'Voucher không tồn tại.');
 			redirect(admin_url('voucher'));
 		}
 
@@ -96,16 +96,17 @@ class Voucher extends MY_Admin_Controller {
 		$this->voucher_model->update($id, array('is_active' => $new_active));
 
 		if ($this->input->is_ajax_request()) {
+			$this->load->helper('csrf');
 			$this->output->set_content_type('application/json', 'utf-8')
-				->set_output(json_encode(array(
+				->set_output(json_encode(array_merge(array(
 					'ok' => true,
 					'is_active' => $new_active,
 					'label' => $new_active ? 'Đang bật' : 'Tắt',
-				)));
+				), csrf_json_meta()), JSON_UNESCAPED_UNICODE));
 			return;
 		}
 
-		$this->session->set_flashdata('message', $new_active ? 'Đã bật voucher.' : 'Đã tắt voucher.');
+		admin_flash_info( $new_active ? 'Đã bật voucher.' : 'Đã tắt voucher.');
 		redirect(admin_url('voucher'));
 	}
 
@@ -113,12 +114,12 @@ class Voucher extends MY_Admin_Controller {
 	{
 		$code = loyalty_normalize_voucher_code($this->input->post('code'));
 		if ($code === '') {
-			$this->session->set_flashdata('message_fail', 'Mã voucher không hợp lệ.');
+			admin_flash_fail( 'Mã voucher không hợp lệ.');
 			return false;
 		}
 		$exists = $this->db->where('code', $code)->get('voucher')->row();
 		if ($exists && (int) $exists->id !== (int) $exclude_id) {
-			$this->session->set_flashdata('message_fail', 'Mã voucher đã tồn tại.');
+			admin_flash_fail( 'Mã voucher đã tồn tại.');
 			return false;
 		}
 

@@ -36,8 +36,22 @@
     }
 
     $chosen_price = $this->input->get('price_range');
+
+    $current_sort = $this->input->get('sort');
+    if ($current_sort === false || $current_sort === null || $current_sort === '') {
+        $current_sort = !empty($is_hot_list) ? 'hot' : 'new';
+    }
+    $sort_options = array();
+    if (!empty($is_hot_list)) {
+        $sort_options['hot'] = 'Bán chạy nhất';
+        $sort_options['new'] = 'Mới nhất';
+    } else {
+        $sort_options['new'] = 'Mới nhất';
+    }
+    $sort_options['price_asc'] = 'Giá tăng dần';
+    $sort_options['price_desc'] = 'Giá giảm dần';
 ?>
-<link rel="stylesheet" href="<?php echo $site_asset_url; ?>css/catalog-luxury.css?v=26">
+<link rel="stylesheet" href="<?php echo $site_asset_url; ?>css/catalog-luxury.css?v=28">
 <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12 jm-catalog-wrapper jm-catalog-lux jm-catalog-lux--sidebar-pinned">
 
     <div class="jm-toolbar jm-catalog-header">
@@ -48,7 +62,8 @@
             <div class="jm-product-counter">
                 Hiển thị <span class="jm-catalog-count"><?php echo isset($total) ? $total : (isset($product_list) ? count($product_list) : 0); ?></span> sản phẩm
             </div>
-            <div class="jm-sort-box">
+            <div class="jm-filter-slot-sort" data-jm-filter-home="sort">
+            <div class="jm-sort-box jm-sort-box--toolbar">
                 <label class="jm-label-sort">Xem theo</label>
                 <form method="GET" action="<?php echo $filter_action; ?>">
                     <?php 
@@ -71,7 +86,7 @@
                             echo '<input type="hidden" name="price_range" value="'.htmlspecialchars($this->input->get('price_range')).'">';
                         }
                     ?>
-                    <select class="form-control jm-select-sort" name="sort" onchange="this.form.submit()">
+                    <select class="form-control jm-select-sort" id="jmCatalogSortSelect" name="sort" onchange="this.form.submit()">
                         <?php if (!empty($is_hot_list)) { ?>
                         <option value="hot" <?php if ($this->input->get('sort') === 'hot' || $this->input->get('sort') === '' || $this->input->get('sort') === false) echo 'selected'; ?>>Bán chạy nhất</option>
                         <option value="new" <?php if ($this->input->get('sort') == 'new') echo 'selected'; ?>>Mới nhất</option>
@@ -83,8 +98,38 @@
                     </select>
                 </form>
             </div>
+            </div>
         </div>
     </div>
+
+    <div class="jm-catalog-mobile-bar" id="jmCatalogMobileBar" aria-label="Bộ lọc nhanh">
+        <div class="jm-catalog-mobile-bar__inner">
+            <button type="button" class="jm-mfilter-chip" data-jm-mfilter="sort" aria-expanded="false">
+                <span class="jm-mfilter-chip__text">Xem theo</span>
+                <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+            </button>
+            <button type="button" class="jm-mfilter-chip jm-mfilter-chip--filter" data-jm-mfilter="all" aria-expanded="false">
+                <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                <span class="jm-mfilter-chip__text">Bộ lọc</span>
+            </button>
+        </div>
+        <div class="jm-mfilter-drop" data-jm-mfilter-drop="sort" hidden>
+            <ul class="jm-sort-menu" role="listbox" aria-label="Sắp xếp sản phẩm">
+                <?php foreach ($sort_options as $sort_value => $sort_label) { ?>
+                <li role="none">
+                    <button type="button"
+                        class="jm-sort-menu__option<?php echo ($current_sort === $sort_value) ? ' is-active' : ''; ?>"
+                        role="option"
+                        data-sort-value="<?php echo htmlspecialchars($sort_value, ENT_QUOTES, 'UTF-8'); ?>"
+                        aria-selected="<?php echo ($current_sort === $sort_value) ? 'true' : 'false'; ?>">
+                        <?php echo htmlspecialchars($sort_label, ENT_QUOTES, 'UTF-8'); ?>
+                    </button>
+                </li>
+                <?php } ?>
+            </ul>
+        </div>
+    </div>
+    <div class="jm-catalog-mfilter-backdrop" id="jmCatalogMfilterBackdrop" hidden aria-hidden="true"></div>
 
     <div class="row jm-main-layout-flex">
         <aside class="col-xs-12 col-sm-4 col-md-3 jm-sidebar-filter">
@@ -135,7 +180,8 @@
                     </div>
                 </div>
 
-                <div class="jm-filter-group">
+                <div class="jm-filter-slot" data-jm-filter-home="size"></div>
+                <div class="jm-filter-group" id="jm-filter-group-size">
                     <div class="jm-filter-heading jm-filter-heading--static">
                         <span>Kích thước</span>
                     </div>
@@ -180,7 +226,8 @@
                     </div>
                 </div>
 
-                <div class="jm-filter-group">
+                <div class="jm-filter-slot" data-jm-filter-home="color"></div>
+                <div class="jm-filter-group" id="jm-filter-group-color">
                     <div class="jm-filter-heading jm-filter-heading--static">
                         <span>Màu sắc</span>
                     </div>
@@ -297,7 +344,7 @@
                                     <?php echo product_discount_badge_html($value); ?>
                                     <?php if (!$in_stock) { echo product_out_of_stock_badge_html(); } ?>
                                     <a href="<?php echo $product_link; ?>" class="jm-img-link">
-                                        <img src="<?php echo base_url(); ?>upload/product/<?php echo $value->image_link; ?>" alt="<?php echo htmlspecialchars(product_display_name($value->name), ENT_QUOTES, 'UTF-8'); ?>" class="jm-product-img">
+                                        <img src="<?php echo product_image_url($value->image_link); ?>" alt="<?php echo htmlspecialchars(product_display_name($value->name), ENT_QUOTES, 'UTF-8'); ?>" class="jm-product-img" loading="lazy">
                                     </a>
 
                                     <?php if ($in_stock) { ?>
@@ -326,7 +373,10 @@
                                     </div>
                                     
                                     <div class="jm-product-rating">
-                                        <span class="jm-stars">★★★★★</span>
+                                        <?php echo product_catalog_stars_html($value); ?>
+                                        <?php if (!empty($value->rate_count)) { ?>
+                                        <span class="jm-rating-avg">(<?php echo number_format(product_rating_average($value), 1, '.', ''); ?>)</span>
+                                        <?php } ?>
                                         <?php if (!empty($is_hot_list)) { ?>
                                         <span class="jm-sales-count">(<?php echo (int) $value->buyed; ?> đã bán)</span>
                                         <?php } else { ?>
@@ -373,4 +423,4 @@
     </div>
 </div>
 
-<script src="<?php echo $site_asset_url; ?>js/catalog-luxury.js?v=6"></script>
+<script src="<?php echo $site_asset_url; ?>js/catalog-luxury.js?v=12"></script>

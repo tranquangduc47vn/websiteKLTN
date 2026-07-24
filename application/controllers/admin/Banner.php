@@ -17,7 +17,7 @@ class Banner extends MY_Admin_Controller {
         }
 
         if (!admin_can('banner.manage', $this->currentUser)) {
-            $this->session->set_flashdata('message_fail', 'Bạn không có quyền quản lý khu vực Banner!');
+            admin_flash_fail( 'Bạn không có quyền quản lý khu vực Banner!');
             redirect(admin_url('home'));
         }
     }
@@ -27,7 +27,6 @@ class Banner extends MY_Admin_Controller {
         $this->data['list'] = $this->banner_model->get_list($input);
 
         $this->data['message'] = $this->session->flashdata('message');
-        $this->data['message_fail'] = $this->session->flashdata('message_fail');
 
         $this->render_admin('admin/banner/index');
     }
@@ -36,7 +35,7 @@ class Banner extends MY_Admin_Controller {
         $id = $this->uri->rsegment(3);
         $banner = $this->banner_model->get_info($id);
         if(!$banner) {
-            $this->session->set_flashdata('message', 'Không tồn tại banner này');
+            admin_flash_info( 'Không tồn tại banner này');
             redirect(admin_url('banner'));
         }
         $this->data['banner'] = $banner;
@@ -56,9 +55,9 @@ class Banner extends MY_Admin_Controller {
             }
 
             if($this->banner_model->update($banner->id, $data)) {
-                $this->session->set_flashdata('message', 'Cập nhật dữ liệu thành công');
+                admin_flash_info( 'Cập nhật dữ liệu thành công');
             } else {
-                $this->session->set_flashdata('message', 'Không có temporary thay đổi nào được thực hiện');
+                admin_flash_info( 'Không có temporary thay đổi nào được thực hiện');
             }
             redirect(admin_url('banner'));
         }

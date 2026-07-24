@@ -61,6 +61,13 @@
 		if (pollTimer) { window.clearInterval(pollTimer); pollTimer = null; }
 	}
 
+	function appendCsrfBody(body) {
+		if (window.CI_CSRF) {
+			body += (body ? '&' : '') + encodeURIComponent(window.CI_CSRF.name) + '=' + encodeURIComponent(window.CI_CSRF.hash);
+		}
+		return body;
+	}
+
 	function postJson(url, body) {
 		return fetch(url, {
 			method: 'POST',
@@ -69,13 +76,17 @@
 				'Content-Type': 'application/x-www-form-urlencoded',
 				'X-Requested-With': 'XMLHttpRequest',
 			},
-			body: body,
-		}).then(function (r) { return r.json(); });
+			body: appendCsrfBody(body),
+		}).then(function (r) { return r.json(); }).then(function (data) {
+			if (typeof window.applyCsrfResponse === 'function') {
+				window.applyCsrfResponse(data);
+			}
+			return data;
+		});
 	}
 
 	function takeConversation(done) {
-		return fetch(cfg.takeUrl, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-			.then(function (r) { return r.json(); })
+		return postJson(cfg.takeUrl, '')
 			.then(function (data) {
 				if (data && data.ok) {
 					if (statusEl) statusEl.textContent = data.status;
@@ -142,8 +153,7 @@
 	if (endBtn) {
 		endBtn.addEventListener('click', function () {
 			if (!confirm('Kết thúc cuộc trò chuyện?')) return;
-			fetch(cfg.endUrl, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-				.then(function (r) { return r.json(); })
+			postJson(cfg.endUrl, '')
 				.then(function (data) {
 					if (data && data.ok) {
 						if (statusEl) statusEl.textContent = data.status;
@@ -156,8 +166,7 @@
 	if (returnAiBtn) {
 		returnAiBtn.addEventListener('click', function () {
 			if (!confirm('Trả lại AI xử lý?')) return;
-			fetch(cfg.returnAiUrl, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-				.then(function (r) { return r.json(); })
+			postJson(cfg.returnAiUrl, '')
 				.then(function (data) {
 					if (data && data.ok) {
 						if (statusEl) statusEl.textContent = data.status;

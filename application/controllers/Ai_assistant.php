@@ -2,7 +2,7 @@
 defined('BASEPATH') OR exit('No direct script access allowed');
 
 // AJAX widget hỗ trợ khách
-class AiAssistant extends MY_Frontend_Controller {
+class Ai_assistant extends MY_Frontend_Controller {
 
 	public function send()
 	{

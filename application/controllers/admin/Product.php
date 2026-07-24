@@ -25,16 +25,13 @@ class Product extends MY_Admin_Controller {
 		}
 
 		if (!admin_can('product.manage', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có quyền truy cập khu vực Sản phẩm!');
+			admin_flash_fail( 'Bạn không có quyền truy cập khu vực Sản phẩm!');
 			redirect(admin_url('home')); 
 		}
 	}
 
 	public function index()
 	{
-		$this->data['message_success'] = $this->session->flashdata('message_success');
-		$this->data['message_fail'] = $this->session->flashdata('message_fail');
-
 		$search_name = $this->input->get('name');
 		$search_catalog = $this->input->get('catalog_id');
 		
@@ -126,15 +123,15 @@ class Product extends MY_Admin_Controller {
 				$path = './upload/product/';
 				$image_link = $this->upload_library->upload($path, 'image');
 				if (empty($image_link)) {
-					$this->session->set_flashdata(
-						'message_fail',
+					admin_flash_fail(
 						'Không tải được ảnh đại diện. ' . $this->upload_library->last_error()
 					);
 				} else {
 				$image_list = array();
 				$image_list = $this->upload_library->upload_file($path,'list_image');
+				$gallery_warning = '';
 				if (!empty($this->upload_library->last_error()) && empty($image_list)) {
-					$this->session->set_flashdata('message_fail', 'Ảnh kèm theo: ' . $this->upload_library->last_error());
+					$gallery_warning = ' Ảnh kèm theo: ' . $this->upload_library->last_error();
 				}
 				$image_list = json_encode($image_list);
 
@@ -184,12 +181,11 @@ class Product extends MY_Admin_Controller {
 					$sizes = is_array($size_array) ? $size_array : array();
 					$this->product_service->sync_variants($product_id, $colors, $sizes, $price_value);
 
-					$this->session->set_flashdata(
-						'message_success',
-						'Sản phẩm đã tạo thành công. Tồn kho hiện tại = 0. Hãy tạo phiếu nhập để cập nhật số lượng thực tế.'
+					admin_flash_success(
+						'Sản phẩm đã tạo thành công. Tồn kho hiện tại = 0. Hãy tạo phiếu nhập để cập nhật số lượng thực tế.' . $gallery_warning
 					);
 				}else{
-					$this->session->set_flashdata('message_fail', 'Thêm sản phẩm thất bại');
+					admin_flash_fail('Thêm sản phẩm thất bại');
 				}
 				redirect(admin_url('product'));
 				}
@@ -204,7 +200,7 @@ class Product extends MY_Admin_Controller {
 		$id = $this->uri->rsegment(3);
 		$product = $this->product_model->get_info($id);
 		if(!$product) {
-			$this->session->set_flashdata('message_fail', 'Không tồn tại sản phẩm này');
+			admin_flash_fail( 'Không tồn tại sản phẩm này');
 			redirect(admin_url('product'));
 		}
 
@@ -256,9 +252,9 @@ class Product extends MY_Admin_Controller {
 			$colors = is_array($color_array) ? $color_array : array();
 			$sizes = is_array($size_array) ? $size_array : array();
 			$this->product_service->sync_variants($product->id, $colors, $sizes, $price);
-			$this->session->set_flashdata('message_success', 'Cập nhật sản phẩm thành công!');
+			admin_flash_success( 'Cập nhật sản phẩm thành công!');
 		} else {
-			$this->session->set_flashdata('message_fail', 'Có lỗi xảy ra, không thể cập nhật.');
+			admin_flash_fail( 'Có lỗi xảy ra, không thể cập nhật.');
 		}
 		redirect(admin_url('product'));
 	}
@@ -279,17 +275,32 @@ class Product extends MY_Admin_Controller {
 		}
 
 		if (!admin_can('product.delete_single', $this->currentUser)) {
-			echo 'failer';
+			$this->_product_del_response(false);
 			return;
 		}
 
 		$id = (int) $this->input->post('id');
 		if ($id <= 0) {
-			echo 'failer';
+			$this->_product_del_response(false);
 			return;
 		}
 
-		echo $this->_delete_products_by_ids(array($id)) > 0 ? 'success' : 'failer';
+		$this->_product_del_response($this->_delete_products_by_ids(array($id)) > 0);
+	}
+
+	protected function _product_del_response($ok)
+	{
+		$this->load->helper('csrf');
+		if ($this->input->is_ajax_request()) {
+			$this->output->set_content_type('application/json', 'utf-8')
+				->set_output(json_encode(array_merge(array(
+					'ok' => (bool) $ok,
+					'status' => $ok ? 'success' : 'failer',
+				), csrf_json_meta()), JSON_UNESCAPED_UNICODE));
+			return;
+		}
+
+		echo $ok ? 'success' : 'failer';
 	}
 
 	public function bulk_del()
@@ -304,7 +315,7 @@ class Product extends MY_Admin_Controller {
 				echo 'failer';
 				return;
 			}
-			$this->session->set_flashdata('message_fail', 'Tài khoản nhân viên (MOD) không có quyền xóa hàng loạt sản phẩm!');
+			admin_flash_fail( 'Tài khoản nhân viên (MOD) không có quyền xóa hàng loạt sản phẩm!');
 			redirect(admin_url('product'));
 			return;
 		}
@@ -315,7 +326,7 @@ class Product extends MY_Admin_Controller {
 				echo 'failer';
 				return;
 			}
-			$this->session->set_flashdata('message_fail', 'Không có sản phẩm nào được chọn');
+			admin_flash_fail( 'Không có sản phẩm nào được chọn');
 			redirect(admin_url('product'));
 			return;
 		}
@@ -333,9 +344,9 @@ class Product extends MY_Admin_Controller {
 			if ($deleted < $selected) {
 				$msg .= ' (' . ($selected - $deleted) . ' sản phẩm không xóa được)';
 			}
-			$this->session->set_flashdata('message_success', $msg);
+			admin_flash_success( $msg);
 		} else {
-			$this->session->set_flashdata('message_fail', 'Không xóa được sản phẩm đã chọn. Vui lòng thử lại.');
+			admin_flash_fail( 'Không xóa được sản phẩm đã chọn. Vui lòng thử lại.');
 		}
 		redirect(admin_url('product'));
 	}
@@ -458,8 +469,7 @@ class Product extends MY_Admin_Controller {
 		if (!empty($_FILES['image']['name'])) {
 			$uploaded_main = $this->upload_library->upload($upload_path, 'image');
 			if (empty($uploaded_main)) {
-				$this->session->set_flashdata(
-					'message_fail',
+				admin_flash_fail(
 					'Không cập nhật được ảnh đại diện. ' . $this->upload_library->last_error()
 				);
 				redirect(admin_url('product/edit/' . $product->id));

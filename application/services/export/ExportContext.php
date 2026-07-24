@@ -21,7 +21,7 @@ class ExportContext
 		$this->exporterName = '';
 		$this->filterText = '';
 
-		$logo = FCPATH . 'upload/logo.png';
+		$logo = function_exists('site_logo_absolute_path') ? site_logo_absolute_path() : (FCPATH . 'upload/logo.png');
 		if (is_file($logo)) {
 			$this->logoPath = $logo;
 		}

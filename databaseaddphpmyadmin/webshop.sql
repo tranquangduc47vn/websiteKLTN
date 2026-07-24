@@ -1,4 +1,8 @@
 -- phpMyAdmin SQL Dump
+--
+-- FULL SCHEMA: đã gộp module kho v2 (suppliers, stock_*, product_variants).
+-- Import file này một lần trên hosting; run_migrations.php chỉ cần khi nâng cấp DB cũ.
+--
 -- version 5.2.3
 -- https://www.phpmyadmin.net/
 --
@@ -437,6 +441,8 @@ CREATE TABLE `order` (
   `size` varchar(50) COLLATE utf8mb3_unicode_ci DEFAULT NULL,
   `color` varchar(100) COLLATE utf8mb3_unicode_ci DEFAULT NULL,
   `qty` int NOT NULL DEFAULT '0',
+  `variant_id` int NOT NULL DEFAULT '0',
+  `cost_price` decimal(15,2) NOT NULL DEFAULT '0.00',
   `amount` decimal(15,2) NOT NULL DEFAULT '0.00',
   `status` int NOT NULL DEFAULT '0'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
@@ -524,6 +530,8 @@ CREATE TABLE `product` (
   `discount` int DEFAULT '0',
   `discount_type` varchar(10) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT 'percent',
   `discount_percent` int NOT NULL DEFAULT '0',
+  `code` varchar(64) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  `status` tinyint NOT NULL DEFAULT '1',
   `image_link` varchar(100) COLLATE utf8mb3_unicode_ci NOT NULL,
   `image_list` text COLLATE utf8mb3_unicode_ci NOT NULL,
   `view` int NOT NULL DEFAULT '0',
@@ -893,6 +901,151 @@ CREATE TABLE `product_review` (
   KEY `idx_product_review_user` (`user_id`),
   KEY `idx_product_review_session` (`session_token`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
+
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `suppliers`
+--
+
+CREATE TABLE `suppliers` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `code` varchar(32) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  `name` varchar(255) COLLATE utf8mb3_unicode_ci NOT NULL,
+  `contact_name` varchar(128) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  `phone` varchar(32) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  `email` varchar(128) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  `address` varchar(512) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  `note` text COLLATE utf8mb3_unicode_ci,
+  `status` tinyint NOT NULL DEFAULT '1',
+  `created` int NOT NULL DEFAULT '0',
+  `updated` int NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_suppliers_code` (`code`),
+  KEY `idx_suppliers_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `stock_receipts`
+--
+
+CREATE TABLE `stock_receipts` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `receipt_code` varchar(20) COLLATE utf8mb3_unicode_ci NOT NULL,
+  `supplier_id` int NOT NULL DEFAULT '0',
+  `status` enum('draft','confirmed','cancelled') COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT 'draft',
+  `receipt_date` date DEFAULT NULL,
+  `note` text COLLATE utf8mb3_unicode_ci,
+  `total_qty` int NOT NULL DEFAULT '0',
+  `total_amount` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `created_by` int NOT NULL DEFAULT '0',
+  `confirmed_by` int NOT NULL DEFAULT '0',
+  `confirmed_at` int NOT NULL DEFAULT '0',
+  `cancelled_at` int NOT NULL DEFAULT '0',
+  `created` int NOT NULL DEFAULT '0',
+  `updated` int NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_stock_receipts_code` (`receipt_code`),
+  KEY `idx_stock_receipts_status` (`status`),
+  KEY `idx_stock_receipts_supplier` (`supplier_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `stock_receipt_items`
+--
+
+CREATE TABLE `stock_receipt_items` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `receipt_id` int NOT NULL,
+  `product_id` int NOT NULL,
+  `variant_id` int NOT NULL DEFAULT '0',
+  `size` varchar(64) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  `color` varchar(64) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  `qty` int NOT NULL DEFAULT '0',
+  `unit_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `subtotal` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `note` varchar(255) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`),
+  KEY `idx_sri_receipt` (`receipt_id`),
+  KEY `idx_sri_product` (`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `product_inventory`
+--
+
+CREATE TABLE `product_inventory` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `size` varchar(64) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  `color` varchar(64) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  `quantity` int NOT NULL DEFAULT '0',
+  `updated` int NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_product_inventory_variant` (`product_id`,`size`,`color`),
+  KEY `idx_pi_product` (`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `stock_movements`
+--
+
+CREATE TABLE `stock_movements` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `variant_id` int NOT NULL DEFAULT '0',
+  `size` varchar(64) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  `color` varchar(64) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  `movement_type` varchar(16) COLLATE utf8mb3_unicode_ci NOT NULL,
+  `qty_change` int NOT NULL,
+  `before_qty` int NOT NULL DEFAULT '0',
+  `after_qty` int NOT NULL DEFAULT '0',
+  `reference_type` varchar(32) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  `reference_id` int NOT NULL DEFAULT '0',
+  `note` varchar(255) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  `created_by` int NOT NULL DEFAULT '0',
+  `created` int NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  KEY `idx_sm_product` (`product_id`),
+  KEY `idx_sm_reference` (`reference_type`,`reference_id`),
+  KEY `idx_sm_created` (`created`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `product_variants`
+--
+
+CREATE TABLE `product_variants` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `sku` varchar(64) COLLATE utf8mb3_unicode_ci NOT NULL,
+  `color` varchar(64) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  `size` varchar(64) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  `price` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `cost_price` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `stock` int NOT NULL DEFAULT '0',
+  `min_stock` int NOT NULL DEFAULT '5',
+  `image` varchar(255) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
+  `status` tinyint NOT NULL DEFAULT '1',
+  `created` int NOT NULL DEFAULT '0',
+  `updated` int NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_product_variants_sku` (`sku`),
+  UNIQUE KEY `uk_product_variants_combo` (`product_id`,`color`,`size`),
+  KEY `idx_pv_product` (`product_id`),
+  KEY `idx_pv_stock` (`stock`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -1303,6 +1456,779 @@ ALTER TABLE `voucher`
 --
 ALTER TABLE `voucher_use`
   MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+
+
+
+
+
+-- --------------------------------------------------------
+-- Module kho v2: mã SP, biến thể (gộp từ run_migrations.php)
+-- --------------------------------------------------------
+
+UPDATE `product` SET `code` = 'SP00001' WHERE `id` = 1;
+UPDATE `product` SET `code` = 'SP00002' WHERE `id` = 2;
+UPDATE `product` SET `code` = 'SP00003' WHERE `id` = 3;
+UPDATE `product` SET `code` = 'SP00004' WHERE `id` = 4;
+UPDATE `product` SET `code` = 'SP00006' WHERE `id` = 6;
+UPDATE `product` SET `code` = 'SP00007' WHERE `id` = 7;
+UPDATE `product` SET `code` = 'SP00009' WHERE `id` = 9;
+UPDATE `product` SET `code` = 'SP00010' WHERE `id` = 10;
+UPDATE `product` SET `code` = 'SP00011' WHERE `id` = 11;
+UPDATE `product` SET `code` = 'SP00012' WHERE `id` = 12;
+UPDATE `product` SET `code` = 'SP00013' WHERE `id` = 13;
+UPDATE `product` SET `code` = 'SP00014' WHERE `id` = 14;
+UPDATE `product` SET `code` = 'SP00015' WHERE `id` = 15;
+UPDATE `product` SET `code` = 'SP00016' WHERE `id` = 16;
+UPDATE `product` SET `code` = 'SP00017' WHERE `id` = 17;
+UPDATE `product` SET `code` = 'SP00018' WHERE `id` = 18;
+UPDATE `product` SET `code` = 'SP00019' WHERE `id` = 19;
+UPDATE `product` SET `code` = 'SP00020' WHERE `id` = 20;
+UPDATE `product` SET `code` = 'SP00021' WHERE `id` = 21;
+UPDATE `product` SET `code` = 'SP00022' WHERE `id` = 22;
+UPDATE `product` SET `code` = 'SP00023' WHERE `id` = 23;
+UPDATE `product` SET `code` = 'SP00024' WHERE `id` = 24;
+UPDATE `product` SET `code` = 'SP00027' WHERE `id` = 27;
+UPDATE `product` SET `code` = 'SP00028' WHERE `id` = 28;
+UPDATE `product` SET `code` = 'SP00049' WHERE `id` = 49;
+UPDATE `product` SET `code` = 'SP00050' WHERE `id` = 50;
+UPDATE `product` SET `code` = 'SP00051' WHERE `id` = 51;
+UPDATE `product` SET `code` = 'SP00052' WHERE `id` = 52;
+UPDATE `product` SET `code` = 'SP00053' WHERE `id` = 53;
+UPDATE `product` SET `code` = 'SP00054' WHERE `id` = 54;
+UPDATE `product` SET `code` = 'SP00055' WHERE `id` = 55;
+UPDATE `product` SET `code` = 'SP00056' WHERE `id` = 56;
+UPDATE `product` SET `code` = 'SP00057' WHERE `id` = 57;
+UPDATE `product` SET `code` = 'SP00058' WHERE `id` = 58;
+UPDATE `product` SET `code` = 'SP00059' WHERE `id` = 59;
+UPDATE `product` SET `code` = 'SP00060' WHERE `id` = 60;
+UPDATE `product` SET `code` = 'SP00061' WHERE `id` = 61;
+UPDATE `product` SET `code` = 'SP00062' WHERE `id` = 62;
+UPDATE `product` SET `code` = 'SP00063' WHERE `id` = 63;
+UPDATE `product` SET `code` = 'SP00064' WHERE `id` = 64;
+UPDATE `product` SET `code` = 'SP00065' WHERE `id` = 65;
+UPDATE `product` SET `code` = 'SP00066' WHERE `id` = 66;
+UPDATE `product` SET `code` = 'SP00067' WHERE `id` = 67;
+UPDATE `product` SET `code` = 'SP00068' WHERE `id` = 68;
+UPDATE `product` SET `code` = 'SP00069' WHERE `id` = 69;
+UPDATE `product` SET `code` = 'SP00070' WHERE `id` = 70;
+UPDATE `product` SET `code` = 'SP00071' WHERE `id` = 71;
+UPDATE `product` SET `code` = 'SP00072' WHERE `id` = 72;
+UPDATE `product` SET `code` = 'SP00073' WHERE `id` = 73;
+UPDATE `product` SET `code` = 'SP00074' WHERE `id` = 74;
+UPDATE `product` SET `code` = 'SP00075' WHERE `id` = 75;
+UPDATE `product` SET `code` = 'SP00076' WHERE `id` = 76;
+UPDATE `product` SET `code` = 'SP00077' WHERE `id` = 77;
+UPDATE `product` SET `code` = 'SP00078' WHERE `id` = 78;
+UPDATE `product` SET `code` = 'SP00079' WHERE `id` = 79;
+UPDATE `product` SET `code` = 'SP00080' WHERE `id` = 80;
+UPDATE `product` SET `code` = 'SP00081' WHERE `id` = 81;
+UPDATE `product` SET `code` = 'SP00082' WHERE `id` = 82;
+UPDATE `product` SET `code` = 'SP00083' WHERE `id` = 83;
+UPDATE `product` SET `code` = 'SP00084' WHERE `id` = 84;
+UPDATE `product` SET `code` = 'SP00085' WHERE `id` = 85;
+UPDATE `product` SET `code` = 'SP00086' WHERE `id` = 86;
+UPDATE `product` SET `code` = 'SP00087' WHERE `id` = 87;
+UPDATE `product` SET `code` = 'SP00088' WHERE `id` = 88;
+UPDATE `product` SET `code` = 'SP00089' WHERE `id` = 89;
+UPDATE `product` SET `code` = 'SP00090' WHERE `id` = 90;
+UPDATE `product` SET `code` = 'SP00091' WHERE `id` = 91;
+UPDATE `product` SET `code` = 'SP00092' WHERE `id` = 92;
+UPDATE `product` SET `code` = 'SP00093' WHERE `id` = 93;
+UPDATE `product` SET `code` = 'SP00104' WHERE `id` = 104;
+UPDATE `product` SET `code` = 'SP00105' WHERE `id` = 105;
+UPDATE `product` SET `code` = 'SP00106' WHERE `id` = 106;
+UPDATE `product` SET `code` = 'SP00107' WHERE `id` = 107;
+UPDATE `product` SET `code` = 'SP00108' WHERE `id` = 108;
+UPDATE `product` SET `code` = 'SP00109' WHERE `id` = 109;
+UPDATE `product` SET `code` = 'SP00110' WHERE `id` = 110;
+UPDATE `product` SET `code` = 'SP00111' WHERE `id` = 111;
+UPDATE `product` SET `code` = 'SP00112' WHERE `id` = 112;
+UPDATE `product` SET `code` = 'SP00113' WHERE `id` = 113;
+UPDATE `product` SET `code` = 'SP00114' WHERE `id` = 114;
+UPDATE `product` SET `code` = 'SP00115' WHERE `id` = 115;
+UPDATE `product` SET `code` = 'SP00116' WHERE `id` = 116;
+UPDATE `product` SET `code` = 'SP00117' WHERE `id` = 117;
+UPDATE `product` SET `code` = 'SP00118' WHERE `id` = 118;
+UPDATE `product` SET `code` = 'SP00119' WHERE `id` = 119;
+UPDATE `product` SET `code` = 'SP00120' WHERE `id` = 120;
+UPDATE `product` SET `code` = 'SP00121' WHERE `id` = 121;
+UPDATE `product` SET `code` = 'SP00122' WHERE `id` = 122;
+UPDATE `product` SET `code` = 'SP00123' WHERE `id` = 123;
+UPDATE `product` SET `code` = 'SP00124' WHERE `id` = 124;
+UPDATE `product` SET `code` = 'SP00125' WHERE `id` = 125;
+UPDATE `product` SET `code` = 'SP00126' WHERE `id` = 126;
+UPDATE `product` SET `code` = 'SP00127' WHERE `id` = 127;
+UPDATE `product` SET `code` = 'SP00128' WHERE `id` = 128;
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (1, 1, 'SP00001-EN-M', 'Đen', 'M', 17900000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (2, 1, 'SP00001-EN-L', 'Đen', 'L', 17900000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (3, 1, 'SP00001-EN-XL', 'Đen', 'XL', 17900000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (4, 1, 'SP00001-EN-XXL', 'Đen', 'XXL', 17900000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (5, 1, 'SP00001-CAM-M', 'Cam', 'M', 17900000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (6, 1, 'SP00001-CAM-L', 'Cam', 'L', 17900000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (7, 1, 'SP00001-CAM-XL', 'Cam', 'XL', 17900000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (8, 1, 'SP00001-CAM-XXL', 'Cam', 'XXL', 17900000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (9, 1, 'SP00001-X-M-M', 'Xám', 'M', 17900000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (10, 1, 'SP00001-X-M-L', 'Xám', 'L', 17900000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (11, 1, 'SP00001-X-M-XL', 'Xám', 'XL', 17900000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (12, 1, 'SP00001-X-M-XXL', 'Xám', 'XXL', 17900000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (13, 2, 'SP00002-EN-M', 'Đen', 'M', 255000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (14, 2, 'SP00002-EN-L', 'Đen', 'L', 255000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (15, 2, 'SP00002-EN-XL', 'Đen', 'XL', 255000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (16, 2, 'SP00002-EN-XXL', 'Đen', 'XXL', 255000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (17, 2, 'SP00002-XANH-EN-M', 'Xanh đen', 'M', 255000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (18, 2, 'SP00002-XANH-EN-L', 'Xanh đen', 'L', 255000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (19, 2, 'SP00002-XANH-EN-XL', 'Xanh đen', 'XL', 255000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (20, 2, 'SP00002-XANH-EN-XXL', 'Xanh đen', 'XXL', 255000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (21, 2, 'SP00002-X-M-M', 'Xám', 'M', 255000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (22, 2, 'SP00002-X-M-L', 'Xám', 'L', 255000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (23, 2, 'SP00002-X-M-XL', 'Xám', 'XL', 255000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (24, 2, 'SP00002-X-M-XXL', 'Xám', 'XXL', 255000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (25, 3, 'SP00003-EN-M', 'Đen', 'M', 300000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (26, 3, 'SP00003-EN-L', 'Đen', 'L', 300000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (27, 3, 'SP00003-EN-XL', 'Đen', 'XL', 300000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (28, 3, 'SP00003-EN-XXL', 'Đen', 'XXL', 300000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (29, 3, 'SP00003-XANH-EN-M', 'Xanh đen', 'M', 300000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (30, 3, 'SP00003-XANH-EN-L', 'Xanh đen', 'L', 300000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (31, 3, 'SP00003-XANH-EN-XL', 'Xanh đen', 'XL', 300000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (32, 3, 'SP00003-XANH-EN-XXL', 'Xanh đen', 'XXL', 300000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (33, 3, 'SP00003-X-M-M', 'Xám', 'M', 300000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (34, 3, 'SP00003-X-M-L', 'Xám', 'L', 300000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (35, 3, 'SP00003-X-M-XL', 'Xám', 'XL', 300000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (36, 3, 'SP00003-X-M-XXL', 'Xám', 'XXL', 300000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (37, 4, 'SP00004-DF-DF', '', '', 280000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (38, 6, 'SP00006-DF-DF', '', '', 300000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (39, 7, 'SP00007-DF-DF', '', '', 450000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (40, 9, 'SP00009-DF-DF', '', '', 180000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (41, 10, 'SP00010-DF-DF', '', '', 129000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (42, 11, 'SP00011-DF-DF', '', '', 80000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (43, 12, 'SP00012-DF-DF', '', '', 720000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (44, 13, 'SP00013-DF-DF', '', '', 200000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (45, 14, 'SP00014-DF-DF', '', '', 200000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (46, 15, 'SP00015-DF-DF', '', '', 350000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (47, 16, 'SP00016-DF-DF', '', '', 580000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (48, 17, 'SP00017-DF-DF', '', '', 500000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (49, 18, 'SP00018-DF-DF', '', '', 900000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (50, 19, 'SP00019-DF-DF', '', '', 390000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (51, 20, 'SP00020-DF-DF', '', '', 380000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (52, 21, 'SP00021-DF-DF', '', '', 180000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (53, 22, 'SP00022-DF-DF', '', '', 400000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (54, 23, 'SP00023-DF-S', '', 'S', 450000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (55, 23, 'SP00023-DF-M', '', 'M', 450000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (56, 23, 'SP00023-DF-XXL', '', 'XXL', 450000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (57, 24, 'SP00024-DF-DF', '', '', 230000, 0, 10, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (58, 27, 'SP00027-T-M-S', 'Tím', 'S', 200000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (59, 27, 'SP00027-T-M-M', 'Tím', 'M', 200000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (60, 27, 'SP00027-T-M-L', 'Tím', 'L', 200000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (61, 27, 'SP00027-T-M-XXL', 'Tím', 'XXL', 200000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (62, 27, 'SP00027-EN-S', 'Đen', 'S', 200000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (63, 27, 'SP00027-EN-M', 'Đen', 'M', 200000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (64, 27, 'SP00027-EN-L', 'Đen', 'L', 200000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (65, 27, 'SP00027-EN-XXL', 'Đen', 'XXL', 200000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (66, 27, 'SP00027-DF-S', 'Đỏ', 'S', 200000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (67, 27, 'SP00027-DF-M', 'Đỏ', 'M', 200000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (68, 27, 'SP00027-DF-L', 'Đỏ', 'L', 200000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (69, 27, 'SP00027-DF-XXL', 'Đỏ', 'XXL', 200000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (70, 27, 'SP00027-V-NG-S', 'Vàng', 'S', 200000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (71, 27, 'SP00027-V-NG-M', 'Vàng', 'M', 200000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (72, 27, 'SP00027-V-NG-L', 'Vàng', 'L', 200000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (73, 27, 'SP00027-V-NG-XXL', 'Vàng', 'XXL', 200000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (74, 28, 'SP00028-EN-M', 'Đen', 'M', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (75, 28, 'SP00028-EN-L', 'Đen', 'L', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (76, 28, 'SP00028-EN-XL', 'Đen', 'XL', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (77, 28, 'SP00028-EN-XXL', 'Đen', 'XXL', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (78, 28, 'SP00028-TR-NG-M', 'Trắng', 'M', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (79, 28, 'SP00028-TR-NG-L', 'Trắng', 'L', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (80, 28, 'SP00028-TR-NG-XL', 'Trắng', 'XL', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (81, 28, 'SP00028-TR-NG-XXL', 'Trắng', 'XXL', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (82, 28, 'SP00028-DF-M', 'Đỏ', 'M', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (83, 28, 'SP00028-DF-L', 'Đỏ', 'L', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (84, 28, 'SP00028-DF-XL', 'Đỏ', 'XL', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (85, 28, 'SP00028-DF-XXL', 'Đỏ', 'XXL', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (86, 28, 'SP00028-CAM-M', 'Cam', 'M', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (87, 28, 'SP00028-CAM-L', 'Cam', 'L', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (88, 28, 'SP00028-CAM-XL', 'Cam', 'XL', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (89, 28, 'SP00028-CAM-XXL', 'Cam', 'XXL', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (90, 49, 'SP00049-EN-S', 'Đen', 'S', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (91, 49, 'SP00049-EN-M', 'Đen', 'M', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (92, 49, 'SP00049-EN-L', 'Đen', 'L', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (93, 49, 'SP00049-EN-XL', 'Đen', 'XL', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (94, 49, 'SP00049-EN-XXL', 'Đen', 'XXL', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (95, 49, 'SP00049-TR-NG-S', 'Trắng', 'S', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (96, 49, 'SP00049-TR-NG-M', 'Trắng', 'M', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (97, 49, 'SP00049-TR-NG-L', 'Trắng', 'L', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (98, 49, 'SP00049-TR-NG-XL', 'Trắng', 'XL', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (99, 49, 'SP00049-TR-NG-XXL', 'Trắng', 'XXL', 169000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (100, 50, 'SP00050-EN-S', 'Đen', 'S', 795000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (101, 50, 'SP00050-EN-M', 'Đen', 'M', 795000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (102, 50, 'SP00050-EN-L', 'Đen', 'L', 795000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (103, 50, 'SP00050-EN-XL', 'Đen', 'XL', 795000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (104, 50, 'SP00050-TR-NG-S', 'Trắng', 'S', 795000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (105, 50, 'SP00050-TR-NG-M', 'Trắng', 'M', 795000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (106, 50, 'SP00050-TR-NG-L', 'Trắng', 'L', 795000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (107, 50, 'SP00050-TR-NG-XL', 'Trắng', 'XL', 795000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (108, 50, 'SP00050-DF-S', 'Đỏ', 'S', 795000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (109, 50, 'SP00050-DF-M', 'Đỏ', 'M', 795000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (110, 50, 'SP00050-DF-L', 'Đỏ', 'L', 795000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (111, 50, 'SP00050-DF-XL', 'Đỏ', 'XL', 795000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (112, 50, 'SP00050-V-NG-S', 'Vàng', 'S', 795000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (113, 50, 'SP00050-V-NG-M', 'Vàng', 'M', 795000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (114, 50, 'SP00050-V-NG-L', 'Vàng', 'L', 795000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (115, 50, 'SP00050-V-NG-XL', 'Vàng', 'XL', 795000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (116, 51, 'SP00051-EN-S', 'Đen', 'S', 945000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (117, 51, 'SP00051-EN-M', 'Đen', 'M', 945000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (118, 51, 'SP00051-TR-NG-S', 'Trắng', 'S', 945000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (119, 51, 'SP00051-TR-NG-M', 'Trắng', 'M', 945000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (120, 51, 'SP00051-H-NG-S', 'Hồng', 'S', 945000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (121, 51, 'SP00051-H-NG-M', 'Hồng', 'M', 945000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (122, 51, 'SP00051-N-U-S', 'Nâu', 'S', 945000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (123, 51, 'SP00051-N-U-M', 'Nâu', 'M', 945000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (124, 52, 'SP00052-TR-NG-M', 'Trắng', 'M', 875000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (125, 52, 'SP00052-TR-NG-L', 'Trắng', 'L', 875000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (126, 52, 'SP00052-H-NG-M', 'Hồng', 'M', 875000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (127, 52, 'SP00052-H-NG-L', 'Hồng', 'L', 875000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (128, 53, 'SP00053-XANH-D-NG-M', 'Xanh dương', 'M', 875000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (129, 53, 'SP00053-XANH-D-NG-L', 'Xanh dương', 'L', 875000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (130, 53, 'SP00053-XANH-D-NG-XL', 'Xanh dương', 'XL', 875000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (131, 53, 'SP00053-H-NG-M', 'Hồng', 'M', 875000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (132, 53, 'SP00053-H-NG-L', 'Hồng', 'L', 875000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (133, 53, 'SP00053-H-NG-XL', 'Hồng', 'XL', 875000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (134, 54, 'SP00054-EN-S', 'Đen', 'S', 1055000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (135, 54, 'SP00054-EN-M', 'Đen', 'M', 1055000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (136, 54, 'SP00054-EN-L', 'Đen', 'L', 1055000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (137, 54, 'SP00054-EN-XL', 'Đen', 'XL', 1055000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (138, 54, 'SP00054-TR-NG-S', 'Trắng', 'S', 1055000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (139, 54, 'SP00054-TR-NG-M', 'Trắng', 'M', 1055000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (140, 54, 'SP00054-TR-NG-L', 'Trắng', 'L', 1055000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (141, 54, 'SP00054-TR-NG-XL', 'Trắng', 'XL', 1055000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (142, 54, 'SP00054-H-NG-S', 'Hồng', 'S', 1055000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (143, 54, 'SP00054-H-NG-M', 'Hồng', 'M', 1055000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (144, 54, 'SP00054-H-NG-L', 'Hồng', 'L', 1055000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (145, 54, 'SP00054-H-NG-XL', 'Hồng', 'XL', 1055000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (146, 55, 'SP00055-TR-NG-S', 'Trắng', 'S', 199000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (147, 55, 'SP00055-TR-NG-M', 'Trắng', 'M', 199000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (148, 55, 'SP00055-TR-NG-L', 'Trắng', 'L', 199000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (149, 55, 'SP00055-TR-NG-XL', 'Trắng', 'XL', 199000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (150, 56, 'SP00056-EN-DF', 'Đen', '', 599000, 0, 15, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (151, 57, 'SP00057-DF-S', '', 'S', 895000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (152, 57, 'SP00057-DF-M', '', 'M', 895000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (153, 57, 'SP00057-DF-L', '', 'L', 895000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (154, 58, 'SP00058-DF-S', '', 'S', 895000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (155, 58, 'SP00058-DF-M', '', 'M', 895000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (156, 58, 'SP00058-DF-L', '', 'L', 895000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (157, 58, 'SP00058-DF-XL', '', 'XL', 895000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (158, 59, 'SP00059-DF-S', '', 'S', 875000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (159, 59, 'SP00059-DF-M', '', 'M', 875000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (160, 59, 'SP00059-DF-L', '', 'L', 875000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (161, 60, 'SP00060-DF-S', '', 'S', 895000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (162, 60, 'SP00060-DF-M', '', 'M', 895000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (163, 60, 'SP00060-DF-L', '', 'L', 895000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (164, 60, 'SP00060-DF-XL', '', 'XL', 895000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (165, 61, 'SP00061-DF-S', '', 'S', 895000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (166, 61, 'SP00061-DF-M', '', 'M', 895000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (167, 61, 'SP00061-DF-L', '', 'L', 895000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (168, 61, 'SP00061-DF-XL', '', 'XL', 895000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (169, 62, 'SP00062-DF-S', '', 'S', 985000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (170, 62, 'SP00062-DF-M', '', 'M', 985000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (171, 62, 'SP00062-DF-L', '', 'L', 985000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (172, 63, 'SP00063-DF-S', '', 'S', 875000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (173, 63, 'SP00063-DF-M', '', 'M', 875000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (174, 63, 'SP00063-DF-L', '', 'L', 875000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (175, 64, 'SP00064-DF-S', '', 'S', 975000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (176, 64, 'SP00064-DF-M', '', 'M', 975000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (177, 64, 'SP00064-DF-L', '', 'L', 975000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (178, 65, 'SP00065-DF-S', '', 'S', 355000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (179, 65, 'SP00065-DF-M', '', 'M', 355000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (180, 65, 'SP00065-DF-L', '', 'L', 355000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (181, 66, 'SP00066-DF-S', '', 'S', 295000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (182, 66, 'SP00066-DF-M', '', 'M', 295000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (183, 66, 'SP00066-DF-L', '', 'L', 295000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (184, 67, 'SP00067-DF-S', '', 'S', 295000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (185, 67, 'SP00067-DF-M', '', 'M', 295000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (186, 67, 'SP00067-DF-L', '', 'L', 295000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (187, 67, 'SP00067-DF-XL', '', 'XL', 295000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (188, 68, 'SP00068-DF-S', '', 'S', 295000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (189, 68, 'SP00068-DF-M', '', 'M', 295000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (190, 68, 'SP00068-DF-L', '', 'L', 295000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (191, 68, 'SP00068-DF-XL', '', 'XL', 295000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (192, 69, 'SP00069-DF-S', '', 'S', 525000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (193, 69, 'SP00069-DF-M', '', 'M', 525000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (194, 70, 'SP00070-DF-S', '', 'S', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (195, 70, 'SP00070-DF-M', '', 'M', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (196, 70, 'SP00070-DF-L', '', 'L', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (197, 71, 'SP00071-DF-S', '', 'S', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (198, 71, 'SP00071-DF-M', '', 'M', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (199, 71, 'SP00071-DF-L', '', 'L', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (200, 72, 'SP00072-DF-S', '', 'S', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (201, 72, 'SP00072-DF-M', '', 'M', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (202, 72, 'SP00072-DF-L', '', 'L', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (203, 73, 'SP00073-DF-S', '', 'S', 595000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (204, 73, 'SP00073-DF-M', '', 'M', 595000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (205, 73, 'SP00073-DF-L', '', 'L', 595000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (206, 74, 'SP00074-DF-S', '', 'S', 655000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (207, 74, 'SP00074-DF-M', '', 'M', 655000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (208, 74, 'SP00074-DF-L', '', 'L', 655000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (209, 74, 'SP00074-DF-XL', '', 'XL', 655000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (210, 75, 'SP00075-DF-S', '', 'S', 485000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (211, 75, 'SP00075-DF-M', '', 'M', 485000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (212, 75, 'SP00075-DF-L', '', 'L', 485000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (213, 75, 'SP00075-DF-XL', '', 'XL', 485000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (214, 76, 'SP00076-DF-S', '', 'S', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (215, 76, 'SP00076-DF-M', '', 'M', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (216, 76, 'SP00076-DF-L', '', 'L', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (217, 76, 'SP00076-DF-XL', '', 'XL', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (218, 77, 'SP00077-DF-S', '', 'S', 455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (219, 77, 'SP00077-DF-M', '', 'M', 455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (220, 77, 'SP00077-DF-L', '', 'L', 455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (221, 77, 'SP00077-DF-XL', '', 'XL', 455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (222, 78, 'SP00078-DF-S', '', 'S', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (223, 78, 'SP00078-DF-M', '', 'M', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (224, 78, 'SP00078-DF-L', '', 'L', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (225, 79, 'SP00079-DF-S', '', 'S', 655000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (226, 79, 'SP00079-DF-M', '', 'M', 655000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (227, 79, 'SP00079-DF-L', '', 'L', 655000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (228, 80, 'SP00080-DF-S', '', 'S', 655000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (229, 80, 'SP00080-DF-M', '', 'M', 655000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (230, 80, 'SP00080-DF-L', '', 'L', 655000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (231, 81, 'SP00081-DF-S', '', 'S', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (232, 81, 'SP00081-DF-M', '', 'M', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (233, 81, 'SP00081-DF-L', '', 'L', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (234, 82, 'SP00082-DF-S', '', 'S', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (235, 82, 'SP00082-DF-M', '', 'M', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (236, 82, 'SP00082-DF-L', '', 'L', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (237, 83, 'SP00083-DF-S', '', 'S', 455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (238, 83, 'SP00083-DF-M', '', 'M', 455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (239, 83, 'SP00083-DF-L', '', 'L', 455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (240, 84, 'SP00084-DF-S', '', 'S', 299000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (241, 84, 'SP00084-DF-M', '', 'M', 299000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (242, 84, 'SP00084-DF-L', '', 'L', 299000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (243, 85, 'SP00085-DF-S', '', 'S', 525000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (244, 85, 'SP00085-DF-M', '', 'M', 525000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (245, 85, 'SP00085-DF-L', '', 'L', 525000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (246, 86, 'SP00086-DF-S', '', 'S', 495000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (247, 86, 'SP00086-DF-M', '', 'M', 495000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (248, 86, 'SP00086-DF-L', '', 'L', 495000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (249, 86, 'SP00086-DF-XL', '', 'XL', 495000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (250, 87, 'SP00087-DF-S', '', 'S', 695000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (251, 87, 'SP00087-DF-M', '', 'M', 695000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (252, 87, 'SP00087-DF-L', '', 'L', 695000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (253, 88, 'SP00088-DF-S', '', 'S', 485000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (254, 88, 'SP00088-DF-M', '', 'M', 485000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (255, 88, 'SP00088-DF-L', '', 'L', 485000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (256, 89, 'SP00089-DF-S', '', 'S', 555000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (257, 89, 'SP00089-DF-M', '', 'M', 555000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (258, 89, 'SP00089-DF-L', '', 'L', 555000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (259, 90, 'SP00090-DF-S', '', 'S', 625000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (260, 90, 'SP00090-DF-M', '', 'M', 625000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (261, 90, 'SP00090-DF-L', '', 'L', 625000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (262, 91, 'SP00091-DF-S', '', 'S', 625000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (263, 91, 'SP00091-DF-M', '', 'M', 625000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (264, 91, 'SP00091-DF-L', '', 'L', 625000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (265, 92, 'SP00092-DF-S', '', 'S', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (266, 92, 'SP00092-DF-M', '', 'M', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (267, 92, 'SP00092-DF-L', '', 'L', 585000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (268, 93, 'SP00093-DF-S', '', 'S', 555000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (269, 93, 'SP00093-DF-M', '', 'M', 555000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (270, 93, 'SP00093-DF-L', '', 'L', 555000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (271, 104, 'SP00104-DF-S', '', 'S', 2285000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (272, 104, 'SP00104-DF-M', '', 'M', 2285000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (273, 105, 'SP00105-DF-S', '', 'S', 1355000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (274, 105, 'SP00105-DF-M', '', 'M', 1355000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (275, 106, 'SP00106-DF-S', '', 'S', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (276, 106, 'SP00106-DF-M', '', 'M', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (277, 106, 'SP00106-DF-L', '', 'L', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (278, 106, 'SP00106-DF-XL', '', 'XL', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (279, 107, 'SP00107-DF-S', '', 'S', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (280, 107, 'SP00107-DF-M', '', 'M', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (281, 107, 'SP00107-DF-L', '', 'L', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (282, 107, 'SP00107-DF-XL', '', 'XL', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (283, 108, 'SP00108-DF-S', '', 'S', 1385000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (284, 108, 'SP00108-DF-M', '', 'M', 1385000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (285, 109, 'SP00109-DF-S', '', 'S', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (286, 109, 'SP00109-DF-M', '', 'M', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (287, 109, 'SP00109-DF-L', '', 'L', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (288, 109, 'SP00109-DF-XL', '', 'XL', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (289, 110, 'SP00110-DF-S', '', 'S', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (290, 110, 'SP00110-DF-M', '', 'M', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (291, 110, 'SP00110-DF-L', '', 'L', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (292, 110, 'SP00110-DF-XL', '', 'XL', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (293, 111, 'SP00111-DF-S', '', 'S', 1385000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (294, 111, 'SP00111-DF-M', '', 'M', 1385000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (295, 112, 'SP00112-DF-S', '', 'S', 1385000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (296, 112, 'SP00112-DF-M', '', 'M', 1385000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (297, 112, 'SP00112-DF-L', '', 'L', 1385000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (298, 112, 'SP00112-DF-XL', '', 'XL', 1385000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (299, 113, 'SP00113-DF-S', '', 'S', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (300, 113, 'SP00113-DF-M', '', 'M', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (301, 113, 'SP00113-DF-L', '', 'L', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (302, 113, 'SP00113-DF-XL', '', 'XL', 1455000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (303, 114, 'SP00114-EN-0068-29', 'Đen-0068', '29', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (304, 114, 'SP00114-EN-0068-30', 'Đen-0068', '30', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (305, 114, 'SP00114-EN-0068-31', 'Đen-0068', '31', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (306, 114, 'SP00114-EN-0068-32', 'Đen-0068', '32', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (307, 114, 'SP00114-EN-0068-34', 'Đen-0068', '34', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (308, 114, 'SP00114-EN-0068-36', 'Đen-0068', '36', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (309, 114, 'SP00114-TR-NG-0068-29', 'Trắng-0068', '29', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (310, 114, 'SP00114-TR-NG-0068-30', 'Trắng-0068', '30', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (311, 114, 'SP00114-TR-NG-0068-31', 'Trắng-0068', '31', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (312, 114, 'SP00114-TR-NG-0068-32', 'Trắng-0068', '32', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (313, 114, 'SP00114-TR-NG-0068-34', 'Trắng-0068', '34', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (314, 114, 'SP00114-TR-NG-0068-36', 'Trắng-0068', '36', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (315, 114, 'SP00114-N-U-0068-29', 'Nâu-0068', '29', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (316, 114, 'SP00114-N-U-0068-30', 'Nâu-0068', '30', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (317, 114, 'SP00114-N-U-0068-31', 'Nâu-0068', '31', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (318, 114, 'SP00114-N-U-0068-32', 'Nâu-0068', '32', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (319, 114, 'SP00114-N-U-0068-34', 'Nâu-0068', '34', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (320, 114, 'SP00114-N-U-0068-36', 'Nâu-0068', '36', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (321, 115, 'SP00115-V-NG-N-U-005-29', 'Vàng Nâu-0055', '29', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (322, 115, 'SP00115-V-NG-N-U-005-30', 'Vàng Nâu-0055', '30', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (323, 115, 'SP00115-V-NG-N-U-005-31', 'Vàng Nâu-0055', '31', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (324, 115, 'SP00115-V-NG-N-U-005-32', 'Vàng Nâu-0055', '32', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (325, 115, 'SP00115-V-NG-N-U-005-34', 'Vàng Nâu-0055', '34', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (326, 115, 'SP00115-V-NG-N-U-005-36', 'Vàng Nâu-0055', '36', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (327, 115, 'SP00115-EN-0055-29', 'Đen-0055', '29', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (328, 115, 'SP00115-EN-0055-30', 'Đen-0055', '30', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (329, 115, 'SP00115-EN-0055-31', 'Đen-0055', '31', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (330, 115, 'SP00115-EN-0055-32', 'Đen-0055', '32', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (331, 115, 'SP00115-EN-0055-34', 'Đen-0055', '34', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (332, 115, 'SP00115-EN-0055-36', 'Đen-0055', '36', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (333, 115, 'SP00115-BE-0055-29', 'Be-0055', '29', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (334, 115, 'SP00115-BE-0055-30', 'Be-0055', '30', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (335, 115, 'SP00115-BE-0055-31', 'Be-0055', '31', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (336, 115, 'SP00115-BE-0055-32', 'Be-0055', '32', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (337, 115, 'SP00115-BE-0055-34', 'Be-0055', '34', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (338, 115, 'SP00115-BE-0055-36', 'Be-0055', '36', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (339, 116, 'SP00116-EN-0054-29', 'Đen-0054', '29', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (340, 116, 'SP00116-EN-0054-30', 'Đen-0054', '30', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (341, 116, 'SP00116-EN-0054-31', 'Đen-0054', '31', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (342, 116, 'SP00116-EN-0054-32', 'Đen-0054', '32', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (343, 116, 'SP00116-EN-0054-34', 'Đen-0054', '34', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (344, 116, 'SP00116-EN-0054-36', 'Đen-0054', '36', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (345, 116, 'SP00116-BE-0054-29', 'Be-0054', '29', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (346, 116, 'SP00116-BE-0054-30', 'Be-0054', '30', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (347, 116, 'SP00116-BE-0054-31', 'Be-0054', '31', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (348, 116, 'SP00116-BE-0054-32', 'Be-0054', '32', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (349, 116, 'SP00116-BE-0054-34', 'Be-0054', '34', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (350, 116, 'SP00116-BE-0054-36', 'Be-0054', '36', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (351, 116, 'SP00116-N-U-0054-29', 'Nâu-0054', '29', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (352, 116, 'SP00116-N-U-0054-30', 'Nâu-0054', '30', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (353, 116, 'SP00116-N-U-0054-31', 'Nâu-0054', '31', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (354, 116, 'SP00116-N-U-0054-32', 'Nâu-0054', '32', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (355, 116, 'SP00116-N-U-0054-34', 'Nâu-0054', '34', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (356, 116, 'SP00116-N-U-0054-36', 'Nâu-0054', '36', 549000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (357, 117, 'SP00117-EN-0047-29', 'Đen-0047', '29', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (358, 117, 'SP00117-EN-0047-30', 'Đen-0047', '30', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (359, 117, 'SP00117-EN-0047-31', 'Đen-0047', '31', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (360, 117, 'SP00117-EN-0047-32', 'Đen-0047', '32', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (361, 117, 'SP00117-EN-0047-34', 'Đen-0047', '34', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (362, 117, 'SP00117-EN-0047-36', 'Đen-0047', '36', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (363, 117, 'SP00117-N-U-0047-29', 'Nâu-0047', '29', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (364, 117, 'SP00117-N-U-0047-30', 'Nâu-0047', '30', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (365, 117, 'SP00117-N-U-0047-31', 'Nâu-0047', '31', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (366, 117, 'SP00117-N-U-0047-32', 'Nâu-0047', '32', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (367, 117, 'SP00117-N-U-0047-34', 'Nâu-0047', '34', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (368, 117, 'SP00117-N-U-0047-36', 'Nâu-0047', '36', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (369, 117, 'SP00117-TR-NG-0047-29', 'Trắng-0047', '29', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (370, 117, 'SP00117-TR-NG-0047-30', 'Trắng-0047', '30', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (371, 117, 'SP00117-TR-NG-0047-31', 'Trắng-0047', '31', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (372, 117, 'SP00117-TR-NG-0047-32', 'Trắng-0047', '32', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (373, 117, 'SP00117-TR-NG-0047-34', 'Trắng-0047', '34', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (374, 117, 'SP00117-TR-NG-0047-36', 'Trắng-0047', '36', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (375, 118, 'SP00118-R-U-0053-S', 'Rêu-0053', 'S', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (376, 118, 'SP00118-R-U-0053-M', 'Rêu-0053', 'M', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (377, 118, 'SP00118-R-U-0053-L', 'Rêu-0053', 'L', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (378, 118, 'SP00118-R-U-0053-XL', 'Rêu-0053', 'XL', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (379, 118, 'SP00118-N-U-0053-S', 'Nâu-0053', 'S', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (380, 118, 'SP00118-N-U-0053-M', 'Nâu-0053', 'M', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (381, 118, 'SP00118-N-U-0053-L', 'Nâu-0053', 'L', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (382, 118, 'SP00118-N-U-0053-XL', 'Nâu-0053', 'XL', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (383, 118, 'SP00118-EN-WASH-0053-S', 'Đen Wash-0053', 'S', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (384, 118, 'SP00118-EN-WASH-0053-M', 'Đen Wash-0053', 'M', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (385, 118, 'SP00118-EN-WASH-0053-L', 'Đen Wash-0053', 'L', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (386, 118, 'SP00118-EN-WASH-0053-XL', 'Đen Wash-0053', 'XL', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (387, 119, 'SP00119-N-U-0051-29', 'Nâu-0051', '29', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (388, 119, 'SP00119-N-U-0051-30', 'Nâu-0051', '30', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (389, 119, 'SP00119-N-U-0051-31', 'Nâu-0051', '31', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (390, 119, 'SP00119-N-U-0051-32', 'Nâu-0051', '32', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (391, 119, 'SP00119-N-U-0051-34', 'Nâu-0051', '34', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (392, 119, 'SP00119-N-U-0051-36', 'Nâu-0051', '36', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (393, 119, 'SP00119-EN-0051-29', 'Đen-0051', '29', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (394, 119, 'SP00119-EN-0051-30', 'Đen-0051', '30', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (395, 119, 'SP00119-EN-0051-31', 'Đen-0051', '31', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (396, 119, 'SP00119-EN-0051-32', 'Đen-0051', '32', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (397, 119, 'SP00119-EN-0051-34', 'Đen-0051', '34', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (398, 119, 'SP00119-EN-0051-36', 'Đen-0051', '36', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (399, 120, 'SP00120-KEM-0052-29', 'Kem-0052', '29', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (400, 120, 'SP00120-KEM-0052-30', 'Kem-0052', '30', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (401, 120, 'SP00120-KEM-0052-31', 'Kem-0052', '31', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (402, 120, 'SP00120-KEM-0052-32', 'Kem-0052', '32', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (403, 120, 'SP00120-KEM-0052-34', 'Kem-0052', '34', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (404, 120, 'SP00120-KEM-0052-36', 'Kem-0052', '36', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (405, 120, 'SP00120-EN-0052-29', 'Đen-0052', '29', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (406, 120, 'SP00120-EN-0052-30', 'Đen-0052', '30', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (407, 120, 'SP00120-EN-0052-31', 'Đen-0052', '31', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (408, 120, 'SP00120-EN-0052-32', 'Đen-0052', '32', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (409, 120, 'SP00120-EN-0052-34', 'Đen-0052', '34', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (410, 120, 'SP00120-EN-0052-36', 'Đen-0052', '36', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (411, 120, 'SP00120-R-U-0052-29', 'Rêu-0052', '29', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (412, 120, 'SP00120-R-U-0052-30', 'Rêu-0052', '30', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (413, 120, 'SP00120-R-U-0052-31', 'Rêu-0052', '31', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (414, 120, 'SP00120-R-U-0052-32', 'Rêu-0052', '32', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (415, 120, 'SP00120-R-U-0052-34', 'Rêu-0052', '34', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (416, 120, 'SP00120-R-U-0052-36', 'Rêu-0052', '36', 429000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (417, 121, 'SP00121-KEM-0048-29', 'Kem-0048', '29', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (418, 121, 'SP00121-KEM-0048-30', 'Kem-0048', '30', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (419, 121, 'SP00121-KEM-0048-31', 'Kem-0048', '31', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (420, 121, 'SP00121-KEM-0048-32', 'Kem-0048', '32', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (421, 121, 'SP00121-KEM-0048-34', 'Kem-0048', '34', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (422, 121, 'SP00121-KEM-0048-36', 'Kem-0048', '36', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (423, 121, 'SP00121-EN-0048-29', 'Đen-0048', '29', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (424, 121, 'SP00121-EN-0048-30', 'Đen-0048', '30', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (425, 121, 'SP00121-EN-0048-31', 'Đen-0048', '31', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (426, 121, 'SP00121-EN-0048-32', 'Đen-0048', '32', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (427, 121, 'SP00121-EN-0048-34', 'Đen-0048', '34', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (428, 121, 'SP00121-EN-0048-36', 'Đen-0048', '36', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (429, 121, 'SP00121-BE-0048-29', 'Be-0048', '29', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (430, 121, 'SP00121-BE-0048-30', 'Be-0048', '30', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (431, 121, 'SP00121-BE-0048-31', 'Be-0048', '31', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (432, 121, 'SP00121-BE-0048-32', 'Be-0048', '32', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (433, 121, 'SP00121-BE-0048-34', 'Be-0048', '34', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (434, 121, 'SP00121-BE-0048-36', 'Be-0048', '36', 449000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (435, 122, 'SP00122-KEM-0049-29', 'Kem-0049', '29', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (436, 122, 'SP00122-KEM-0049-30', 'Kem-0049', '30', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (437, 122, 'SP00122-KEM-0049-31', 'Kem-0049', '31', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (438, 122, 'SP00122-KEM-0049-32', 'Kem-0049', '32', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (439, 122, 'SP00122-KEM-0049-34', 'Kem-0049', '34', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (440, 122, 'SP00122-KEM-0049-36', 'Kem-0049', '36', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (441, 122, 'SP00122-BE-0049-29', 'Be-0049', '29', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (442, 122, 'SP00122-BE-0049-30', 'Be-0049', '30', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (443, 122, 'SP00122-BE-0049-31', 'Be-0049', '31', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (444, 122, 'SP00122-BE-0049-32', 'Be-0049', '32', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (445, 122, 'SP00122-BE-0049-34', 'Be-0049', '34', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (446, 122, 'SP00122-BE-0049-36', 'Be-0049', '36', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (447, 122, 'SP00122-EN-0049-29', 'Đen-0049', '29', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (448, 122, 'SP00122-EN-0049-30', 'Đen-0049', '30', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (449, 122, 'SP00122-EN-0049-31', 'Đen-0049', '31', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (450, 122, 'SP00122-EN-0049-32', 'Đen-0049', '32', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (451, 122, 'SP00122-EN-0049-34', 'Đen-0049', '34', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (452, 122, 'SP00122-EN-0049-36', 'Đen-0049', '36', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (453, 123, 'SP00123-KEM-0046-29', 'Kem-0046', '29', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (454, 123, 'SP00123-KEM-0046-30', 'Kem-0046', '30', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (455, 123, 'SP00123-KEM-0046-31', 'Kem-0046', '31', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (456, 123, 'SP00123-KEM-0046-32', 'Kem-0046', '32', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (457, 123, 'SP00123-KEM-0046-34', 'Kem-0046', '34', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (458, 123, 'SP00123-KEM-0046-36', 'Kem-0046', '36', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (459, 123, 'SP00123-N-U-0046-29', 'Nâu-0046', '29', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (460, 123, 'SP00123-N-U-0046-30', 'Nâu-0046', '30', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (461, 123, 'SP00123-N-U-0046-31', 'Nâu-0046', '31', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (462, 123, 'SP00123-N-U-0046-32', 'Nâu-0046', '32', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (463, 123, 'SP00123-N-U-0046-34', 'Nâu-0046', '34', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (464, 123, 'SP00123-N-U-0046-36', 'Nâu-0046', '36', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (465, 123, 'SP00123-VA-NG-BO-004-29', 'Vàng Bò-0046', '29', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (466, 123, 'SP00123-VA-NG-BO-004-30', 'Vàng Bò-0046', '30', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (467, 123, 'SP00123-VA-NG-BO-004-31', 'Vàng Bò-0046', '31', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (468, 123, 'SP00123-VA-NG-BO-004-32', 'Vàng Bò-0046', '32', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (469, 123, 'SP00123-VA-NG-BO-004-34', 'Vàng Bò-0046', '34', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (470, 123, 'SP00123-VA-NG-BO-004-36', 'Vàng Bò-0046', '36', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (471, 123, 'SP00123-XA-M-R-U-004-29', 'Xám Rêu-0046', '29', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (472, 123, 'SP00123-XA-M-R-U-004-30', 'Xám Rêu-0046', '30', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (473, 123, 'SP00123-XA-M-R-U-004-31', 'Xám Rêu-0046', '31', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (474, 123, 'SP00123-XA-M-R-U-004-32', 'Xám Rêu-0046', '32', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (475, 123, 'SP00123-XA-M-R-U-004-34', 'Xám Rêu-0046', '34', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (476, 123, 'SP00123-XA-M-R-U-004-36', 'Xám Rêu-0046', '36', 529000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (477, 124, 'SP00124-R-U-WASH-004-29', 'Rêu Wash-0043', '29', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (478, 124, 'SP00124-R-U-WASH-004-30', 'Rêu Wash-0043', '30', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (479, 124, 'SP00124-R-U-WASH-004-31', 'Rêu Wash-0043', '31', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (480, 124, 'SP00124-R-U-WASH-004-32', 'Rêu Wash-0043', '32', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (481, 124, 'SP00124-R-U-WASH-004-34', 'Rêu Wash-0043', '34', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (482, 124, 'SP00124-R-U-WASH-004-36', 'Rêu Wash-0043', '36', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (483, 124, 'SP00124-XA-M-EN-WASH-29', 'Xám Đen Wash-0043', '29', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (484, 124, 'SP00124-XA-M-EN-WASH-30', 'Xám Đen Wash-0043', '30', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (485, 124, 'SP00124-XA-M-EN-WASH-31', 'Xám Đen Wash-0043', '31', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (486, 124, 'SP00124-XA-M-EN-WASH-32', 'Xám Đen Wash-0043', '32', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (487, 124, 'SP00124-XA-M-EN-WASH-34', 'Xám Đen Wash-0043', '34', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (488, 124, 'SP00124-XA-M-EN-WASH-36', 'Xám Đen Wash-0043', '36', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (489, 124, 'SP00124-KEM-WASH-004-29', 'Kem Wash-0043', '29', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (490, 124, 'SP00124-KEM-WASH-004-30', 'Kem Wash-0043', '30', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (491, 124, 'SP00124-KEM-WASH-004-31', 'Kem Wash-0043', '31', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (492, 124, 'SP00124-KEM-WASH-004-32', 'Kem Wash-0043', '32', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (493, 124, 'SP00124-KEM-WASH-004-34', 'Kem Wash-0043', '34', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (494, 124, 'SP00124-KEM-WASH-004-36', 'Kem Wash-0043', '36', 579000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (495, 125, 'SP00125-TR-NG-0045-29', 'Trắng-0045', '29', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (496, 125, 'SP00125-TR-NG-0045-30', 'Trắng-0045', '30', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (497, 125, 'SP00125-TR-NG-0045-31', 'Trắng-0045', '31', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (498, 125, 'SP00125-TR-NG-0045-32', 'Trắng-0045', '32', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (499, 125, 'SP00125-TR-NG-0045-34', 'Trắng-0045', '34', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (500, 125, 'SP00125-TR-NG-0045-36', 'Trắng-0045', '36', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (501, 125, 'SP00125-EN-0045-29', 'Đen-0045', '29', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (502, 125, 'SP00125-EN-0045-30', 'Đen-0045', '30', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (503, 125, 'SP00125-EN-0045-31', 'Đen-0045', '31', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (504, 125, 'SP00125-EN-0045-32', 'Đen-0045', '32', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (505, 125, 'SP00125-EN-0045-34', 'Đen-0045', '34', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (506, 125, 'SP00125-EN-0045-36', 'Đen-0045', '36', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (507, 125, 'SP00125-XANH-EN-0045-29', 'Xanh Đen-0045', '29', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (508, 125, 'SP00125-XANH-EN-0045-30', 'Xanh Đen-0045', '30', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (509, 125, 'SP00125-XANH-EN-0045-31', 'Xanh Đen-0045', '31', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (510, 125, 'SP00125-XANH-EN-0045-32', 'Xanh Đen-0045', '32', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (511, 125, 'SP00125-XANH-EN-0045-34', 'Xanh Đen-0045', '34', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (512, 125, 'SP00125-XANH-EN-0045-36', 'Xanh Đen-0045', '36', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (513, 125, 'SP00125-N-U-NH-T-004-29', 'Nâu Nhạt-0045', '29', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (514, 125, 'SP00125-N-U-NH-T-004-30', 'Nâu Nhạt-0045', '30', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (515, 125, 'SP00125-N-U-NH-T-004-31', 'Nâu Nhạt-0045', '31', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (516, 125, 'SP00125-N-U-NH-T-004-32', 'Nâu Nhạt-0045', '32', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (517, 125, 'SP00125-N-U-NH-T-004-34', 'Nâu Nhạt-0045', '34', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (518, 125, 'SP00125-N-U-NH-T-004-36', 'Nâu Nhạt-0045', '36', 419000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (519, 126, 'SP00126-KEM-0042-29', 'Kem-0042', '29', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (520, 126, 'SP00126-KEM-0042-30', 'Kem-0042', '30', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (521, 126, 'SP00126-KEM-0042-31', 'Kem-0042', '31', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (522, 126, 'SP00126-KEM-0042-32', 'Kem-0042', '32', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (523, 126, 'SP00126-KEM-0042-34', 'Kem-0042', '34', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (524, 126, 'SP00126-KEM-0042-36', 'Kem-0042', '36', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (525, 126, 'SP00126-X-M-R-U-0042-29', 'Xám Rêu-0042', '29', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (526, 126, 'SP00126-X-M-R-U-0042-30', 'Xám Rêu-0042', '30', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (527, 126, 'SP00126-X-M-R-U-0042-31', 'Xám Rêu-0042', '31', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (528, 126, 'SP00126-X-M-R-U-0042-32', 'Xám Rêu-0042', '32', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (529, 126, 'SP00126-X-M-R-U-0042-34', 'Xám Rêu-0042', '34', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (530, 126, 'SP00126-X-M-R-U-0042-36', 'Xám Rêu-0042', '36', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (531, 126, 'SP00126-EN-0042-29', 'Đen-0042', '29', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (532, 126, 'SP00126-EN-0042-30', 'Đen-0042', '30', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (533, 126, 'SP00126-EN-0042-31', 'Đen-0042', '31', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (534, 126, 'SP00126-EN-0042-32', 'Đen-0042', '32', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (535, 126, 'SP00126-EN-0042-34', 'Đen-0042', '34', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (536, 126, 'SP00126-EN-0042-36', 'Đen-0042', '36', 479000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (537, 127, 'SP00127-KEM-0032-29', 'Kem-0032', '29', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (538, 127, 'SP00127-KEM-0032-30', 'Kem-0032', '30', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (539, 127, 'SP00127-KEM-0032-31', 'Kem-0032', '31', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (540, 127, 'SP00127-KEM-0032-32', 'Kem-0032', '32', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (541, 127, 'SP00127-KEM-0032-34', 'Kem-0032', '34', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (542, 127, 'SP00127-KEM-0032-36', 'Kem-0032', '36', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (543, 127, 'SP00127-X-M-0032-29', 'Xám-0032', '29', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (544, 127, 'SP00127-X-M-0032-30', 'Xám-0032', '30', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (545, 127, 'SP00127-X-M-0032-31', 'Xám-0032', '31', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (546, 127, 'SP00127-X-M-0032-32', 'Xám-0032', '32', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (547, 127, 'SP00127-X-M-0032-34', 'Xám-0032', '34', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (548, 127, 'SP00127-X-M-0032-36', 'Xám-0032', '36', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (549, 127, 'SP00127-EN-0032-29', 'Đen-0032', '29', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (550, 127, 'SP00127-EN-0032-30', 'Đen-0032', '30', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (551, 127, 'SP00127-EN-0032-31', 'Đen-0032', '31', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (552, 127, 'SP00127-EN-0032-32', 'Đen-0032', '32', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (553, 127, 'SP00127-EN-0032-34', 'Đen-0032', '34', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (554, 127, 'SP00127-EN-0032-36', 'Đen-0032', '36', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (555, 128, 'SP00128-EN-0026-29', 'Đen-0026', '29', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (556, 128, 'SP00128-EN-0026-30', 'Đen-0026', '30', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (557, 128, 'SP00128-EN-0026-31', 'Đen-0026', '31', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (558, 128, 'SP00128-EN-0026-32', 'Đen-0026', '32', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (559, 128, 'SP00128-EN-0026-34', 'Đen-0026', '34', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (560, 128, 'SP00128-EN-0026-36', 'Đen-0026', '36', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (561, 128, 'SP00128-KEM-0026-29', 'Kem-0026', '29', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (562, 128, 'SP00128-KEM-0026-30', 'Kem-0026', '30', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (563, 128, 'SP00128-KEM-0026-31', 'Kem-0026', '31', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (564, 128, 'SP00128-KEM-0026-32', 'Kem-0026', '32', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (565, 128, 'SP00128-KEM-0026-34', 'Kem-0026', '34', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (566, 128, 'SP00128-KEM-0026-36', 'Kem-0026', '36', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (567, 128, 'SP00128-BE-0026-29', 'Be-0026', '29', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (568, 128, 'SP00128-BE-0026-30', 'Be-0026', '30', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (569, 128, 'SP00128-BE-0026-31', 'Be-0026', '31', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (570, 128, 'SP00128-BE-0026-32', 'Be-0026', '32', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (571, 128, 'SP00128-BE-0026-34', 'Be-0026', '34', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+INSERT INTO `product_variants` (`id`, `product_id`, `sku`, `color`, `size`, `price`, `cost_price`, `stock`, `min_stock`, `image`, `status`, `created`, `updated`) VALUES (572, 128, 'SP00128-BE-0026-36', 'Be-0026', '36', 420000, 0, 0, 5, '', 1, 1784891527, 1784891527);
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 1) WHERE `id` = 1;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 2) WHERE `id` = 2;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 3) WHERE `id` = 3;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 4) WHERE `id` = 4;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 6) WHERE `id` = 6;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 7) WHERE `id` = 7;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 9) WHERE `id` = 9;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 10) WHERE `id` = 10;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 11) WHERE `id` = 11;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 12) WHERE `id` = 12;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 13) WHERE `id` = 13;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 14) WHERE `id` = 14;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 15) WHERE `id` = 15;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 16) WHERE `id` = 16;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 17) WHERE `id` = 17;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 18) WHERE `id` = 18;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 19) WHERE `id` = 19;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 20) WHERE `id` = 20;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 21) WHERE `id` = 21;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 22) WHERE `id` = 22;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 23) WHERE `id` = 23;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 24) WHERE `id` = 24;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 27) WHERE `id` = 27;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 28) WHERE `id` = 28;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 49) WHERE `id` = 49;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 50) WHERE `id` = 50;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 51) WHERE `id` = 51;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 52) WHERE `id` = 52;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 53) WHERE `id` = 53;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 54) WHERE `id` = 54;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 55) WHERE `id` = 55;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 56) WHERE `id` = 56;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 57) WHERE `id` = 57;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 58) WHERE `id` = 58;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 59) WHERE `id` = 59;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 60) WHERE `id` = 60;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 61) WHERE `id` = 61;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 62) WHERE `id` = 62;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 63) WHERE `id` = 63;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 64) WHERE `id` = 64;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 65) WHERE `id` = 65;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 66) WHERE `id` = 66;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 67) WHERE `id` = 67;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 68) WHERE `id` = 68;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 69) WHERE `id` = 69;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 70) WHERE `id` = 70;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 71) WHERE `id` = 71;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 72) WHERE `id` = 72;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 73) WHERE `id` = 73;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 74) WHERE `id` = 74;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 75) WHERE `id` = 75;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 76) WHERE `id` = 76;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 77) WHERE `id` = 77;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 78) WHERE `id` = 78;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 79) WHERE `id` = 79;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 80) WHERE `id` = 80;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 81) WHERE `id` = 81;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 82) WHERE `id` = 82;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 83) WHERE `id` = 83;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 84) WHERE `id` = 84;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 85) WHERE `id` = 85;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 86) WHERE `id` = 86;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 87) WHERE `id` = 87;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 88) WHERE `id` = 88;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 89) WHERE `id` = 89;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 90) WHERE `id` = 90;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 91) WHERE `id` = 91;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 92) WHERE `id` = 92;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 93) WHERE `id` = 93;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 104) WHERE `id` = 104;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 105) WHERE `id` = 105;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 106) WHERE `id` = 106;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 107) WHERE `id` = 107;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 108) WHERE `id` = 108;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 109) WHERE `id` = 109;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 110) WHERE `id` = 110;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 111) WHERE `id` = 111;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 112) WHERE `id` = 112;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 113) WHERE `id` = 113;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 114) WHERE `id` = 114;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 115) WHERE `id` = 115;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 116) WHERE `id` = 116;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 117) WHERE `id` = 117;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 118) WHERE `id` = 118;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 119) WHERE `id` = 119;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 120) WHERE `id` = 120;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 121) WHERE `id` = 121;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 122) WHERE `id` = 122;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 123) WHERE `id` = 123;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 124) WHERE `id` = 124;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 125) WHERE `id` = 125;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 126) WHERE `id` = 126;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 127) WHERE `id` = 127;
+UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 128) WHERE `id` = 128;
+INSERT INTO `suppliers` (`id`, `code`, `name`, `contact_name`, `phone`, `email`, `address`, `note`, `status`, `created`, `updated`) VALUES (1, 'NCC001', 'Nhà cung cấp mẫu qD Design', 'Nguyễn Văn A', '0901234567', 'ncc@example.com', 'TP.HCM', 'Dữ liệu demo nhập kho', 1, 1784891527, 1784891527);
+
+ALTER TABLE `product_variants` AUTO_INCREMENT = 573;
 
 --
 -- Ràng buộc đối với các bảng kết xuất

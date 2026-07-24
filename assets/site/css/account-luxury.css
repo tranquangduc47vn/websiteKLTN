@@ -136,20 +136,28 @@
 	word-break: break-word;
 }
 
+.jm-account-profile__item--full {
+	grid-column: 1 / -1;
+}
+
+.jm-account-profile__item--full .jm-account-profile__row--address {
+	width: 100%;
+	justify-content: center;
+}
+
 .jm-account-profile__row--address {
 	align-items: flex-start;
 	max-width: 100%;
 }
 
 .jm-account-profile__value--address {
-	font-size: 12px;
-	line-height: 1.45;
-	text-align: left;
-	max-width: 200px;
-	display: -webkit-box;
-	-webkit-line-clamp: 3;
-	-webkit-box-orient: vertical;
-	overflow: hidden;
+	font-size: 13px;
+	line-height: 1.5;
+	text-align: center;
+	max-width: none;
+	display: block;
+	-webkit-line-clamp: unset;
+	overflow: visible;
 }
 
 .jm-account-edit-btn {

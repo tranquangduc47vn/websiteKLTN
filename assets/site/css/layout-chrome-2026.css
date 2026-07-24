@@ -53,7 +53,7 @@
 }
 
 .wf-chrome-2026 .wf-chrome-logo img {
-	max-height: 48px;
+	max-height: 98px;
 	width: auto;
 	display: block;
 }
@@ -99,19 +99,30 @@
 	text-decoration: none;
 	background: none;
 	border: none;
+	outline: none;
+	box-shadow: none;
 	cursor: pointer;
-	padding: 8px 0;
+	padding: 8px 4px;
 	font-family: inherit;
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
-	transition: color 0.2s ease;
+	transition: color 0.25s ease;
+	-webkit-tap-highlight-color: transparent;
 }
 
-.wf-chrome-2026 .wf-chrome-menu__item.is-active > a,
 .wf-chrome-2026 .wf-chrome-menu a:hover,
-.wf-chrome-2026 .wf-chrome-menu__trigger:hover {
-	color: var(--wf-text);
+.wf-chrome-2026 .wf-chrome-menu__trigger:hover,
+.wf-chrome-2026 .wf-chrome-menu a:focus-visible,
+.wf-chrome-2026 .wf-chrome-menu__trigger:focus-visible {
+	color: var(--wf-accent);
+	outline: none;
+	box-shadow: none;
+	border: none;
+}
+
+.wf-chrome-2026 .wf-chrome-menu__item.is-active > a {
+	color: var(--wf-accent);
 }
 
 .wf-chrome-2026 .wf-chrome-menu__item--has-sub {
@@ -265,6 +276,30 @@
 	border: 1.5px solid #c62828;
 	border-radius: 999px;
 	box-sizing: border-box;
+}
+
+.wf-chrome-2026 .wf-chrome-order-badge,
+.wf-chrome-2026 .jm-icon-dot.wf-chrome-order-badge {
+	position: absolute;
+	top: 0;
+	right: 0;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 5px;
+	font-size: 10px;
+	font-weight: 700;
+	display: inline-flex !important;
+	align-items: center;
+	justify-content: center;
+	line-height: 1 !important;
+	text-align: center;
+	background: #c62828 !important;
+	color: #fff !important;
+	border: 1.5px solid #fff;
+	border-radius: 999px;
+	box-sizing: border-box;
+	pointer-events: none;
+	box-shadow: 0 1px 4px rgba(198, 40, 40, 0.35);
 }
 
 .wf-chrome-2026 .wf-chrome-popover {
@@ -611,6 +646,35 @@
 		flex: none;
 		width: max-content;
 		max-width: 100%;
+		position: relative !important;
+		top: auto !important;
+		right: auto !important;
+		height: auto !important;
+		transform: none !important;
+		padding: 0 !important;
+		border-left: none !important;
+		overflow: visible !important;
+		background: transparent !important;
+		pointer-events: auto !important;
+	}
+
+	.wf-chrome-2026 .wf-chrome-nav.is-open {
+		transform: none !important;
+	}
+
+	.wf-chrome-2026.wf-chrome-nav-backdrop::before,
+	.wf-chrome-2026.wf-chrome-nav-backdrop .wf-chrome-shell::before {
+		content: none !important;
+		display: none !important;
+	}
+
+	.wf-chrome-2026 .wf-chrome-menu {
+		flex-direction: row !important;
+		align-items: center !important;
+	}
+
+	.wf-chrome-2026 .wf-chrome-menu__item {
+		border-bottom: none !important;
 	}
 
 	.wf-chrome-2026 .wf-chrome-actions {
@@ -679,11 +743,33 @@
 		transform: translateX(100%);
 		transition: transform 0.35s ease;
 		overflow-y: auto;
-		z-index: 1050;
+		z-index: 10;
+		pointer-events: auto;
 	}
 
 	.wf-chrome-2026 .wf-chrome-nav.is-open {
 		transform: translateX(0);
+	}
+
+	/* Backdrop trong shell — z-index thấp hơn header/drawer (header = 2) */
+	.wf-chrome-2026.wf-chrome-nav-backdrop .wf-chrome-shell::before {
+		content: '';
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.55);
+		z-index: 1;
+		pointer-events: auto;
+	}
+
+	.wf-chrome-2026.wf-chrome-nav-backdrop .wf-chrome-header {
+		position: relative;
+		z-index: 4;
+	}
+
+	/* Trust bar stays below backdrop + menu drawer (drawer lives inside header stack) */
+	.wf-chrome-2026.wf-chrome-nav-backdrop .wf-chrome-trust {
+		position: relative;
+		z-index: 0;
 	}
 
 	.wf-chrome-2026 .wf-chrome-menu {
@@ -701,6 +787,9 @@
 		width: 100%;
 		justify-content: space-between;
 		padding: 14px 0;
+		position: relative;
+		z-index: 1;
+		pointer-events: auto;
 	}
 
 	.wf-chrome-2026 .wf-chrome-submenu {
@@ -771,10 +860,8 @@
 	}
 }
 
+/* Legacy backdrop hook — disabled; use .wf-chrome-shell::before on mobile */
 .wf-chrome-2026.wf-chrome-nav-backdrop::before {
-	content: '';
-	position: fixed;
-	inset: 0;
-	background: rgba(0, 0, 0, 0.55);
-	z-index: 1045;
+	content: none;
+	display: none;
 }

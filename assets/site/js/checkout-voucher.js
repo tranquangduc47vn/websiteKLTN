@@ -92,6 +92,9 @@
 
 		var body = new URLSearchParams();
 		body.set('voucher_code', input.value.trim());
+		if (window.CI_CSRF) {
+			body.set(window.CI_CSRF.name, window.CI_CSRF.hash);
+		}
 
 		fetch(cfg.applyUrl, {
 			method: 'POST',
@@ -104,6 +107,9 @@
 		})
 			.then(parseJsonResponse)
 			.then(function (data) {
+				if (data && data.csrf_hash && window.CI_CSRF) {
+					window.CI_CSRF.hash = data.csrf_hash;
+				}
 				if (!data || data.ok !== true) {
 					resetTotals();
 					showMsg((data && data.message) ? data.message : 'Không áp dụng được mã.', 'err');

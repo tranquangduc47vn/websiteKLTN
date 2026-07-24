@@ -218,9 +218,14 @@
 				$.ajax({
 					url: '<?php echo admin_url('product/del'); ?>',
 					type: 'post',
-					data: { id: id },
+					dataType: 'json',
+					data: window.appendCsrf({ id: id }),
 					success: function(response){
-						if(response.trim() == 'success') {
+						if (typeof window.applyCsrfResponse === 'function') {
+							window.applyCsrfResponse(response);
+						}
+						var ok = response && (response.ok || response.status === 'success');
+						if(ok) {
 							container.slideUp('slow', function(){
 								container.remove();
 							});

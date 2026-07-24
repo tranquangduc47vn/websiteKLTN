@@ -1016,3 +1016,14 @@ div.col-md-3:has(form) {
         margin-bottom: 1.5rem;
     }
 }
+
+.jm-pdp-flash {
+    margin: 0 0 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    background: #fff8e6;
+    border: 1px solid #e6c200;
+    color: #5c4a00;
+    font-size: 14px;
+    line-height: 1.5;
+}

@@ -20,12 +20,6 @@
 		</div>
 	</div>
 	<div class="admin-card-body">
-		<?php if (!empty($message_success)) { ?>
-			<div class="alert alert-success"><strong>Thành công!</strong> <?php echo $message_success; ?></div>
-		<?php } ?>
-		<?php if (!empty($message_fail)) { ?>
-			<div class="alert alert-danger"><strong>Thất bại!</strong> <?php echo $message_fail; ?></div>
-		<?php } ?>
 		<div class="table-responsive">
 			<table class="table table-hover admin-table" id="sliderListTable">
 				<thead>
@@ -47,7 +41,7 @@
 								<td><span class="badge bg-primary"><?php echo $value->sort_order; ?></span></td>
 								<td class="text-center">
 									<a class="btn btn-sm btn-outline-primary me-1" href="<?php echo admin_url('slider/edit/' . $value->id); ?>"><i class="fa-solid fa-pen"></i></a>
-									<a class="btn btn-sm btn-outline-danger" href="<?php echo admin_url('slider/del/' . $value->id); ?>" onclick="return confirm('Bạn chắc chắn muốn xóa slider này?')"><i class="fa-solid fa-trash"></i></a>
+									<?php echo admin_csrf_post_button(admin_url('slider/del/' . $value->id), '<i class="fa-solid fa-trash"></i>', array('confirm' => 'Bạn chắc chắn muốn xóa slider này?')); ?>
 								</td>
 							</tr>
 						<?php } ?>

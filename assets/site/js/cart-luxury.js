@@ -3,9 +3,23 @@
 
 	var cfg = window.JM_CART_AJAX || {};
 	var busy = false;
+	var interactionsEnabled = false;
 
 	function formatMoney(n) {
 		return (Number(n) || 0).toLocaleString('vi-VN') + ' ₫';
+	}
+
+	function appendCsrf(data) {
+		if (typeof window.appendCsrf === 'function') {
+			return window.appendCsrf(data);
+		}
+		return data || {};
+	}
+
+	function applyCsrfResponse(data) {
+		if (typeof window.applyCsrfResponse === 'function') {
+			window.applyCsrfResponse(data);
+		}
 	}
 
 	function postForm(url, data) {
@@ -16,18 +30,12 @@
 				'X-Requested-With': 'XMLHttpRequest',
 			},
 			credentials: 'same-origin',
-			body: new URLSearchParams(data).toString(),
+			body: new URLSearchParams(appendCsrf(data)).toString(),
 		}).then(function (res) {
 			return res.json();
-		});
-	}
-
-	function getJson(url) {
-		return fetch(url, {
-			headers: { 'X-Requested-With': 'XMLHttpRequest' },
-			credentials: 'same-origin',
-		}).then(function (res) {
-			return res.json();
+		}).then(function (data) {
+			applyCsrfResponse(data);
+			return data;
 		});
 	}
 
@@ -105,10 +113,14 @@
 		}
 		var row = findRow(data.rowid);
 		if (!row) return;
-		var qtyEl = row.querySelector('.jm-cart-qty__val');
-		var priceEl = row.querySelector('.jm-cart-line-price');
-		if (qtyEl) qtyEl.textContent = String(data.qty);
-		if (priceEl) priceEl.textContent = formatMoney(data.subtotal);
+		var qtyEls = row.querySelectorAll('.jm-cart-qty__val');
+		var priceEls = row.querySelectorAll('.jm-cart-line-price');
+		qtyEls.forEach(function (qtyEl) {
+			qtyEl.textContent = String(data.qty);
+		});
+		priceEls.forEach(function (priceEl) {
+			priceEl.textContent = formatMoney(data.subtotal);
+		});
 	}
 
 	function applyOptionsUpdate(data) {
@@ -126,10 +138,14 @@
 		if (sizeSelect && data.size) sizeSelect.value = data.size;
 		if (colorSelect && data.color) colorSelect.value = data.color;
 
-		var qtyEl = row.querySelector('.jm-cart-qty__val');
-		var priceEl = row.querySelector('.jm-cart-line-price');
-		if (qtyEl) qtyEl.textContent = String(data.qty);
-		if (priceEl) priceEl.textContent = formatMoney(data.subtotal);
+		var qtyEls = row.querySelectorAll('.jm-cart-qty__val');
+		var priceEls = row.querySelectorAll('.jm-cart-line-price');
+		qtyEls.forEach(function (qtyEl) {
+			qtyEl.textContent = String(data.qty);
+		});
+		priceEls.forEach(function (priceEl) {
+			priceEl.textContent = formatMoney(data.subtotal);
+		});
 	}
 
 	function handleResponse(data, rollback) {
@@ -140,7 +156,11 @@
 		if (!data.ok) {
 			if (rollback) rollback();
 			if (data.stock !== undefined || (data.message && data.message.indexOf('chỉ còn') !== -1)) {
-				showStockNotice(data);
+				if (!data.rowid || findRow(data.rowid)) {
+					showStockNotice(data);
+				} else {
+					showFlash(data.message || 'Không đủ tồn kho.', true);
+				}
 			} else {
 				showFlash(data.message || 'Không thể cập nhật giỏ hàng.', true);
 			}
@@ -168,6 +188,7 @@
 	}
 
 	function onQtyClick(e) {
+		if (!interactionsEnabled || busy) return;
 		var btn = e.target.closest('.jm-cart-qty__btn');
 		if (!btn || busy) return;
 		e.preventDefault();
@@ -179,14 +200,16 @@
 		if (!rowid || !action) return;
 
 		var qtyEl = row.querySelector('.jm-cart-qty__val');
-		var prevQty = parseInt(qtyEl.textContent, 10) || 1;
-		var url = (cfg.updateUrl || '/gio-hang/update/') + encodeURIComponent(rowid) + '/' + action;
+		var prevQty = qtyEl ? (parseInt(qtyEl.textContent, 10) || 1) : 1;
+		var url = cfg.updateUrl || '/gio-hang/update';
 
 		setBusy(true);
-		getJson(url)
+		postForm(url, { rowid: rowid, action: action })
 			.then(function (data) {
 				handleResponse(data, function () {
-					if (qtyEl) qtyEl.textContent = String(prevQty);
+					row.querySelectorAll('.jm-cart-qty__val').forEach(function (el) {
+						el.textContent = String(prevQty);
+					});
 				});
 			})
 			.catch(function () {
@@ -198,6 +221,7 @@
 	}
 
 	function onOptionsChange(e) {
+		if (!interactionsEnabled || busy) return;
 		var select = e.target.closest('.jm-cart-opt__select');
 		if (!select || busy) return;
 
@@ -241,16 +265,13 @@
 			});
 	}
 
-	function onRemoveClick(e) {
-		var link = e.target.closest('.jm-cart-remove');
-		if (!link || busy) return;
-		if (!window.confirm('Xóa sản phẩm này khỏi giỏ hàng?')) {
-			e.preventDefault();
-			return;
-		}
-		e.preventDefault();
+	function postDelete(rowid) {
 		setBusy(true);
-		getJson(link.getAttribute('href'))
+		var payload = {};
+		if (rowid) {
+			payload.rowid = rowid;
+		}
+		return postForm(cfg.delUrl || '/gio-hang/del', payload)
 			.then(function (data) {
 				handleResponse(data);
 			})
@@ -262,6 +283,18 @@
 			});
 	}
 
+	function onRemoveClick(e) {
+		var link = e.target.closest('.jm-cart-remove');
+		if (!link || busy) return;
+		if (!window.confirm('Xóa sản phẩm này khỏi giỏ hàng?')) {
+			e.preventDefault();
+			return;
+		}
+		e.preventDefault();
+		var rowid = link.getAttribute('data-rowid') || '';
+		postDelete(rowid);
+	}
+
 	function onClearClick(e) {
 		var link = e.target.closest('.jm-cart-clear');
 		if (!link || busy) return;
@@ -270,17 +303,7 @@
 			return;
 		}
 		e.preventDefault();
-		setBusy(true);
-		getJson(link.getAttribute('href'))
-			.then(function (data) {
-				handleResponse(data);
-			})
-			.catch(function () {
-				showFlash('Không thể xóa giỏ hàng.', true);
-			})
-			.finally(function () {
-				setBusy(false);
-			});
+		postDelete('');
 	}
 
 	function initSelectPrev() {
@@ -298,5 +321,9 @@
 		root.addEventListener('change', onOptionsChange);
 		root.addEventListener('click', onRemoveClick);
 		root.addEventListener('click', onClearClick);
+
+		window.setTimeout(function () {
+			interactionsEnabled = true;
+		}, 300);
 	});
 })();

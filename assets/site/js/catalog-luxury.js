@@ -98,6 +98,9 @@
 				.finally(function () {
 					endPageLoading();
 					pageLock = false;
+					if (typeof window.jmCatalogCloseFilters === 'function') {
+						window.jmCatalogCloseFilters();
+					}
 				});
 		}
 
@@ -161,5 +164,155 @@
 		window.addEventListener('popstate', function () {
 			loadCatalogPage(window.location.href, false);
 		});
+
+		initMobileCatalogFilters($root, formEl);
 	});
+
+	function initMobileCatalogFilters($root, formEl) {
+		var mobileMq = window.matchMedia('(max-width: 991px)');
+		var $bar = $('#jmCatalogMobileBar');
+		var $backdrop = $('#jmCatalogMfilterBackdrop');
+		if (!$bar.length) {
+			return;
+		}
+
+		var $sortSelect = $('#jmCatalogSortSelect');
+		var $sortForm = $root.find('.jm-sort-box--toolbar form');
+		var $sortDrop = $bar.find('[data-jm-mfilter-drop="sort"]');
+		var $sortMenu = $sortDrop.find('.jm-sort-menu');
+
+		var openPanel = null;
+
+		function isMobile() {
+			return mobileMq.matches;
+		}
+
+		function syncSortMenu() {
+			if (!$sortSelect.length || !$sortMenu.length) {
+				return;
+			}
+			var sortVal = $sortSelect.val();
+			$sortMenu.find('.jm-sort-menu__option').each(function () {
+				var active = this.getAttribute('data-sort-value') === sortVal;
+				$(this).toggleClass('is-active', active).attr('aria-selected', active ? 'true' : 'false');
+			});
+			$bar.find('[data-jm-mfilter="sort"]').toggleClass('is-active', sortVal && sortVal !== 'new' && sortVal !== 'hot');
+		}
+
+		function closePanels() {
+			openPanel = null;
+			$bar.find('.jm-mfilter-chip').removeClass('is-open').attr('aria-expanded', 'false');
+			$bar.find('.jm-mfilter-drop').attr('hidden', 'hidden');
+			$backdrop.attr('hidden', 'hidden').attr('aria-hidden', 'true');
+			$root.removeClass('jm-catalog-lux--drawer-open');
+		}
+
+		window.jmCatalogCloseFilters = closePanels;
+
+		function openDrawer() {
+			if (typeof window.wfChromeCloseNav === 'function') {
+				window.wfChromeCloseNav();
+			}
+			closePanels();
+			$root.addClass('jm-catalog-lux--drawer-open');
+			$backdrop.removeAttr('hidden').attr('aria-hidden', 'false');
+			$bar.find('[data-jm-mfilter="all"]').addClass('is-open').attr('aria-expanded', 'true');
+			openPanel = 'all';
+		}
+
+		function openSortDrop() {
+			if (openPanel === 'sort') {
+				closePanels();
+				return;
+			}
+
+			closePanels();
+			openPanel = 'sort';
+			syncSortMenu();
+			$bar.find('[data-jm-mfilter="sort"]').addClass('is-open').attr('aria-expanded', 'true');
+			$sortDrop.removeAttr('hidden');
+		}
+
+		function applySort(value) {
+			if (!$sortSelect.length || !$sortForm.length) {
+				return;
+			}
+			$sortSelect.val(value);
+			syncSortMenu();
+			closePanels();
+			$sortForm.trigger('submit');
+		}
+
+		function applyLayout() {
+			closePanels();
+			syncSortMenu();
+		}
+
+		$bar.on('click', function (e) {
+			e.stopPropagation();
+		});
+
+		$bar.on('click', '.jm-mfilter-chip', function () {
+			if (!isMobile()) {
+				return;
+			}
+			var panel = this.getAttribute('data-jm-mfilter');
+			if (panel === 'all') {
+				if ($root.hasClass('jm-catalog-lux--drawer-open')) {
+					closePanels();
+				} else {
+					openDrawer();
+				}
+				return;
+			}
+			if (panel === 'sort') {
+				openSortDrop();
+			}
+		});
+
+		$sortDrop.on('click', '.jm-sort-menu__option', function () {
+			if (!isMobile()) {
+				return;
+			}
+			var value = this.getAttribute('data-sort-value');
+			if (!value) {
+				return;
+			}
+			applySort(value);
+		});
+
+		$(document).on('click.jmCatalogMfilter', function () {
+			if (!isMobile() || openPanel !== 'sort') {
+				return;
+			}
+			closePanels();
+		});
+
+		$backdrop.on('click', function () {
+			closePanels();
+		});
+
+		window.addEventListener('pagehide', closePanels);
+		window.addEventListener('pageshow', closePanels);
+
+		$root.on('click', 'a[href]', function () {
+			var href = this.getAttribute('href');
+			if (!href || href.charAt(0) === '#') {
+				return;
+			}
+			closePanels();
+		});
+
+		if (formEl) {
+			$(formEl).on('change', 'input, select', syncSortMenu);
+		}
+
+		if (mobileMq.addEventListener) {
+			mobileMq.addEventListener('change', applyLayout);
+		} else if (mobileMq.addListener) {
+			mobileMq.addListener(applyLayout);
+		}
+
+		applyLayout();
+	}
 })(window.jQuery);

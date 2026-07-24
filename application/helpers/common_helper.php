@@ -9,6 +9,39 @@
 		return base_url('assets/site/' . ltrim($url, '/'));
 	}
 
+	function upload_image_url($filename, $subdir = 'product')
+	{
+		$filename = trim((string) $filename);
+		if ($filename === '') {
+			return site_asset_url('images/no-product.svg');
+		}
+
+		$subdir = trim(str_replace('\\', '/', $subdir), '/');
+		$filename = str_replace('\\', '/', $filename);
+		$encoded = implode('/', array_map('rawurlencode', explode('/', $filename)));
+
+		return base_url('upload/' . $subdir . '/' . $encoded);
+	}
+
+	function product_image_url($filename)
+	{
+		return upload_image_url($filename, 'product');
+	}
+
+	function upload_image_exists($filename, $subdir = 'product')
+	{
+		$filename = trim((string) $filename);
+		if ($filename === '') {
+			return false;
+		}
+
+		$subdir = trim(str_replace('\\', '/', $subdir), '/');
+		$root = rtrim(FCPATH, '/\\') . DIRECTORY_SEPARATOR . 'upload' . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $subdir);
+		$full = $root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $filename);
+
+		return is_file($full);
+	}
+
 	function render_frontend_view($view, array $data = array(), $layout = 'site/layout', $controller = null)
 	{
 		$CI = $controller ?: get_instance();
@@ -165,11 +198,97 @@
 		return '<span class="' . htmlspecialchars($class, ENT_QUOTES, 'UTF-8') . '">Hết hàng</span>';
 	}
 
+	function product_rating_average($product)
+	{
+		if (!$product) {
+			return 0.0;
+		}
+		$count = isset($product->rate_count) ? (int) $product->rate_count : 0;
+		$total = isset($product->rate_total) ? (int) $product->rate_total : 0;
+		if ($count <= 0) {
+			return 0.0;
+		}
+		return round($total / $count, 1);
+	}
+
+	function product_catalog_stars_html($product)
+	{
+		$count = ($product && isset($product->rate_count)) ? (int) $product->rate_count : 0;
+		$avg = product_rating_average($product);
+		$pct = ($count > 0) ? min(100, max(0, ($avg / 5) * 100)) : 0;
+		$label = ($count > 0)
+			? ('Đánh giá trung bình ' . number_format($avg, 1, '.', '') . ' / 5')
+			: 'Chưa có đánh giá';
+
+		return '<span class="jm-stars-wrap" aria-label="' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '">'
+			. '<span class="jm-stars jm-stars--bg" aria-hidden="true">★★★★★</span>'
+			. '<span class="jm-stars jm-stars--fg" style="width:' . $pct . '%" aria-hidden="true">★★★★★</span>'
+			. '</span>';
+	}
+
 	function shop_name($upper = false)
 	{
 		if ($upper) {
 			return defined('SHOP_NAME_UPPER') ? SHOP_NAME_UPPER : strtoupper(SHOP_NAME);
 		}
 		return defined('SHOP_NAME') ? SHOP_NAME : 'qD Design';
+	}
+
+	function site_logo_relative_path()
+	{
+		$CI =& get_instance();
+		$CI->config->load('branding', true);
+		$path = $CI->config->item('site_logo', 'branding');
+		return $path ? (string) $path : 'logo.png';
+	}
+
+	function site_logo_url()
+	{
+		return base_url('upload/' . site_logo_relative_path());
+	}
+
+	function site_logo_absolute_path()
+	{
+		return FCPATH . 'upload/' . ltrim(str_replace('\\', '/', site_logo_relative_path()), '/');
+	}
+
+	function set_auth_flash($type, $message)
+	{
+		$CI =& get_instance();
+		$key = ($type === 'success') ? 'auth_message_success' : 'auth_message_fail';
+		$CI->session->set_flashdata($key, $message);
+	}
+
+	function get_auth_flash()
+	{
+		$CI =& get_instance();
+		return array(
+			'success' => $CI->session->flashdata('auth_message_success'),
+			'fail' => $CI->session->flashdata('auth_message_fail'),
+		);
+	}
+
+	function load_auth_flash_to(array &$data)
+	{
+		$flash = get_auth_flash();
+		$data['message_success'] = $flash['success'];
+		$data['message_fail'] = $flash['fail'];
+	}
+
+	function set_store_flash($type, $message)
+	{
+		$CI =& get_instance();
+		$key = ($type === 'success') ? 'store_message_success' : 'store_message_fail';
+		$CI->session->set_flashdata($key, $message);
+	}
+
+	function get_store_flash()
+	{
+		$CI =& get_instance();
+		return array(
+			'success' => $CI->session->flashdata('store_message_success'),
+			'fail' => $CI->session->flashdata('store_message_fail'),
+			'info' => $CI->session->flashdata('message'),
+		);
 	}
 ?>

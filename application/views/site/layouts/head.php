@@ -11,6 +11,7 @@ $site_asset_url = site_asset_url('');
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
 	<script src="<?php echo public_url(); ?>js/jquery-3.1.1.js" type="text/javascript"></script>
+	<?php echo csrf_bootstrap_script(); ?>
 	<script src="<?php echo public_url('js/jqzoom_ev'); ?>js/jquery.jcarousel.pack.js" type="text/javascript"></script>
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,7 +19,7 @@ $site_asset_url = site_asset_url('');
 	<link rel="stylesheet" type="text/css" href="<?php echo $site_asset_url; ?>bootstrap/css/bootstrap.css">
 	<link rel="stylesheet" type="text/css" href="<?php echo $site_asset_url; ?>css/style.css?v=20260724b">
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
-	<link rel="stylesheet" type="text/css" href="<?php echo $site_asset_url; ?>css/layout-chrome-2026.css?v=10">
+	<link rel="stylesheet" type="text/css" href="<?php echo $site_asset_url; ?>css/layout-chrome-2026.css?v=19">
 	<?php if (!empty($canonical_url)) { ?>
 	<link rel="canonical" href="<?php echo htmlspecialchars($canonical_url, ENT_QUOTES, 'UTF-8'); ?>">
 	<?php } ?>

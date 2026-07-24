@@ -19,11 +19,12 @@ class Login extends MY_Controller {
 
 	public function index()
 	{
-		$message_success = $this->session->flashdata('message_success');
-		$this->data['message_success'] = $message_success;
-
-		$message_fail = $this->session->flashdata('message_fail');
-		$this->data['message_fail'] = $message_fail;
+		$flash = array(
+			'success' => $this->session->flashdata('admin_message_success'),
+			'fail' => $this->session->flashdata('admin_message_fail'),
+		);
+		$this->data['message_success'] = $flash['success'];
+		$this->data['message_fail'] = $flash['fail'];
 
 		if ($this->input->post()) {
 			$this->form_validation->set_rules('email', 'Email đăng nhập', 'required|valid_email');
@@ -32,7 +33,7 @@ class Login extends MY_Controller {
 			if ($this->form_validation->run()) {
 				$user = $this->get_info_login();
 				$this->session->set_userdata('login', $user);
-				$this->session->set_flashdata('message_success', 'Đăng nhập thành công');
+				admin_flash_success('Đăng nhập thành công');
 				redirect(admin_url('home'));
 			}
 		}
@@ -41,16 +42,26 @@ class Login extends MY_Controller {
 
 	public function check_login()
 	{
+		$this->load->helper('rate_limit');
+		$email = trim((string) $this->input->post('email'));
+		$rate = rate_limit_check($email);
+		if (!empty($rate['locked'])) {
+			$this->form_validation->set_message(__FUNCTION__, rate_limit_message($rate['retry_after']));
+			return FALSE;
+		}
+
 		$user = $this->get_info_login();
 		if (!$user) {
+			rate_limit_hit($email);
 			$this->form_validation->set_message(__FUNCTION__, 'Đăng nhập thất bại');
-			return false;
+			return FALSE;
 		}
 		if (!admin_can_access_panel($user)) {
 			$this->form_validation->set_message(__FUNCTION__, 'Tài khoản không có quyền truy cập khu vực quản trị.');
-			return false;
+			return FALSE;
 		}
-		return true;
+		rate_limit_clear($email);
+		return TRUE;
 	}
 
 	function get_info_login()

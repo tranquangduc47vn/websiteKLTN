@@ -12,13 +12,6 @@
 	<a href="<?php echo admin_url('voucher/add'); ?>" class="btn btn-primary"><i class="fa-solid fa-plus me-1"></i> Thêm voucher</a>
 </div>
 
-<?php if (!empty($message)) { ?>
-	<div class="alert alert-success"><?php echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8'); ?></div>
-<?php } ?>
-<?php if (!empty($message_fail)) { ?>
-	<div class="alert alert-danger"><?php echo htmlspecialchars($message_fail, ENT_QUOTES, 'UTF-8'); ?></div>
-<?php } ?>
-
 <?php $this->load->helper('export'); admin_export_toolbar('voucher'); ?>
 
 <div class="admin-card">
@@ -61,7 +54,7 @@
 											<?php echo (int) $row->is_active === 1 ? 'checked' : ''; ?>>
 									</label>
 									<a class="btn btn-sm btn-outline-primary" href="<?php echo admin_url('voucher/edit/' . (int) $row->id); ?>" title="Sửa"><i class="fa-solid fa-pen"></i></a>
-									<a class="btn btn-sm btn-outline-danger" href="<?php echo admin_url('voucher/delete/' . (int) $row->id); ?>" title="Xóa" onclick="return confirm('Xóa voucher này?');"><i class="fa-solid fa-trash"></i></a>
+									<?php echo admin_csrf_post_button(admin_url('voucher/delete/' . (int) $row->id), '<i class="fa-solid fa-trash"></i>', array('title' => 'Xóa', 'confirm' => 'Xóa voucher này?')); ?>
 								</div>
 							</td>
 						</tr>
@@ -105,13 +98,25 @@
 			var statusCell = row ? row.querySelector('[data-voucher-status]') : null;
 			var prev = !input.checked;
 
+			var body = '';
+			if (window.CI_CSRF) {
+				body = encodeURIComponent(window.CI_CSRF.name) + '=' + encodeURIComponent(window.CI_CSRF.hash);
+			}
+
 			fetch(url, {
 				method: 'POST',
 				credentials: 'same-origin',
-				headers: { 'X-Requested-With': 'XMLHttpRequest' },
+				headers: {
+					'Content-Type': 'application/x-www-form-urlencoded',
+					'X-Requested-With': 'XMLHttpRequest'
+				},
+				body: body,
 			})
 				.then(function (res) { return res.json(); })
 				.then(function (data) {
+					if (typeof window.applyCsrfResponse === 'function') {
+						window.applyCsrfResponse(data);
+					}
 					if (!data.ok) {
 						input.checked = prev;
 						return;

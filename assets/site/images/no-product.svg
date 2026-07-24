@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="500" viewBox="0 0 400 500" role="img" aria-label="Ch°a có hình £nh">
+  <rect width="400" height="500" fill="#f3f3f5"/>
+  <rect x="120" y="150" width="160" height="120" rx="8" fill="#e3e3e8"/>
+  <circle cx="165" cy="195" r="18" fill="#d0d0d8"/>
+  <path d="M130 250 L190 205 L230 235 L270 210 L270 270 L130 270 Z" fill="#d0d0d8"/>
+  <text x="200" y="320" text-anchor="middle" fill="#8a8a96" font-family="Arial, sans-serif" font-size="18">Ch°a có £nh</text>
+</svg>

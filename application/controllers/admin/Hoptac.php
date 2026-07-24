@@ -96,11 +96,11 @@ class Hoptac extends MY_Admin_Controller {
 
                 if($this->hoptac_model->create($data)) {
 
-                    $this->session->set_flashdata('message', 'Thêm mới dữ liệu thành công!');
+                    admin_flash_info( 'Thêm mới dữ liệu thành công!');
 
                 } else {
 
-                    $this->session->set_flashdata('message', 'Không thêm được dữ liệu.');
+                    admin_flash_info( 'Không thêm được dữ liệu.');
 
                 }
 
@@ -126,7 +126,7 @@ class Hoptac extends MY_Admin_Controller {
 
         if(!$info) {
 
-            $this->session->set_flashdata('message', 'Không tồn tại bài viết này.');
+            admin_flash_info( 'Không tồn tại bài viết này.');
 
             redirect(admin_url('hoptac'));
 
@@ -194,7 +194,7 @@ class Hoptac extends MY_Admin_Controller {
 
                 if($this->hoptac_model->update($id, $data)) {
 
-                    $this->session->set_flashdata('message', 'Cập nhật dữ liệu thành công!');
+                    admin_flash_info( 'Cập nhật dữ liệu thành công!');
 
                 }
 
@@ -214,13 +214,15 @@ class Hoptac extends MY_Admin_Controller {
 
     public function delete() {
 
+        admin_require_post();
+
         $id = $this->uri->rsegment(3);
 
         $info = $this->hoptac_model->get_info($id);
 
         if(!$info) {
 
-            $this->session->set_flashdata('message', 'Không tồn tại dữ liệu cần xóa.');
+            admin_flash_info( 'Không tồn tại dữ liệu cần xóa.');
 
             redirect(admin_url('hoptac'));
 
@@ -236,7 +238,7 @@ class Hoptac extends MY_Admin_Controller {
 
             }
 
-            $this->session->set_flashdata('message', 'Xóa bài viết thành công!');
+            admin_flash_info( 'Xóa bài viết thành công!');
 
         }
 

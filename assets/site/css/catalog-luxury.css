@@ -804,13 +804,45 @@ body:has(.jm-catalog-lux) .jm-catalog-wrapper {
 
 .jm-catalog-lux .jm-product-rating {
 	justify-content: flex-start !important;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
 	margin-top: 8px;
 	padding-top: 0;
 }
 
+.jm-catalog-lux .jm-stars-wrap {
+	position: relative;
+	display: inline-block;
+	font-size: 14px;
+	line-height: 1;
+	vertical-align: middle;
+}
+
 .jm-catalog-lux .jm-stars {
-	color: #c4a962;
+	display: inline-block;
+	letter-spacing: 1px;
 	font-size: 14px !important;
+	line-height: 1;
+}
+
+.jm-catalog-lux .jm-stars--bg {
+	color: #d8d8dc;
+}
+
+.jm-catalog-lux .jm-stars--fg {
+	position: absolute;
+	left: 0;
+	top: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	color: #c4a962;
+}
+
+.jm-catalog-lux .jm-rating-avg {
+	color: var(--cat-lux-text);
+	font-size: 14px !important;
+	font-weight: 600;
 }
 
 .jm-catalog-lux .jm-sales-count {
@@ -848,15 +880,6 @@ body:has(.jm-catalog-lux) .jm-catalog-wrapper {
 	.jm-catalog-lux .jm-product-grid {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 20px 14px;
-	}
-
-	.jm-catalog-lux .jm-sidebar-filter {
-		position: static;
-		width: 100%;
-		height: auto;
-		max-height: none;
-		display: block;
-		justify-content: flex-start;
 	}
 
 	.jm-catalog-lux .jm-main-layout-flex {

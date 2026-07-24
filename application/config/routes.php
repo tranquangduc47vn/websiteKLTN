@@ -62,6 +62,8 @@ $route['admin/export/pdf/(:any)'] = 'admin/export/pdf/$1';
 $route['admin/export/print_report/(:any)'] = 'admin/export/print_report/$1';
 
 // Alias plural URL → controller cũ
+$route['admin/branding'] = 'admin/site_branding/index';
+$route['admin/branding/(.+)'] = 'admin/site_branding/$1';
 $route['admin/products'] = 'admin/product/index';
 $route['admin/products/(.+)'] = 'admin/product/$1';
 $route['admin/inventory'] = 'admin/inventory/index';
@@ -123,9 +125,10 @@ $route['gio-hang'] = 'cart/index';
 $route['gio-hang/them/(:num)'] = 'cart/add/$1';
 $route['gio-hang/add/(:num)'] = 'cart/add/$1';
 $route['gio-hang/cap-nhat-thuoc-tinh'] = 'cart/update_options';
+$route['gio-hang/update'] = 'cart/update';
 $route['gio-hang/update/(.+)'] = 'cart/update/$1';
-$route['gio-hang/del/(.+)'] = 'cart/del/$1';
 $route['gio-hang/del'] = 'cart/del';
+$route['gio-hang/del/(.+)'] = 'cart/del/$1';
 $route['gio-hang/(.+)'] = 'cart/$1';
 $route['thanh-toan'] = 'order/index';
 $route['thanh-toan/apply_voucher'] = 'order/apply_voucher';
@@ -208,10 +211,10 @@ $route['([a-z0-9-]+)/(:num)'] = 'product/catalog_seo/$1/_/$2';
 $route['([a-z0-9-]+)'] = 'product/catalog_seo/$1';
 
 // AI + support chat
-$route['ai-assistant/send'] = 'aiassistant/send';
-$route['ai-assistant/history'] = 'aiassistant/history';
-$route['ai-assistant/poll'] = 'aiassistant/poll';
-$route['admin/ai-assistant'] = 'admin/aiassistant/settings';
-$route['admin/ai-assistant/(.+)'] = 'admin/aiassistant/$1';
-$route['admin/support-chat'] = 'admin/supportchat/index';
-$route['admin/support-chat/(.+)'] = 'admin/supportchat/$1';
+$route['ai-assistant/send'] = 'ai_assistant/send';
+$route['ai-assistant/history'] = 'ai_assistant/history';
+$route['ai-assistant/poll'] = 'ai_assistant/poll';
+$route['admin/ai-assistant'] = 'admin/ai_assistant/settings';
+$route['admin/ai-assistant/(.+)'] = 'admin/ai_assistant/$1';
+$route['admin/support-chat'] = 'admin/support_chat/index';
+$route['admin/support-chat/(.+)'] = 'admin/support_chat/$1';

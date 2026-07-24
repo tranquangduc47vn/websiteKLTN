@@ -108,7 +108,7 @@ if (!function_exists('admin_sidebar_allowed')) {
 		}
 
 		$user_only = array('home');
-		$staff = array('catalog', 'products', 'slider', 'users', 'admin', 'posts', 'page', 'banner', 'store', 'tuyendung', 'hoptac', 'vanchuyen', 'voucher');
+		$staff = array('catalog', 'products', 'slider', 'users', 'admin', 'posts', 'page', 'banner', 'branding', 'store', 'tuyendung', 'hoptac', 'vanchuyen', 'voucher');
 		$warehouse_slugs = array('inventory', 'receipts', 'inventory-adjust', 'stock-movements', 'suppliers', 'stock-receipts', 'stock-inventory');
 
 		$level = (int) $login->level;

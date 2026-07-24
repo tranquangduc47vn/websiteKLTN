@@ -3,6 +3,9 @@
  * Cập nhật schema DB sau khi import webshop.sql — chạy lại an toàn.
  *
  *   php databaseaddphpmyadmin/run_migrations.php
+ *
+ * Lưu ý: webshop.sql (bản FULL) đã gộp schema + biến thể — import một lần trên hosting.
+ * Script này chỉ cần khi nâng cấp DB cũ hoặc sau khi sửa schema mà chưa tái tạo dump.
  */
 define('BASEPATH', true);
 define('ENVIRONMENT', 'development');

@@ -32,12 +32,10 @@ class Admin extends MY_Admin_Controller {
 	public function index()
 	{
 		if (!admin_can('staff.manage', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có quyền truy cập khu vực này!');
+			admin_flash_fail( 'Bạn không có quyền truy cập khu vực này!');
 			redirect(admin_url('home'));
 		}
 
-		$this->data['message_success'] = $this->session->flashdata('message_success');
-		$this->data['message_fail'] = $this->session->flashdata('message_fail');
 
 		$admin = $this->admin_model->get_list();
 		$this->data['admin']= $admin;
@@ -48,7 +46,7 @@ class Admin extends MY_Admin_Controller {
 	public function add()
 	{
 		if (!admin_can('staff.manage', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có quyền thêm mới thành viên!');
+			admin_flash_fail( 'Bạn không có quyền thêm mới thành viên!');
 			redirect(admin_url('admin'));
 		}
 
@@ -66,7 +64,7 @@ class Admin extends MY_Admin_Controller {
 				
 				// MOD không được tạo tài khoản ADMIN
 				if (!admin_can('staff.grant_admin', $this->currentUser) && (int) $level_input === ROLE_ADMIN) {
-					$this->session->set_flashdata('message_fail', 'Bạn không thể cấp quyền ADMIN cho người khác!');
+					admin_flash_fail( 'Bạn không thể cấp quyền ADMIN cho người khác!');
 					redirect(admin_url('admin'));
 				}
 
@@ -79,9 +77,9 @@ class Admin extends MY_Admin_Controller {
 					'created' => now()
 				);
 				if ($this->admin_model->create($data)) {
-					$this->session->set_flashdata('message_success', 'Thêm thành viên thành công');
+					admin_flash_success( 'Thêm thành viên thành công');
 				}else{
-					$this->session->set_flashdata('message_fail', 'Thêm thành viên thất bại');
+					admin_flash_fail( 'Thêm thành viên thất bại');
 				}
 				redirect(admin_url('admin'));
 			}
@@ -93,7 +91,7 @@ class Admin extends MY_Admin_Controller {
 	public function edit()
 	{
 		if (!admin_can('staff.manage', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có quyền chỉnh sửa thành viên!');
+			admin_flash_fail( 'Bạn không có quyền chỉnh sửa thành viên!');
 			redirect(admin_url('admin'));
 		}
 
@@ -101,13 +99,13 @@ class Admin extends MY_Admin_Controller {
 		$admin = $this->admin_model->get_info($id);
 
 		if (empty($admin)) {
-			$this->session->set_flashdata('message_fail', 'Thành viên không tồn tại');
+			admin_flash_fail( 'Thành viên không tồn tại');
 			redirect(admin_url('admin'));
 		}
 
 		// MOD không sửa được tài khoản ADMIN
 		if ((int) $admin->level === ROLE_ADMIN && !admin_can('staff.edit_admin', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có quyền chỉnh sửa tài khoản của Quản trị tối cao (ADMIN)!');
+			admin_flash_fail( 'Bạn không có quyền chỉnh sửa tài khoản của Quản trị tối cao (ADMIN)!');
 			redirect(admin_url('admin'));
 		}
 
@@ -125,7 +123,7 @@ class Admin extends MY_Admin_Controller {
 
 				// MOD không nâng quyền lên ADMIN
 				if (!admin_can('staff.grant_admin', $this->currentUser) && (int) $level_input === ROLE_ADMIN) {
-					$this->session->set_flashdata('message_fail', 'Bạn không được phép nâng quyền lên ADMIN!');
+					admin_flash_fail( 'Bạn không được phép nâng quyền lên ADMIN!');
 					redirect(admin_url('admin'));
 				}
 
@@ -138,9 +136,9 @@ class Admin extends MY_Admin_Controller {
 					$data['password'] = hash_user_password($password);
 				}
 				if ($this->admin_model->update($id,$data)) {
-					$this->session->set_flashdata('message_success', 'Thay đổi thông tin thành viên thành công');
+					admin_flash_success( 'Thay đổi thông tin thành viên thành công');
 				}else{
-					$this->session->set_flashdata('message_fail', 'Thay đổi thông tin thành viên thất bại');
+					admin_flash_fail( 'Thay đổi thông tin thành viên thất bại');
 				}
 				redirect(admin_url('admin'));
 			}
@@ -153,8 +151,9 @@ class Admin extends MY_Admin_Controller {
 
 	public function del()
 	{
+		admin_require_post();
 		if (!admin_can('staff.delete', $this->currentUser)) {
-			$this->session->set_flashdata('message_fail', 'Bạn không có đủ quyền hạn để xóa thành viên!');
+			admin_flash_fail( 'Bạn không có đủ quyền hạn để xóa thành viên!');
 			redirect(admin_url('admin'));
 		}
 
@@ -162,20 +161,20 @@ class Admin extends MY_Admin_Controller {
 		$admin_to_delete = $this->admin_model->get_info($id);
 
 		if (!$admin_to_delete) {
-			$this->session->set_flashdata('message_fail', 'Admin không tồn tại');
+			admin_flash_fail( 'Admin không tồn tại');
 			redirect(admin_url('admin'));
 		}
 
 		// Không xóa tài khoản ADMIN
 		if ($admin_to_delete->level == ROLE_ADMIN) {
-			$this->session->set_flashdata('message_fail', 'Hệ thống bảo vệ: Không thể xóa tài khoản Quản trị tối cao (ADMIN)!');
+			admin_flash_fail( 'Hệ thống bảo vệ: Không thể xóa tài khoản Quản trị tối cao (ADMIN)!');
 			redirect(admin_url('admin'));
 		}
 
 		if ($this->admin_model->delete($id)) {
-			$this->session->set_flashdata('message_success', 'Xóa admin thành công');
+			admin_flash_success( 'Xóa admin thành công');
 		}else{
-			$this->session->set_flashdata('message_fail', 'Xóa admin thất bại');
+			admin_flash_fail( 'Xóa admin thất bại');
 		}
 		redirect(admin_url('admin'));
 	}
@@ -185,7 +184,7 @@ class Admin extends MY_Admin_Controller {
 		if ($this->session->userdata('login')) {
 			$this->session->unset_userdata('login');
 		}
-		$this->session->set_flashdata('message_success', 'Bạn đã đăng xuất.');
+		admin_flash_success( 'Bạn đã đăng xuất.');
 		admin_no_cache_headers();
 		redirect(admin_url('login'));
 	}

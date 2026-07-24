@@ -27,6 +27,7 @@ $voucher_init_code = $has_applied ? $cv['code'] : set_value('voucher_code');
 			</header>
 
 			<form class="jm-checkout-form" id="jmCheckoutForm" enctype="multipart/form-data" method="post" novalidate>
+				<?php echo csrf_field(); ?>
 				<div class="jm-checkout-field">
 					<label for="jm-checkout-name">Họ và tên</label>
 					<input id="jm-checkout-name" type="text" name="name" class="form-control" value="<?php echo (!empty($user)) ? htmlspecialchars($user->name, ENT_QUOTES, 'UTF-8') : ''; ?>" required>

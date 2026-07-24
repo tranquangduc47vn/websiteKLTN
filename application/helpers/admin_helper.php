@@ -223,8 +223,8 @@
 		function admin_flash_success($message)
 		{
 			$CI =& get_instance();
-			$CI->session->unset_userdata('message_fail');
-			$CI->session->set_flashdata('message_success', $message);
+			$CI->session->unset_userdata('admin_message_fail');
+			$CI->session->set_flashdata('admin_message_success', $message);
 		}
 	}
 
@@ -232,8 +232,35 @@
 		function admin_flash_fail($message)
 		{
 			$CI =& get_instance();
-			$CI->session->unset_userdata('message_success');
-			$CI->session->set_flashdata('message_fail', $message);
+			$CI->session->unset_userdata('admin_message_success');
+			$CI->session->set_flashdata('admin_message_fail', $message);
+		}
+	}
+
+	if (!function_exists('admin_flash_info')) {
+		function admin_flash_info($message)
+		{
+			$CI =& get_instance();
+			$CI->session->set_flashdata('admin_message', $message);
+		}
+	}
+
+	if (!function_exists('admin_discard_storefront_flash')) {
+		function admin_discard_storefront_flash()
+		{
+			$CI =& get_instance();
+			$keys = array(
+				'store_message_success',
+				'store_message_fail',
+				'auth_message_success',
+				'auth_message_fail',
+				'message',
+				'message_success',
+				'message_fail',
+			);
+			foreach ($keys as $key) {
+				$CI->session->flashdata($key);
+			}
 		}
 	}
 
@@ -292,6 +319,62 @@
 			}
 
 			return '—';
+		}
+	}
+
+	if (!function_exists('admin_require_post')) {
+		function admin_require_post()
+		{
+			$CI =& get_instance();
+			if (strtoupper($CI->input->method()) !== 'POST') {
+				show_404();
+				exit;
+			}
+		}
+	}
+
+	if (!function_exists('admin_csrf_post_button')) {
+		function admin_csrf_post_button($action_url, $inner_html, array $options = array())
+		{
+			$class = isset($options['class']) ? $options['class'] : 'btn btn-sm btn-outline-danger';
+			$title = isset($options['title']) ? $options['title'] : '';
+			$confirm = isset($options['confirm']) ? $options['confirm'] : '';
+			$form_class = isset($options['form_class']) ? $options['form_class'] : 'd-inline';
+
+			$confirm_attr = '';
+			if ($confirm !== '') {
+				$confirm_attr = ' onclick="return confirm(' . json_encode($confirm, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) . ')"';
+			}
+
+			$title_attr = $title !== '' ? ' title="' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '"' : '';
+
+			$hidden = '';
+			if (!empty($options['hidden']) && is_array($options['hidden'])) {
+				foreach ($options['hidden'] as $name => $value) {
+					$hidden .= '<input type="hidden" name="' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8') . '">';
+				}
+			}
+
+			return '<form method="post" action="' . htmlspecialchars($action_url, ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($form_class, ENT_QUOTES, 'UTF-8') . '">'
+				. csrf_field()
+				. $hidden
+				. '<button type="submit" class="' . htmlspecialchars($class, ENT_QUOTES, 'UTF-8') . '"' . $title_attr . $confirm_attr . '>' . $inner_html . '</button>'
+				. '</form>';
+		}
+	}
+
+	if (!function_exists('admin_prompt_post_button')) {
+		function admin_prompt_post_button($action_url, $inner_html, $prompt, array $options = array())
+		{
+			$form_id = 'admin-prompt-post-' . substr(md5($action_url . $prompt), 0, 10);
+			$class = isset($options['class']) ? $options['class'] : 'btn btn-danger';
+			$form_class = isset($options['form_class']) ? $options['form_class'] : 'd-inline';
+
+			return '<form id="' . htmlspecialchars($form_id, ENT_QUOTES, 'UTF-8') . '" method="post" action="' . htmlspecialchars($action_url, ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($form_class, ENT_QUOTES, 'UTF-8') . '">'
+				. csrf_field()
+				. '<input type="hidden" name="reason" value="">'
+				. '<button type="button" class="' . htmlspecialchars($class, ENT_QUOTES, 'UTF-8') . '" onclick="adminPromptPost(' . json_encode($form_id) . ',' . json_encode($prompt, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) . ')">' . $inner_html . '</button>'
+				. '</form>';
 		}
 	}
 ?>

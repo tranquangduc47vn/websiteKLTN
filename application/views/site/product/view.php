@@ -1,7 +1,7 @@
 <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12 clearpaddingr jm-pdp-lux">
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12 clearpadding">
         
-        <link rel="stylesheet" href="<?php echo site_asset_url('css/style-detail.css'); ?>?v=14" type="text/css">
+        <link rel="stylesheet" href="<?php echo site_asset_url('css/style-detail.css'); ?>?v=15" type="text/css">
         <link rel="stylesheet" href="<?php echo site_asset_url('css/stock-notice-modal.css'); ?>?v=1" type="text/css">
 
         <script src="<?php echo site_asset_url('js/product-detail.js'); ?>?v=3" type="text/javascript"></script>
@@ -43,6 +43,20 @@
                 window.location.reload();
             });
 
+            function ratyPostData(extra) {
+                var data = extra || {};
+                if (window.CI_CSRF) {
+                    data[window.CI_CSRF.name] = window.CI_CSRF.hash;
+                }
+                return data;
+            }
+
+            function applyRatyCsrf(data) {
+                if (typeof window.applyCsrfResponse === 'function') {
+                    window.applyCsrfResponse(data);
+                }
+            }
+
             $('.raty_detailt').raty({
                 score: function() {
                     if (alreadyRated && myScore > 0) {
@@ -56,9 +70,10 @@
                     $.ajax({
                         url: '<?php echo base_url('product/raty'); ?>',
                         type: 'POST',
-                        data: {'id': '<?php echo $product->id; ?>', 'score': score},
+                        data: ratyPostData({'id': '<?php echo $product->id; ?>', 'score': score}),
                         dataType: 'json',
                         success: function(data) {
+                            applyRatyCsrf(data);
                             if (data.complete) {
                                 if (data.updated || !alreadyRated) {
                                     showReviewThankYou(score, !!data.updated);
@@ -84,9 +99,10 @@
                 $.ajax({
                     url: '<?php echo base_url('product/raty-undo'); ?>',
                     type: 'POST',
-                    data: {'id': '<?php echo $product->id; ?>'},
+                    data: ratyPostData({'id': '<?php echo $product->id; ?>'}),
                     dataType: 'json',
                     success: function(data) {
+                        applyRatyCsrf(data);
                         if (data.complete) {
                             window.location.reload();
                             return;
@@ -106,7 +122,7 @@
                         <div class="jm-thumb-vertical-box">
                             <ul id="thumblist" class="jm-thumb-vertical">
                                 <li>
-                                    <?php $main_img = base_url('upload/product/' . $product->image_link); ?>
+                                    <?php $main_img = product_image_url($product->image_link); ?>
                                     <a class="zoomThumbActive" href="javascript:void(0);"
                                        data-small="<?php echo htmlspecialchars($main_img, ENT_QUOTES, 'UTF-8'); ?>"
                                        data-large="<?php echo htmlspecialchars($main_img, ENT_QUOTES, 'UTF-8'); ?>">
@@ -115,7 +131,7 @@
                                 </li>
                                 <?php if(is_array($image_list)): ?>
                                     <?php foreach ($image_list as $value) {
-                                        $thumb_src = base_url('upload/product/' . $value);
+                                        $thumb_src = product_image_url($value);
                                     ?>
                                         <li>
                                             <a href="javascript:void(0);"
@@ -130,7 +146,7 @@
                         </div>
 
                         <div class="jm-main-image-box">
-                            <?php $main_img = base_url('upload/product/' . $product->image_link); ?>
+                            <?php $main_img = product_image_url($product->image_link); ?>
                             <div class="jm-pdp-main-stage" id="jm-pdp-main-stage">
                                 <img src="<?php echo $main_img; ?>" alt="<?php echo htmlspecialchars(product_display_name($product->name), ENT_QUOTES, 'UTF-8'); ?>" class="jm-pdp-main-img" id="jm-pdp-main-img" width="340" height="440">
                             </div>
@@ -174,6 +190,8 @@
                         
                         <?php 
                         $variant_stock_map = isset($variant_stock_map) ? $variant_stock_map : array();
+                        $default_variant_color = isset($default_variant_color) ? (string) $default_variant_color : '';
+                        $default_variant_size = isset($default_variant_size) ? (string) $default_variant_size : '';
                         $has_any_stock = false;
                         foreach ($variant_stock_map as $variant_row) {
                             if (!empty($variant_row['stock'])) {
@@ -197,19 +215,25 @@
                             <?php } ?>
                         </p>
                     </div>
+
+                    <?php if (!empty($message)) { ?>
+                    <div class="jm-pdp-flash" role="alert"><?php echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8'); ?></div>
+                    <?php } ?>
                     
                     <form action="<?php echo site_url('gio-hang/them/' . (int) $product->id); ?>" method="post" id="form-add-to-cart">
+                        <?php echo csrf_field(); ?>
                         
                         <div class="style2-attr-group">
                             <label class="style2-attr-title">Màu sắc:</label>
                             <ul class="style2-attr-list-rect" id="color-select">
                                 <?php 
-                                $first_color = '';
+                                $first_color = $default_variant_color !== '' ? $default_variant_color : '';
                                 if(!empty($product_colors)) {
+                                    if ($first_color === '') {
+                                        $first_color = trim($product_colors[0]);
+                                    }
                                     foreach ($product_colors as $key => $color) {
                                         $color = trim($color);
-                                        if($key === 0) $first_color = $color;
-
                                         $bg_hex = '#ffffff'; 
                                         $lower_color = mb_strtolower($color, 'UTF-8');
 
@@ -226,7 +250,7 @@
                                         elseif (mb_strpos($lower_color, 'kem') !== false || mb_strpos($lower_color, 'be') !== false || mb_strpos($lower_color, 'beige') !== false || mb_strpos($lower_color, 'cream') !== false) { $bg_hex = '#f5f5dc'; }
                                         else { $bg_hex = '#e0e0e0'; }
                                         ?>
-                                        <li class="style2-rect-box <?php echo ($key === 0) ? 'active' : ''; ?>" 
+                                        <li class="style2-rect-box <?php echo ($color === $first_color) ? 'active' : ''; ?>" 
                                             data-value="<?php echo $color; ?>" 
                                             style="background-color: <?php echo $bg_hex; ?>;" 
                                             title="<?php echo $color; ?>">
@@ -246,13 +270,15 @@
                             <label class="style2-attr-title">Kích cỡ:</label>
                             <ul class="style2-attr-list-square" id="size-select">
                                 <?php 
-                                $first_size = '';
+                                $first_size = $default_variant_size !== '' ? $default_variant_size : '';
                                 if(!empty($product_sizes)) {
+                                    if ($first_size === '') {
+                                        $first_size = trim($product_sizes[0]);
+                                    }
                                     foreach ($product_sizes as $key => $size) {
                                         $size = trim($size);
-                                        if($key === 0) $first_size = $size;
                                         ?>
-                                        <li class="style2-square-box <?php echo ($key === 0) ? 'active' : ''; ?>" data-value="<?php echo $size; ?>"><?php echo $size; ?></li>
+                                        <li class="style2-square-box <?php echo ($size === $first_size) ? 'active' : ''; ?>" data-value="<?php echo $size; ?>"><?php echo $size; ?></li>
                                         <?php
                                     }
                                 } else {
@@ -296,6 +322,15 @@
                             var variantStocks = <?php echo json_encode($variant_stock_map, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
                             var legacyProductStock = <?php echo empty($variant_stock_map) ? (int) (isset($product->quantity) ? $product->quantity : 0) : 0; ?>;
                             var productName = <?php echo json_encode($product->name, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+                            var userInitiated = false;
+
+                            if (window.QD && window.QD.hideStockNoticeModal) {
+                                window.QD.hideStockNoticeModal();
+                            }
+
+                            $('#form-add-to-cart').on('pointerdown mousedown touchstart', 'button, .style2-rect-box, .style2-square-box', function () {
+                                userInitiated = true;
+                            });
 
                             function variantKey(color, size) {
                                 return String(color).trim() + '||' + String(size).trim();
@@ -313,6 +348,9 @@
                             }
 
                             function showStockNotice(color, size, stock) {
+                                if (!userInitiated) {
+                                    return;
+                                }
                                 if (window.QD && window.QD.showStockNotice) {
                                     window.QD.showStockNotice({
                                         product_name: productName,
@@ -379,6 +417,7 @@
                             });
 
                             $('#form-add-to-cart').on('submit', function(e) {
+                                userInitiated = true;
                                 var color = $('#input-color').val();
                                 var size = $('#input-size').val();
                                 var qty = parseInt(qtyInput.val(), 10) || 0;
@@ -522,7 +561,7 @@
                                     <div class="product-image jm-pdp-related-card__media">
                                         <?php echo product_discount_badge_html($value, 'jm-badge-discount jm-pdp-related-badge'); ?>
                                         <a href="<?php echo build_product_url($value); ?>">
-                                            <img src="<?php echo base_url('upload/product/'.$value->image_link); ?>" alt="<?php echo htmlspecialchars($rel_name, ENT_QUOTES, 'UTF-8'); ?>">
+                                            <img src="<?php echo product_image_url($value->image_link); ?>" alt="<?php echo htmlspecialchars($rel_name, ENT_QUOTES, 'UTF-8'); ?>">
                                         </a>
                                     </div>
                                     <div class="jm-pdp-related-card__body">
@@ -558,7 +597,7 @@
 
         <?php $this->load->view('site/partials/stock_notice_modal'); ?>
 
-        <script src="<?php echo site_asset_url('js/stock-notice-modal.js'); ?>?v=1"></script>
+        <script src="<?php echo site_asset_url('js/stock-notice-modal.js'); ?>?v=4"></script>
 
         <div class="modal fade jm-review-thank-modal" id="jmReviewThankModal" tabindex="-1" role="dialog" aria-labelledby="jmReviewThankTitle" aria-hidden="true">
             <div class="modal-dialog modal-sm" role="document">

@@ -4,7 +4,7 @@
             
             <div class="jm-logo-area">
                 <a href="<?php echo base_url(); ?>">
-                    <img src="<?php echo base_url(); ?>upload/logo.png" alt="Logo">
+                    <img src="<?php echo site_logo_url(); ?>" alt="<?php echo htmlspecialchars(shop_name(), ENT_QUOTES, 'UTF-8'); ?>">
                 </a>
             </div>
 

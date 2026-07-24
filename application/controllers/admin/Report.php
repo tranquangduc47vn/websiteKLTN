@@ -10,7 +10,7 @@ class Report extends MY_Admin_Controller {
         $this->load->model('product_model');
         $this->load->helper('permission');
         if (!admin_can('order.manage', $this->session->userdata('login'))) {
-            $this->session->set_flashdata('message_fail', 'Bạn không có quyền xem báo cáo đơn hàng.');
+            admin_flash_fail( 'Bạn không có quyền xem báo cáo đơn hàng.');
             redirect(admin_url('home'));
         }
     }

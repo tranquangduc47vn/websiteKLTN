@@ -15,12 +15,6 @@ class Slider extends MY_Admin_Controller {
 
 	public function index()
 	{
-		$message_success = $this->session->flashdata('message_success');
-		$this->data['message_success'] = $message_success;
-
-		$message_fail = $this->session->flashdata('message_fail');
-		$this->data['message_fail'] = $message_fail;
-
 		$input = array();
 		$input['order'] = array('id' , 'ASC');
 		$slider = $this->slider_model->get_list($input);
@@ -58,10 +52,10 @@ class Slider extends MY_Admin_Controller {
 				);
 				
 				if ($this->slider_model->create($data)) {
-					$this->session->set_flashdata('message_success', 'Thêm slider thành công');
+					admin_flash_success( 'Thêm slider thành công');
 				} else {
 					$this->db->insert('slider', $data);
-					$this->session->set_flashdata('message_success', 'Ép lưu slider vào DB thành công');
+					admin_flash_success( 'Ép lưu slider vào DB thành công');
 				}
 				redirect(admin_url('slider'));
 			}
@@ -75,7 +69,7 @@ class Slider extends MY_Admin_Controller {
 		$id = $this->uri->segment(4);
 		$slider = $this->slider_model->get_info($id);
 		if (empty($slider)) {
-			$this->session->set_flashdata('message_fail', 'Slider không tồn tại');
+			admin_flash_fail( 'Slider không tồn tại');
 			redirect(admin_url('slider'));
 		}
 		$this->data['slider'] = $slider;
@@ -107,9 +101,9 @@ class Slider extends MY_Admin_Controller {
 				}
 				
 				if ($this->slider_model->update($id, $data)) {
-					$this->session->set_flashdata('message_success', 'Thay đổi slider thành công');
+					admin_flash_success( 'Thay đổi slider thành công');
 				} else {
-					$this->session->set_flashdata('message_fail', 'Thay đổi slider thất bại');
+					admin_flash_fail( 'Thay đổi slider thất bại');
 				}
 				redirect(admin_url('slider'));
 			}
@@ -120,11 +114,12 @@ class Slider extends MY_Admin_Controller {
 
 	public function del()
 	{
+		admin_require_post();
 		$id = $this->uri->segment(4);
 		$slider = $this->slider_model->get_info($id);
 		
 		if (empty($slider)) {
-			$this->session->set_flashdata('message_fail', 'Slider không tồn tại');
+			admin_flash_fail( 'Slider không tồn tại');
 			redirect(admin_url('slider'));
 		}
 		
@@ -133,9 +128,9 @@ class Slider extends MY_Admin_Controller {
 			if (file_exists($image) && is_file($image)) {
 				unlink($image);
 			}
-			$this->session->set_flashdata('message_success', 'Xóa Slider thành công');
+			admin_flash_success( 'Xóa Slider thành công');
 		} else {
-			$this->session->set_flashdata('message_fail', 'Xóa Slider thất bại');
+			admin_flash_fail( 'Xóa Slider thất bại');
 		}
 		redirect(admin_url('slider'));
 	}
