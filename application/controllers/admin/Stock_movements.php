@@ -12,7 +12,7 @@ class Stock_movements extends MY_Admin_Controller {
 		$this->currentUser = $this->session->userdata('login');
 
 		if (!admin_can('stock.view', $this->currentUser)) {
-			admin_flash_fail( 'Bạn không có quyền xem lịch sử biến động.');
+			admin_flash_fail( 'Bạn không có quyền xem lịch sử biến động.', 'dashboard');
 			redirect(admin_url('home'));
 		}
 	}

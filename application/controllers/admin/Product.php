@@ -25,7 +25,7 @@ class Product extends MY_Admin_Controller {
 		}
 
 		if (!admin_can('product.manage', $this->currentUser)) {
-			admin_flash_fail( 'Bạn không có quyền truy cập khu vực Sản phẩm!');
+			admin_flash_fail( 'Bạn không có quyền truy cập khu vực Sản phẩm!', 'dashboard');
 			redirect(admin_url('home')); 
 		}
 	}

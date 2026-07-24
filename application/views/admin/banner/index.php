@@ -9,10 +9,6 @@
 
 <p class="admin-page-subtitle mb-3">Tổng số: <?php echo !empty($list) ? count($list) : 0; ?> banner</p>
 
-<?php if (!empty($message)) { ?>
-	<div class="alert alert-success"><strong>Thông báo:</strong> <?php echo $message; ?></div>
-<?php } ?>
-
 <div class="admin-card">
 	<div class="admin-card-header">
 		<span>Danh sách banner</span>

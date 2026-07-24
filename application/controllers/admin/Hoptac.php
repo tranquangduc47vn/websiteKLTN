@@ -20,12 +20,6 @@ class Hoptac extends MY_Admin_Controller {
 
     public function index() {
 
-        $message = $this->session->flashdata('message');
-
-        $this->data['message'] = $message;
-
-
-
         $list = $this->hoptac_model->get_list();
 
         $this->data['list'] = $list;

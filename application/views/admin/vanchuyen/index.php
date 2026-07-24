@@ -11,10 +11,6 @@
 	<a href="<?php echo admin_url('vanchuyen/add'); ?>" class="btn btn-primary"><i class="fa-solid fa-plus me-1"></i> Thêm chính sách</a>
 </div>
 
-<?php if (isset($message) && $message) { ?>
-	<div class="alert alert-success"><?php echo $message; ?></div>
-<?php } ?>
-
 <div class="admin-card">
 	<div class="admin-card-header">
 		<span>Danh sách</span>

@@ -11,10 +11,6 @@
 	<a href="<?php echo admin_url('hoptac/add'); ?>" class="btn btn-primary"><i class="fa-solid fa-plus me-1"></i> Thêm bài viết</a>
 </div>
 
-<?php if (isset($message) && $message) { ?>
-	<div class="alert alert-success"><i class="fa-solid fa-circle-check me-2"></i><?php echo $message; ?></div>
-<?php } ?>
-
 <div class="admin-card">
 	<div class="admin-card-header">
 		<span>Danh sách bài viết</span>

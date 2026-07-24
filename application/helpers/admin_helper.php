@@ -228,13 +228,15 @@
 
 			$map = array(
 				'transaction' => 'orders',
+				'report' => 'orders',
 				'product' => 'products',
 				'inventory' => 'inventory',
 				'stock_receipt' => 'inventory',
 				'stock_movements' => 'inventory',
+				'stock_inventory' => 'inventory',
 				'suppliers' => 'inventory',
 				'ai_assistant' => 'ai',
-				'support_chat' => 'ai',
+				'support_chat' => 'support',
 				'user' => 'users',
 				'catalog' => 'catalog',
 				'news' => 'posts',
@@ -250,9 +252,10 @@
 				'site_branding' => 'branding',
 				'login' => 'auth',
 				'home' => 'dashboard',
+				'export' => 'dashboard',
 			);
 
-			return isset($map[$class]) ? $map[$class] : 'general';
+			return isset($map[$class]) ? $map[$class] : 'dashboard';
 		}
 	}
 
@@ -266,8 +269,11 @@
 			}
 
 			$map = array(
+				'transaction' => 'orders',
 				'orders' => 'orders',
+				'report' => 'orders',
 				'products' => 'products',
+				'product' => 'products',
 				'inventory' => 'inventory',
 				'receipts' => 'inventory',
 				'stock-receipts' => 'inventory',
@@ -275,18 +281,27 @@
 				'stock-movements' => 'inventory',
 				'suppliers' => 'inventory',
 				'ai-assistant' => 'ai',
-				'support-chat' => 'ai',
+				'support-chat' => 'support',
 				'users' => 'users',
 				'catalog' => 'catalog',
 				'posts' => 'posts',
 				'store' => 'store',
 				'branding' => 'branding',
 				'voucher' => 'marketing',
+				'slider' => 'content',
+				'banner' => 'content',
+				'page' => 'content',
+				'pages' => 'content',
+				'tuyendung' => 'content',
+				'hoptac' => 'content',
+				'vanchuyen' => 'content',
+				'admin' => 'staff',
 				'home' => 'dashboard',
+				'export' => 'dashboard',
 				'login' => 'auth',
 			);
 
-			return isset($map[$seg2]) ? $map[$seg2] : 'general';
+			return isset($map[$seg2]) ? $map[$seg2] : 'dashboard';
 		}
 	}
 
@@ -295,26 +310,53 @@
 		{
 			$text = mb_strtolower(trim((string) $message), 'UTF-8');
 			if ($text === '') {
-				return 'general';
+				return '';
 			}
 
-			if (mb_strpos($text, 'đơn đặt hàng') !== false || mb_strpos($text, 'đơn hàng') !== false || mb_strpos($text, 'đơn cần') !== false) {
+			if (mb_strpos($text, 'đơn đặt hàng') !== false || mb_strpos($text, 'đơn hàng') !== false || mb_strpos($text, 'đơn cần') !== false || mb_strpos($text, 'giao hàng') !== false) {
 				return 'orders';
 			}
-			if (mb_strpos($text, 'trợ lý ai') !== false || mb_strpos($text, 'faq') !== false || mb_strpos($text, 'hội thoại') !== false) {
+			if (mb_strpos($text, 'trợ lý ai') !== false || mb_strpos($text, 'cấu hình trợ lý') !== false || mb_strpos($text, 'faq') !== false || mb_strpos($text, 'hội thoại') !== false) {
 				return 'ai';
 			}
-			if (mb_strpos($text, 'tồn kho') !== false || mb_strpos($text, 'nhập kho') !== false || mb_strpos($text, 'phiếu nhập') !== false || mb_strpos($text, 'nhà cung cấp') !== false) {
+			if (mb_strpos($text, 'hỗ trợ khách') !== false) {
+				return 'support';
+			}
+			if (mb_strpos($text, 'tồn kho') !== false || mb_strpos($text, 'nhập kho') !== false || mb_strpos($text, 'phiếu nhập') !== false || mb_strpos($text, 'nhà cung cấp') !== false || mb_strpos($text, 'kiểm kê') !== false) {
 				return 'inventory';
 			}
-			if (mb_strpos($text, 'sản phẩm') !== false || mb_strpos($text, 'danh mục') !== false) {
+			if (mb_strpos($text, 'sản phẩm') !== false) {
 				return 'products';
 			}
+			if (mb_strpos($text, 'danh mục') !== false) {
+				return 'catalog';
+			}
+			if (mb_strpos($text, 'voucher') !== false || mb_strpos($text, 'mã giảm') !== false) {
+				return 'marketing';
+			}
+			if (mb_strpos($text, 'tin tức') !== false || mb_strpos($text, 'bài viết') !== false) {
+				return 'posts';
+			}
+			if (mb_strpos($text, 'slider') !== false || mb_strpos($text, 'banner') !== false || mb_strpos($text, 'hợp tác') !== false || mb_strpos($text, 'tuyển dụng') !== false || mb_strpos($text, 'vận chuyển') !== false) {
+				return 'content';
+			}
+			if (mb_strpos($text, 'thành viên') !== false || mb_strpos($text, 'nhân viên') !== false || mb_strpos($text, ' admin') !== false) {
+				return 'staff';
+			}
+			if (mb_strpos($text, 'khách hàng') !== false || mb_strpos($text, ' user') !== false) {
+				return 'users';
+			}
+			if (mb_strpos($text, 'cửa hàng') !== false) {
+				return 'store';
+			}
+			if (mb_strpos($text, 'logo') !== false || mb_strpos($text, 'branding') !== false) {
+				return 'branding';
+			}
 			if (mb_strpos($text, 'đăng nhập') !== false || mb_strpos($text, 'đăng xuất') !== false) {
-				return 'general';
+				return 'dashboard';
 			}
 
-			return 'general';
+			return '';
 		}
 	}
 
@@ -325,16 +367,31 @@
 				$page_scope = admin_page_scope();
 			}
 
-			$flash_scope = (string) $flash_scope;
-			if ($flash_scope === '' || $flash_scope === 'general') {
-				return true;
+			$flash_scope = trim((string) $flash_scope);
+			if ($flash_scope === '') {
+				return false;
 			}
 
-			if ($page_scope === 'auth' && in_array($flash_scope, array('auth', 'general'), true)) {
-				return true;
+			if ($page_scope === 'auth') {
+				return in_array($flash_scope, array('auth', 'dashboard'), true);
 			}
 
 			return $flash_scope === $page_scope;
+		}
+	}
+
+	if (!function_exists('admin_purge_stale_admin_flash_userdata')) {
+		function admin_purge_stale_admin_flash_userdata()
+		{
+			$CI =& get_instance();
+			$CI->session->unset_userdata(array('admin_message_success', 'admin_message_fail', 'admin_message'));
+		}
+	}
+
+	if (!function_exists('admin_flash_fail_home')) {
+		function admin_flash_fail_home($message)
+		{
+			admin_set_scoped_flash('fail', $message, 'dashboard');
 		}
 	}
 
@@ -364,7 +421,7 @@
 
 			$bundle = $CI->session->flashdata('admin_flash');
 			if (is_array($bundle) && !empty($bundle['message'])) {
-				$scope = isset($bundle['scope']) ? (string) $bundle['scope'] : 'general';
+				$scope = isset($bundle['scope']) ? trim((string) $bundle['scope']) : '';
 				if (admin_flash_scope_matches_page($scope, $page_scope)) {
 					return array(
 						'type' => isset($bundle['type']) ? (string) $bundle['type'] : 'info',

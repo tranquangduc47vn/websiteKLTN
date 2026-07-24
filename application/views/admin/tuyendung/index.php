@@ -11,10 +11,6 @@
 	<a href="<?php echo admin_url('tuyendung/add'); ?>" class="btn btn-primary"><i class="fa-solid fa-plus me-1"></i> Thêm mới</a>
 </div>
 
-<?php if ($this->session->flashdata('message')) { ?>
-	<div class="alert alert-success"><?php echo $this->session->flashdata('message'); ?></div>
-<?php } ?>
-
 <div class="admin-card">
 	<div class="admin-card-header">
 		<span>Vị trí tuyển dụng</span>

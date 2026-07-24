@@ -24,6 +24,7 @@ class MY_Admin_Controller extends MY_Controller
 
 		$this->data['login'] = $login;
 		admin_discard_storefront_flash();
+		admin_purge_stale_admin_flash_userdata();
 	}
 
 	protected function render_admin($view, array $data = array())

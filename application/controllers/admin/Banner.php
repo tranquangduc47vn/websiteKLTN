@@ -17,7 +17,7 @@ class Banner extends MY_Admin_Controller {
         }
 
         if (!admin_can('banner.manage', $this->currentUser)) {
-            admin_flash_fail( 'Bạn không có quyền quản lý khu vực Banner!');
+            admin_flash_fail( 'Bạn không có quyền quản lý khu vực Banner!', 'dashboard');
             redirect(admin_url('home'));
         }
     }
@@ -25,8 +25,6 @@ class Banner extends MY_Admin_Controller {
     public function index() {
         $input = array('order' => array('sort_order', 'ASC'));
         $this->data['list'] = $this->banner_model->get_list($input);
-
-        $this->data['message'] = $this->session->flashdata('message');
 
         $this->render_admin('admin/banner/index');
     }

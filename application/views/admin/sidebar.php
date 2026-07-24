@@ -176,7 +176,7 @@ $info_section_open = in_array($current, $info_slugs, true);
 				<i class="fa-solid fa-headset admin-nav-icon" aria-hidden="true"></i>
 				<span>Hỗ trợ khách hàng</span>
 				<?php if ($waiting_badge > 0) { ?>
-					<span class="admin-nav-badge" id="support-waiting-badge"><?php echo (int) $waiting_badge; ?></span>
+					<span class="admin-nav-badge admin-nav-badge--urgent" id="support-waiting-badge" title="Khách đang chờ nhân viên"><?php echo (int) $waiting_badge; ?></span>
 				<?php } ?>
 			</a>
 			<?php } ?>

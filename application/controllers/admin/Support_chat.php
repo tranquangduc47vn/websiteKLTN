@@ -12,7 +12,7 @@ class Support_chat extends MY_Admin_Controller {
 		$this->load->helper('permission');
 		$this->currentUser = $this->session->userdata('login');
 		if (!admin_can('order.chat', $this->currentUser)) {
-			admin_flash_fail( 'Bạn không có quyền hỗ trợ khách hàng.');
+			admin_flash_fail( 'Bạn không có quyền hỗ trợ khách hàng.', 'dashboard');
 			redirect(admin_url('home'));
 		}
 		$this->load->model('ai_conversation_model');

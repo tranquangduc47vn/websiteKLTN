@@ -14,7 +14,7 @@ class Voucher extends MY_Admin_Controller {
 			redirect(admin_url('login'));
 		}
 		if (!admin_can('voucher.manage', $this->currentUser)) {
-			admin_flash_fail( 'Bạn không có quyền quản lý voucher!');
+			admin_flash_fail( 'Bạn không có quyền quản lý voucher!', 'dashboard');
 			redirect(admin_url('home'));
 		}
 		$this->load->helper('loyalty');
@@ -25,7 +25,6 @@ class Voucher extends MY_Admin_Controller {
 	{
 		$input = array('order' => array('id', 'DESC'));
 		$this->data['list'] = $this->voucher_model->get_list($input);
-		$this->data['message'] = $this->session->flashdata('message');
 		$this->render_admin('admin/voucher/index');
 	}
 

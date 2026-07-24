@@ -19,7 +19,7 @@ class Catalog extends MY_Admin_Controller {
 		}
 
 		if (!admin_can('catalog.manage', $this->currentUser)) {
-			admin_flash_fail( 'Bạn không có quyền quản lý danh mục sản phẩm!');
+			admin_flash_fail( 'Bạn không có quyền quản lý danh mục sản phẩm!', 'dashboard');
 			redirect(admin_url('home'));
 		}
 	}

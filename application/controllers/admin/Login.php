@@ -30,7 +30,7 @@ class Login extends MY_Controller {
 			if ($this->form_validation->run()) {
 				$user = $this->get_info_login();
 				$this->session->set_userdata('login', $user);
-				admin_flash_success('Đăng nhập thành công');
+				admin_flash_success('Đăng nhập thành công', 'dashboard');
 				redirect(admin_url('home'));
 			}
 		}

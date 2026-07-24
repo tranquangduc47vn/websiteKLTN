@@ -32,7 +32,7 @@ class Admin extends MY_Admin_Controller {
 	public function index()
 	{
 		if (!admin_can('staff.manage', $this->currentUser)) {
-			admin_flash_fail( 'Bạn không có quyền truy cập khu vực này!');
+			admin_flash_fail( 'Bạn không có quyền truy cập khu vực này!', 'dashboard');
 			redirect(admin_url('home'));
 		}
 
@@ -184,7 +184,7 @@ class Admin extends MY_Admin_Controller {
 		if ($this->session->userdata('login')) {
 			$this->session->unset_userdata('login');
 		}
-		admin_flash_success( 'Bạn đã đăng xuất.');
+		admin_flash_success('Bạn đã đăng xuất.', 'dashboard');
 		admin_no_cache_headers();
 		redirect(admin_url('login'));
 	}

@@ -21,7 +21,6 @@ class Suppliers extends MY_Admin_Controller {
 		$list = $this->supplier_model->get_list(array('order' => array('name', 'ASC')));
 		$this->data['list'] = $list;
 		$this->data['can_manage'] = admin_can('stock.manage', $this->currentUser);
-		$this->data['message'] = $this->session->flashdata('message');
 		$this->render_admin('admin/suppliers/index');
 	}
 

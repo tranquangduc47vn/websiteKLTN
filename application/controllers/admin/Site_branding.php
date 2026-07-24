@@ -9,7 +9,7 @@ class Site_branding extends MY_Admin_Controller {
 		$this->load->library('site_branding_service');
 
 		if (!admin_can('content.manage', $this->data['login'])) {
-			admin_flash_fail('Bạn không có quyền quản lý logo website.');
+			admin_flash_fail('Bạn không có quyền quản lý logo website.', 'dashboard');
 			redirect(admin_url('home'));
 		}
 	}

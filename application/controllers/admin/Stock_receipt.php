@@ -17,7 +17,7 @@ class Stock_receipt extends MY_Admin_Controller {
 		$this->currentUser = $this->session->userdata('login');
 
 		if (!admin_can('stock.view', $this->currentUser)) {
-			admin_flash_fail( 'Bạn không có quyền xem phiếu nhập kho.');
+			admin_flash_fail( 'Bạn không có quyền xem phiếu nhập kho.', 'dashboard');
 			redirect(admin_url('home'));
 		}
 	}
@@ -49,7 +49,6 @@ class Stock_receipt extends MY_Admin_Controller {
 		$this->data['filter_status'] = $status;
 		$this->data['filter_code'] = $code;
 		$this->data['can_manage'] = admin_can('stock.manage', $this->currentUser);
-		$this->data['message'] = $this->session->flashdata('message');
 
 		$this->render_admin('admin/stock_receipt/index');
 	}
@@ -130,7 +129,6 @@ class Stock_receipt extends MY_Admin_Controller {
 		$this->data['receipt'] = $receipt;
 		$this->data['items'] = $this->stock_receipt_item_model->get_by_receipt($id);
 		$this->data['can_manage'] = admin_can('stock.manage', $this->currentUser);
-		$this->data['message'] = $this->session->flashdata('message');
 
 		$this->render_admin('admin/stock_receipt/view');
 	}

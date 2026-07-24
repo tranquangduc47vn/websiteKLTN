@@ -12,7 +12,7 @@ class Ai_assistant extends MY_Admin_Controller {
 		$this->load->helper('permission');
 		$this->currentUser = $this->session->userdata('login');
 		if (!admin_can('ai.manage', $this->currentUser)) {
-			admin_flash_fail( 'Bạn không có quyền quản lý Trợ lý AI.');
+			admin_flash_fail_home( 'Bạn không có quyền quản lý Trợ lý AI.');
 			redirect(admin_url('home'));
 		}
 		$this->load->model('ai_setting_model');

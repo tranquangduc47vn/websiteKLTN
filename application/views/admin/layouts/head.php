@@ -18,7 +18,7 @@ if ($is_admin_login) {
 
 <link href="<?php echo $admin_asset_url; ?>css/bootstrap5.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
-<link href="<?php echo $admin_asset_url; ?>css/admin-theme.css?v=5" rel="stylesheet">
+<link href="<?php echo $admin_asset_url; ?>css/admin-theme.css?v=7" rel="stylesheet">
 <link href="<?php echo $admin_asset_url; ?>css/admin-dark-mode.css?v=1" rel="stylesheet">
 <?php echo csrf_bootstrap_script(); ?>
 <?php if (!$is_admin_login) { ?>

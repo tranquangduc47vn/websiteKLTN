@@ -15,11 +15,11 @@ class Transaction extends MY_Admin_Controller {
 		$method = $this->router->fetch_method();
 		if ($method === 'chat') {
 			if (!admin_can('order.chat', $login)) {
-				admin_flash_fail('Bạn không có quyền truy cập chat khách hàng.');
+				admin_flash_fail('Bạn không có quyền truy cập chat khách hàng.', 'dashboard');
 				redirect(admin_url('home'));
 			}
 		} elseif (!admin_can('order.manage', $login)) {
-			admin_flash_fail('Bạn không có quyền quản lý đơn hàng.');
+			admin_flash_fail('Bạn không có quyền quản lý đơn hàng.', 'dashboard');
 			redirect(admin_url('home'));
 		}
 	}

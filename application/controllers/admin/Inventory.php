@@ -15,7 +15,7 @@ class Inventory extends MY_Admin_Controller {
 		$this->currentUser = $this->session->userdata('login');
 
 		if (!admin_can('inventory.view', $this->currentUser)) {
-			admin_flash_fail( 'Bạn không có quyền xem tồn kho.');
+			admin_flash_fail( 'Bạn không có quyền xem tồn kho.', 'dashboard');
 			redirect(admin_url('home'));
 		}
 	}
@@ -43,7 +43,6 @@ class Inventory extends MY_Admin_Controller {
 		$this->data['stats'] = $this->inventory_model->get_stats();
 		$this->data['catalog'] = $this->_list_catalog();
 		$this->data['can_adjust'] = admin_can('inventory.adjust', $this->currentUser);
-		$this->data['message'] = $this->session->flashdata('message');
 
 		$this->render_admin('admin/inventory/index');
 	}
