@@ -59,6 +59,27 @@
 		messagesEl.scrollTop = messagesEl.scrollHeight;
 	}
 
+	function parseJsonResponse(res) {
+		return res.text().then(function (text) {
+			if (!text) {
+				return { ok: false, message: 'Phản hồi trống từ máy chủ.' };
+			}
+			try {
+				return JSON.parse(text);
+			} catch (e) {
+				return { ok: false, message: 'Phản hồi không hợp lệ từ máy chủ.' };
+			}
+		});
+	}
+
+	function resetConversationStorage() {
+		conversationId = 0;
+		lastMessageId = 0;
+		try {
+			localStorage.removeItem(STORAGE_KEY);
+		} catch (e) {}
+	}
+
 	function removeLocalMessages() {
 		var locals = messagesEl.querySelectorAll('[data-local="1"]');
 		for (var i = 0; i < locals.length; i++) {
@@ -300,18 +321,24 @@
 			credentials: 'same-origin',
 			headers: { 'X-Requested-With': 'XMLHttpRequest' },
 		})
-			.then(function (res) { return res.json(); })
+			.then(parseJsonResponse)
 			.then(function (data) {
 				if (data && data.status) {
 					updateStatus(data.status, data.staff_name);
 				}
 				if (data && data.ok && Array.isArray(data.messages) && data.messages.length) {
 					ingestMessages(data.messages);
+				} else if (conversationId > 0 && data && data.ok && (!data.messages || !data.messages.length)) {
+					resetConversationStorage();
+					showWelcomeIntro();
 				} else {
 					showWelcomeIntro();
 				}
 			})
 			.catch(function () {
+				if (conversationId > 0) {
+					resetConversationStorage();
+				}
 				showWelcomeIntro();
 			});
 	}
@@ -347,12 +374,7 @@
 			},
 			body: body,
 		})
-			.then(function (res) {
-				if (!res.ok) {
-					throw new Error('HTTP ' + res.status);
-				}
-				return res.json();
-			})
+			.then(parseJsonResponse)
 			.then(function (data) {
 				hideTyping();
 				sending = false;
@@ -363,7 +385,10 @@
 
 				if (!data || !data.ok) {
 					removeLocalMessages();
-					appendMessage({ sender_type: 'ai', content: 'Xin lỗi, có lỗi xảy ra. Vui lòng thử lại.', created: Math.floor(Date.now() / 1000) });
+					var errMsg = (data && data.message)
+						? data.message
+						: 'Xin lỗi, có lỗi xảy ra. Vui lòng thử lại.';
+					appendMessage({ sender_type: 'ai', content: errMsg, created: Math.floor(Date.now() / 1000) });
 					return;
 				}
 
@@ -387,16 +412,31 @@
 					renderProducts(data.products);
 				}
 
+				var replyContent = String(data.content || '').trim();
+
 				return pollOnce().then(function (pollData) {
 					var gotMessages = pollData && Array.isArray(pollData.messages) && pollData.messages.length > 0;
-					if (!gotMessages && data.content) {
-						appendMessage({ sender_type: 'ai', content: data.content, created: Math.floor(Date.now() / 1000) });
+					if (gotMessages) {
+						ingestMessages(pollData.messages);
+						return;
+					}
+					if (replyContent) {
+						appendMessage({ sender_type: 'ai', content: replyContent, created: Math.floor(Date.now() / 1000) });
+						return;
+					}
+					if (chatStatus === 'ai_active' && !data.handoff && !data.connecting) {
+						appendMessage({
+							sender_type: 'ai',
+							content: 'Xin lỗi, mình chưa nhận được phản hồi. Vui lòng thử lại.',
+							created: Math.floor(Date.now() / 1000),
+						});
 					}
 				});
 			})
 			.catch(function () {
 				hideTyping();
 				sending = false;
+				removeLocalMessages();
 				appendMessage({ sender_type: 'ai', content: 'Không thể kết nối. Vui lòng thử lại sau.', created: Math.floor(Date.now() / 1000) });
 			});
 	}

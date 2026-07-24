@@ -38,7 +38,6 @@ class Ai_assistant extends MY_Frontend_Controller {
 			if (function_exists('csrf_json_meta')) {
 				$payload = array_merge($payload, csrf_json_meta());
 			}
-			$this->output->set_status_header(500);
 			$this->output->set_output(json_encode($payload, JSON_UNESCAPED_UNICODE));
 		}
 	}

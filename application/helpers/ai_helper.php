@@ -34,6 +34,10 @@ if (!function_exists('ai_render_widget')) {
 			return;
 		}
 
+		if (!is_file(APPPATH . 'config/ai.php')) {
+			return;
+		}
+
 		$CI->config->load('ai', true);
 
 		$data = array(

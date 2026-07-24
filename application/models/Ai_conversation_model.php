@@ -11,7 +11,15 @@ class Ai_conversation_model extends MY_Model {
 		if ($conversation_id > 0) {
 			$existing = $this->get_info($conversation_id);
 			if ($existing) {
-				return $existing;
+				$user_id = (int) $user_id;
+				$guest_token = (string) $guest_token;
+				if ($user_id > 0 && (int) $existing->user_id === $user_id) {
+					return $existing;
+				}
+				if ($guest_token !== '' && (string) $existing->guest_token === $guest_token) {
+					return $existing;
+				}
+				$conversation_id = 0;
 			}
 		}
 
