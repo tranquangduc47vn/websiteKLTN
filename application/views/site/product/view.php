@@ -215,10 +215,6 @@
                             <?php } ?>
                         </p>
                     </div>
-
-                    <?php if (!empty($message)) { ?>
-                    <div class="jm-pdp-flash" role="alert"><?php echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8'); ?></div>
-                    <?php } ?>
                     
                     <form action="<?php echo site_url('gio-hang/them/' . (int) $product->id); ?>" method="post" id="form-add-to-cart">
                         <?php echo csrf_field(); ?>

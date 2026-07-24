@@ -12,9 +12,11 @@
 <div class="admin-card">
 	<div class="admin-card-body">
 		<form class="admin-form" action="" method="post">
+			<?php echo csrf_field(); ?>
 			<div class="row">
 				<div class="col-md-4 mb-3">
 					<label class="form-check form-switch">
+						<input type="hidden" name="ai_enabled" value="0">
 						<input type="checkbox" name="ai_enabled" value="1" class="form-check-input" role="switch" <?php echo $settings['ai_enabled'] ? 'checked' : ''; ?>>
 						<span class="form-check-label"><strong>Bật Trợ lý AI</strong></span>
 					</label>
@@ -22,6 +24,7 @@
 				</div>
 				<div class="col-md-4 mb-3">
 					<label class="form-check form-switch">
+						<input type="hidden" name="staff_support_enabled" value="0">
 						<input type="checkbox" name="staff_support_enabled" value="1" class="form-check-input" role="switch" <?php echo $settings['staff_support_enabled'] ? 'checked' : ''; ?>>
 						<span class="form-check-label"><strong>Bật chuyển giao nhân viên</strong></span>
 					</label>
@@ -29,6 +32,7 @@
 				</div>
 				<div class="col-md-4 mb-3">
 					<label class="form-check form-switch">
+						<input type="hidden" name="fallback_to_staff" value="0">
 						<input type="checkbox" name="fallback_to_staff" value="1" class="form-check-input" role="switch" <?php echo $settings['fallback_to_staff'] ? 'checked' : ''; ?>>
 						<span class="form-check-label"><strong>Khi AI không trả lời được → chuyển nhân viên</strong></span>
 					</label>
@@ -46,6 +50,8 @@
 				<input type="text" name="working_hours_text" class="form-control" maxlength="255"
 					value="<?php echo htmlspecialchars($settings['working_hours_text'], ENT_QUOTES, 'UTF-8'); ?>">
 			</div>
+
+			<p class="form-text text-muted mb-3">Sau khi bật/tắt công tắc, nhấn <strong>Lưu cấu hình</strong> — F5 không tự lưu. Widget storefront chỉ ẩn khi tắt cả Trợ lý AI và chuyển giao nhân viên.</p>
 
 			<div class="admin-form-actions">
 				<button type="submit" name="submit" value="1" class="btn btn-primary">Lưu cấu hình</button>

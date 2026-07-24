@@ -23,18 +23,18 @@ class Ai_assistant extends MY_Admin_Controller {
 	{
 		if ($this->input->post('submit')) {
 			$this->ai_setting_model->set_many(array(
-				'ai_enabled' => $this->input->post('ai_enabled') ? '1' : '0',
-				'staff_support_enabled' => $this->input->post('staff_support_enabled') ? '1' : '0',
-				'fallback_to_staff' => $this->input->post('fallback_to_staff') ? '1' : '0',
+				'ai_enabled' => $this->input->post('ai_enabled') === '1' ? '1' : '0',
+				'staff_support_enabled' => $this->input->post('staff_support_enabled') === '1' ? '1' : '0',
+				'fallback_to_staff' => $this->input->post('fallback_to_staff') === '1' ? '1' : '0',
 				'welcome_message' => trim((string) $this->input->post('welcome_message')),
 				'working_hours_text' => trim((string) $this->input->post('working_hours_text')),
 			));
-			admin_flash_info( 'Đã lưu cấu hình Trợ lý AI.');
+			admin_flash_info('Đã lưu cấu hình Trợ lý AI.');
 			redirect(admin_url('ai-assistant/settings'));
 		}
 
 		$this->data['settings'] = array(
-			'ai_enabled' => $this->ai_setting_model->get_bool('ai_enabled', true),
+			'ai_enabled' => $this->ai_setting_model->get_bool('ai_enabled', false),
 			'staff_support_enabled' => $this->ai_setting_model->get_bool('staff_support_enabled', true),
 			'fallback_to_staff' => $this->ai_setting_model->get_bool('fallback_to_staff', true),
 			'welcome_message' => $this->ai_setting_model->get('welcome_message', ''),

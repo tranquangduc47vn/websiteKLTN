@@ -158,7 +158,7 @@ class Product extends MY_Frontend_Controller {
 
 		$this->session->flashdata('stock_notice');
 		$this->session->flashdata('message');
-		$this->data['message'] = $this->session->flashdata('product_message');
+		$this->session->flashdata('product_message');
 
         $default_color = '';
         $default_size = '';
