@@ -3,91 +3,77 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class ExportFilter
 {
-	public $params;
-	public $scope;
+	/** @var array */
+	protected $params = array();
 
-	public function __construct(array $params)
+	/** @var string */
+	protected $scope = 'all';
+
+	/** @var int */
+	protected $page = 1;
+
+	/** @var int */
+	protected $per_page = 0;
+
+	/** @var int */
+	protected $offset = 0;
+
+	public static function fromInput(array $input = array())
 	{
-		$this->params = $params;
-		$scope = isset($params['scope']) ? strtolower((string) $params['scope']) : 'all';
-		$this->scope = ($scope === 'page') ? 'page' : 'all';
+		$filter = new self();
+		$filter->params = $input;
+
+		$scope = isset($input['scope']) ? (string) $input['scope'] : 'all';
+		$filter->scope = ($scope === 'page') ? 'page' : 'all';
+
+		$filter->page = max(1, (int) (isset($input['page']) ? $input['page'] : 1));
+		$filter->per_page = max(0, (int) (isset($input['per_page']) ? $input['per_page'] : 0));
+		$filter->offset = max(0, (int) (isset($input['offset']) ? $input['offset'] : 0));
+
+		return $filter;
 	}
 
-	public function get($key, $default = null)
+	public function get($key, $default = '')
 	{
-		return isset($this->params[$key]) ? $this->params[$key] : $default;
+		return array_key_exists($key, $this->params) ? $this->params[$key] : $default;
 	}
 
-	public function int($key, $default = 0)
+	public function all()
 	{
-		return (int) $this->get($key, $default);
+		return $this->params;
 	}
 
-	public function describe($module)
+	public function scope()
 	{
-		$parts = array();
-		switch ($module) {
-			case 'products':
-				if ($this->get('name')) {
-					$parts[] = 'Tên: ' . $this->get('name');
-				}
-				if ($this->get('catalog_id')) {
-					$parts[] = 'Danh mục ID: ' . (int) $this->get('catalog_id');
-				}
-				break;
-			case 'inventory':
-				if ($this->get('name')) {
-					$parts[] = 'Tên: ' . $this->get('name');
-				}
-				if ($this->get('catalog_id')) {
-					$parts[] = 'Danh mục ID: ' . (int) $this->get('catalog_id');
-				}
-				if ($this->get('stock')) {
-					$parts[] = 'Tồn: ' . $this->get('stock');
-				}
-				break;
-			case 'revenue':
-			case 'top_products':
-				if ($this->get('type')) {
-					$parts[] = 'Kỳ: ' . $this->get('type');
-				}
-				if ($this->get('date_from')) {
-					$parts[] = 'Từ ' . $this->get('date_from');
-				}
-				if ($this->get('date_to')) {
-					$parts[] = 'Đến ' . $this->get('date_to');
-				}
-				break;
-			case 'dashboard':
-				$period = $this->get('period', '30d');
-				$parts[] = 'Kỳ: ' . $period;
-				if ($this->get('from')) {
-					$parts[] = 'Từ ' . $this->get('from');
-				}
-				if ($this->get('to')) {
-					$parts[] = 'Đến ' . $this->get('to');
-				}
-				break;
-			default:
-				break;
+		return $this->scope;
+	}
+
+	public function isPageScope()
+	{
+		return $this->scope === 'page';
+	}
+
+	public function page()
+	{
+		return $this->page;
+	}
+
+	public function perPage()
+	{
+		return $this->per_page;
+	}
+
+	public function offset()
+	{
+		return $this->offset;
+	}
+
+	public function setPagination($per_page, $offset)
+	{
+		$this->per_page = max(0, (int) $per_page);
+		$this->offset = max(0, (int) $offset);
+		if ($this->per_page > 0) {
+			$this->page = (int) floor($this->offset / $this->per_page) + 1;
 		}
-		$parts[] = ($this->scope === 'page') ? 'Phạm vi: Trang hiện tại' : 'Phạm vi: Toàn bộ theo bộ lọc';
-		return implode(' · ', $parts);
-	}
-
-	public function paginationLimit($defaultPer = 10)
-	{
-		if ($this->scope !== 'page') {
-			return null;
-		}
-		$per = max(1, $this->int('per_page', $defaultPer));
-		$offsetRaw = $this->get('offset');
-		if ($offsetRaw === null || $offsetRaw === '') {
-			$CI = get_instance();
-			$offset = max(0, (int) $CI->uri->segment(4));
-		} else {
-			$offset = max(0, (int) $offsetRaw);
-		}
-		return array($per, $offset);
 	}
 }

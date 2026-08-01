@@ -1,5 +1,7 @@
 <?php
+$this->load->helper('permission');
 $admin_name = isset($login->name) ? $login->name : 'Admin';
+$admin_role = admin_role_label(isset($login->level) ? $login->level : null);
 $avatar_char = strtoupper(substr($admin_name, 0, 1));
 $login_id = isset($login->id) ? $login->id : 0;
 $header_page_title = (!empty($admin_header_title))
@@ -30,7 +32,7 @@ $header_page_title = (!empty($admin_header_title))
 			<a class="admin-user-link" href="<?php echo admin_url('admin/edit/' . $login_id); ?>">
 				<span class="admin-avatar"><?php echo $avatar_char; ?></span>
 				<span class="admin-user-meta d-none d-md-flex">
-					<small>Xin chào</small>
+					<small><?php echo htmlspecialchars($admin_role, ENT_QUOTES, 'UTF-8'); ?></small>
 					<strong><?php echo htmlspecialchars($admin_name, ENT_QUOTES, 'UTF-8'); ?></strong>
 				</span>
 			</a>

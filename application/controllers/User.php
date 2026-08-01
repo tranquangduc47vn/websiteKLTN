@@ -37,23 +37,70 @@ public function index()
 		$this->data['message_fail'] = $this->session->flashdata('message_fail');
 		$legacy_message = $this->session->flashdata('message');
 		if ($legacy_message !== null && $legacy_message !== '' && empty($this->data['message_success']) && empty($this->data['message_fail'])) {
-			$this->data['message_success'] = $legacy_message;
+			if (store_infer_flash_type($legacy_message) === 'success') {
+				$this->data['message_success'] = $legacy_message;
+			} else {
+				$this->data['message_fail'] = $legacy_message;
+			}
 		}
 
 		$this->load->model('transaction_model');
 
-		$input = array();
-
-		if (isset($user_login->id)) {
-			$input['where'] = array('user_id' => $user_login->id);
-		} else {
-			$input['where'] = array('user_email' => $user_login->email);
+		$order_status = trim((string) $this->input->get('order_status'));
+		$allowed_status = array('', 'all', '0', '1', '2', '3', '4');
+		if (!in_array($order_status, $allowed_status, true)) {
+			$order_status = '';
+		}
+		if ($order_status === 'all') {
+			$order_status = '';
 		}
 
-		$input['order'] = array('id', 'DESC');
+		$order_input = $this->_account_order_query_input($user_login, $order_status);
+		$order_input['order'] = array('id', 'DESC');
 
-		$list_transaction = $this->transaction_model->get_list($input);
+		$this->db->reset_query();
+		$order_total = $this->transaction_model->get_total($order_input);
+
+		$per_page = 5;
+		$page = max(1, (int) $this->input->get('order_page'));
+		$max_page = max(1, (int) ceil($order_total / $per_page));
+		if ($page > $max_page) {
+			$page = $max_page;
+		}
+		$order_offset = ($page - 1) * $per_page;
+
+		$this->load->library('pagination');
+		$config = pagination(base_url('user'), $order_total, $per_page, 0);
+		$config['page_query_string'] = TRUE;
+		$config['query_string_segment'] = 'order_page';
+		$config['reuse_query_string'] = TRUE;
+		$config['use_page_numbers'] = TRUE;
+		$config['full_tag_open'] = '<nav class="jm-account-orders-pagination" aria-label="Phân trang đơn hàng"><ul class="jm-account-orders-pagination__list">';
+		$config['full_tag_close'] = '</ul></nav>';
+		$config['cur_tag_open'] = '<li class="is-active"><span>';
+		$config['cur_tag_close'] = '</span></li>';
+		$config['num_tag_open'] = '<li>';
+		$config['num_tag_close'] = '</li>';
+		$config['prev_tag_open'] = '<li class="jm-account-orders-pagination__prev">';
+		$config['prev_tag_close'] = '</li>';
+		$config['next_tag_open'] = '<li class="jm-account-orders-pagination__next">';
+		$config['next_tag_close'] = '</li>';
+		$config['prev_link'] = 'Trước';
+		$config['next_link'] = 'Sau';
+		$config['first_link'] = FALSE;
+		$config['last_link'] = FALSE;
+		$this->pagination->initialize($config);
+
+		$this->db->reset_query();
+		$order_input['limit'] = array($per_page, $order_offset);
+		$list_transaction = $this->transaction_model->get_list($order_input);
+
 		$this->data['list_transaction'] = $list_transaction;
+		$this->data['order_status_filter'] = $order_status;
+		$this->data['order_total'] = $order_total;
+		$this->data['order_page'] = $page;
+		$this->data['order_stt_offset'] = $order_offset;
+		$this->data['order_pagination'] = $this->pagination->create_links();
 
 		$this->load->helper('loyalty');
 		$this->load->model('loyalty_model');
@@ -66,6 +113,88 @@ public function index()
 
 		$this->data['temp'] = 'site/user/index.php';
 		$this->load->view('site/layoutsub', $this->data);
+	}
+
+	public function order_detail($transaction_id = 0)
+	{
+		$user_login = $this->_require_login();
+		$transaction_id = (int) $transaction_id;
+		if ($transaction_id <= 0) {
+			show_404();
+		}
+
+		$this->load->model('transaction_model');
+		$transaction = $this->transaction_model->get_info($transaction_id);
+		if (!$this->_owns_transaction($transaction, $user_login)) {
+			show_404();
+		}
+
+		$this->data['transaction'] = $transaction;
+		$this->data['order_lines'] = $this->_load_order_detail_lines($transaction_id);
+		$this->load->view('site/user/order_detail', $this->data);
+	}
+
+	protected function _account_order_query_input($user_login, $order_status = '')
+	{
+		$input = array();
+		$where = array();
+
+		$user_id = isset($user_login->id) ? (int) $user_login->id : 0;
+		if ($user_id > 0) {
+			$where['user_id'] = $user_id;
+		} else {
+			$where['user_email'] = $user_login->email;
+		}
+
+		if ($order_status !== '') {
+			$where['status'] = $order_status;
+		}
+
+		$input['where'] = $where;
+		return $input;
+	}
+
+	protected function _owns_transaction($transaction, $user_login)
+	{
+		if (empty($transaction) || empty($user_login)) {
+			return false;
+		}
+
+		$user_id = isset($user_login->id) ? (int) $user_login->id : 0;
+		if ($user_id > 0 && (int) $transaction->user_id === $user_id) {
+			return true;
+		}
+
+		$user_email = isset($user_login->email) ? trim((string) $user_login->email) : '';
+		$tx_email = isset($transaction->user_email) ? trim((string) $transaction->user_email) : '';
+		return $user_email !== '' && strcasecmp($user_email, $tx_email) === 0;
+	}
+
+	protected function _load_order_detail_lines($transaction_id)
+	{
+		$this->load->model('order_model');
+		$this->load->model('product_model');
+
+		$lines = $this->order_model->get_list(array(
+			'where' => array('transaction_id' => (int) $transaction_id),
+		));
+
+		$items = array();
+		foreach ($lines as $line) {
+			$product = $this->product_model->get_info($line->product_id);
+			$items[] = (object) array(
+				'order_id' => (int) $line->id,
+				'product_id' => (int) $line->product_id,
+				'name' => $product ? $product->name : ('Sản phẩm #' . (int) $line->product_id),
+				'image_link' => $product ? $product->image_link : '',
+				'qty' => (int) $line->qty,
+				'amount' => (float) $line->amount,
+				'size' => $line->size,
+				'color' => $line->color,
+			);
+		}
+
+		return $items;
 	}
 
 	public function validate_password_strength($password)
@@ -531,6 +660,8 @@ public function index()
 		
 		$user = $this->session->userdata('user');
 		if(isset($user)) {
+			$this->load->helper('cart');
+			cart_ensure_for_logged_in_user($user);
 			$redirect_url = $this->session->userdata('redirect_back') ? $this->session->userdata('redirect_back') : build_cart_url();
 			$this->session->unset_userdata('redirect_back');
 			redirect($redirect_url);
@@ -560,8 +691,11 @@ public function index()
 
 					$this->session->set_userdata('user', $user_data);
 
+					$this->load->helper('cart');
+					$this->session->unset_userdata('custom_cart');
+					cart_restore_for_user(cart_resolve_user_id($user_data));
 
-					$redirect_url = $this->session->userdata('redirect_back') ? $this->session->userdata('redirect_back') : base_url();
+					$redirect_url = $this->session->userdata('redirect_back') ? $this->session->userdata('redirect_back') : build_cart_url();
 					$this->session->unset_userdata('redirect_back');
 					redirect($redirect_url);
 				} 
@@ -688,7 +822,13 @@ public function index()
 
 	public function logout()
 	{
-		if ($this->session->userdata('user')) {
+		$user = $this->session->userdata('user');
+		if ($user) {
+			$this->load->helper('cart');
+			$user_id = cart_resolve_user_id($user);
+			if ($user_id > 0) {
+				cart_sync_to_user($user_id, cart_get_session());
+			}
 			$this->session->unset_userdata('user');
 		}
 		$this->session->unset_userdata('custom_cart');

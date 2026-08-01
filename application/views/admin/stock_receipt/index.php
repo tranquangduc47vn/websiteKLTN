@@ -12,8 +12,8 @@
 	<div class="d-flex gap-2">
 		<a href="<?php echo admin_url('stock-inventory'); ?>" class="btn btn-outline-secondary btn-sm">Tồn kho</a>
 		<a href="<?php echo admin_url('stock-inventory/movements'); ?>" class="btn btn-outline-secondary btn-sm">Lịch sử biến động</a>
-		<?php if (!empty($can_manage)) { ?>
-			<a href="<?php echo admin_url('stock-receipts/add'); ?>" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus me-1"></i> Tạo phiếu</a>
+		<?php if (!empty($can_receipt)) { ?>
+			<a href="<?php echo admin_url('stock-receipts/add'); ?>" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus me-1"></i> Nhập kho</a>
 		<?php } ?>
 	</div>
 </div>
@@ -30,7 +30,7 @@
 				<select name="status" class="form-select form-select-sm">
 					<option value="">— Tất cả —</option>
 					<option value="draft" <?php echo ($filter_status ?? '') === 'draft' ? 'selected' : ''; ?>>Nháp</option>
-					<option value="confirmed" <?php echo ($filter_status ?? '') === 'confirmed' ? 'selected' : ''; ?>>Đã xác nhận</option>
+					<option value="confirmed" <?php echo ($filter_status ?? '') === 'confirmed' ? 'selected' : ''; ?>>Đã nhập</option>
 					<option value="cancelled" <?php echo ($filter_status ?? '') === 'cancelled' ? 'selected' : ''; ?>>Đã hủy</option>
 				</select>
 			</div>

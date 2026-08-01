@@ -13,8 +13,9 @@ class Gioithieu extends MY_Controller {
 		$slider = $this->slider_model->get_list($input_slider);
 		$this->data['slider'] = $slider;
 
-		$query = $this->db->get_where('pages', array('slug' => 'gioi-thieu'), 1);
-		$page = $query->row_array();
+		$this->load->model('page_model');
+		$page = $this->page_model->get_by_slug('gioi-thieu');
+		$page = $page ? (array) $page : array();
 
 		$this->data['page_title'] = isset($page['title']) ? $page['title'] : ('Giới thiệu về ' . shop_name());
 		$this->data['page_content'] = isset($page['content']) ? $page['content'] : "Nội dung giới thiệu đang được cập nhật...";

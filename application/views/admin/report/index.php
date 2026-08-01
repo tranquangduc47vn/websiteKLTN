@@ -7,9 +7,6 @@
 	</nav>
 </div>
 
-<?php $this->load->helper('export'); admin_export_toolbar('revenue'); ?>
-<?php admin_export_toolbar('top_products'); ?>
-
 <div class="admin-card mb-3">
 	<div class="admin-card-header">Bộ lọc thống kê</div>
 	<div class="admin-card-body">
@@ -36,6 +33,8 @@
 		</form>
 	</div>
 </div>
+
+<?php $this->load->helper('export'); admin_export_toolbar('revenue'); ?>
 
 <div class="row g-3 mb-3">
 	<div class="col-md-4">
@@ -73,6 +72,8 @@
 		<canvas class="main-chart" id="revenue-bar-chart" height="200"></canvas>
 	</div>
 </div>
+
+<?php admin_export_toolbar('top_products'); ?>
 
 <div class="admin-card">
 	<div class="admin-card-header">

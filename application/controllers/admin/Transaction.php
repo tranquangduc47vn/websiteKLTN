@@ -180,12 +180,7 @@ class Transaction extends MY_Admin_Controller {
 		if ($this->order_model->delete($id)) {
 			$transaction = $this->transaction_model->get_info($order->transaction_id);
 			if (!empty($transaction) && (string) $transaction->status === '0') {
-				$product = $this->product_model->get_info($order->product_id);
-				if (!empty($product)) {
-					$this->product_model->update($product->id, array(
-						'quantity' => (int) $product->quantity + (int) $order->qty,
-					));
-				}
+				$this->transaction_model->release_stock_for_order_line($order, false);
 			}
 			if (!empty($transaction)) {
 				$data = array();
@@ -310,5 +305,16 @@ class Transaction extends MY_Admin_Controller {
 	public function chat()
 	{
 		redirect(admin_url('support-chat'));
+	}
+
+	public function pending_count()
+	{
+		$this->load->helper('admin');
+		$this->output
+			->set_content_type('application/json', 'utf-8')
+			->set_output(json_encode(array(
+				'ok' => true,
+				'count' => admin_pending_orders_count(),
+			), JSON_UNESCAPED_UNICODE));
 	}
 }

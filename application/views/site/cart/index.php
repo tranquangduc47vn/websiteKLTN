@@ -1,14 +1,17 @@
 <?php
 $cart_asset = site_asset_url('');
 ?>
-<link rel="stylesheet" href="<?php echo $cart_asset; ?>css/cart-luxury.css?v=13">
+<link rel="stylesheet" href="<?php echo $cart_asset; ?>css/cart-luxury.css?v=15">
 <link rel="stylesheet" href="<?php echo $cart_asset; ?>css/stock-notice-modal.css?v=1">
 
 <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12 clearpadding jm-cart-lux">
 	<div class="jm-cart-lux__inner">
 
-		<?php if (isset($message) && !empty($message)) { ?>
-			<div class="jm-cart-flash" role="alert"><?php echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8'); ?></div>
+		<?php if (!empty($message_success)) { ?>
+			<div class="jm-cart-flash jm-cart-flash--success" role="alert"><?php echo htmlspecialchars($message_success, ENT_QUOTES, 'UTF-8'); ?></div>
+		<?php } ?>
+		<?php if (!empty($message_fail)) { ?>
+			<div class="jm-cart-flash jm-cart-flash--error" role="alert"><?php echo htmlspecialchars($message_fail, ENT_QUOTES, 'UTF-8'); ?></div>
 		<?php } ?>
 
 		<?php if ($total_items > 0) { ?>

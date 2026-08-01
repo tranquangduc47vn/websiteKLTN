@@ -33,6 +33,7 @@ $dash_has_notify = count($notify_groups) > 0;
 $admin_asset = base_url('assets/admin/');
 $filter_base = admin_url('home');
 $period_key = $range['key'];
+$CI->load->helper('export');
 ?>
 
 <link rel="stylesheet" href="<?php echo $admin_asset; ?>css/admin-dashboard.css?v=13">
@@ -74,7 +75,7 @@ $period_key = $range['key'];
 		</form>
 	</div>
 
-	<?php $this->load->helper('export'); admin_export_toolbar('dashboard'); ?>
+	<?php admin_export_toolbar('dashboard'); ?>
 
 	<div id="admDashKpiRows">
 	<?php foreach ($dash['kpi_groups'] as $group) {
@@ -381,7 +382,7 @@ $period_key = $range['key'];
 											<td class="adm-dash-stock-table__act">
 												<?php if ($dash_perm['products']) { ?>
 												<a class="btn btn-sm btn-outline-primary" href="<?php echo admin_url('products/edit/' . (int) $p->id); ?>">Nhập kho</a>
-												<?php } elseif (admin_can('inventory.adjust', $login)) { ?>
+												<?php } elseif (admin_can('inventory.count', $login) || admin_can('inventory.adjust', $login)) { ?>
 												<a class="btn btn-sm btn-outline-primary" href="<?php echo admin_url('inventory'); ?>">Tồn kho</a>
 												<?php } ?>
 											</td>

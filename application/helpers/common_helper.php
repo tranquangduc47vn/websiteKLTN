@@ -279,20 +279,76 @@
 	{
 		$CI =& get_instance();
 		$key = ($type === 'success') ? 'store_message_success' : 'store_message_fail';
+		if ($type === 'info') {
+			$key = 'store_message_info';
+		}
 		$CI->session->set_flashdata($key, $message);
+	}
+
+	if (!function_exists('store_infer_flash_type')) {
+		function store_infer_flash_type($message)
+		{
+			$text = mb_strtolower(trim((string) $message), 'UTF-8');
+			if ($text === '') {
+				return 'fail';
+			}
+
+			$success_needles = array(
+				'thành công',
+				'thanh cong',
+				'đã thêm',
+				'da them',
+				'đã cập nhật',
+				'da cap nhat',
+				'đã xóa',
+				'da xoa',
+				'đã hủy đơn hàng thành công',
+				'đặt hàng thành công',
+				'dat hang thanh cong',
+				'thêm vào giỏ hàng thành công',
+			);
+			foreach ($success_needles as $needle) {
+				if (mb_strpos($text, $needle) !== false) {
+					return 'success';
+				}
+			}
+
+			return 'fail';
+		}
 	}
 
 	function get_store_flash()
 	{
 		$CI =& get_instance();
-		// Legacy key used by cart/checkout; discard here if no controller consumed it yet.
-		$CI->session->flashdata('message');
+		$success = $CI->session->flashdata('store_message_success');
+		$fail = $CI->session->flashdata('store_message_fail');
+		$info = $CI->session->flashdata('store_message_info');
+
+		$legacy = $CI->session->flashdata('message');
+		if ($legacy !== null && $legacy !== '') {
+			$type = store_infer_flash_type($legacy);
+			if ($type === 'success' && ($success === null || $success === '')) {
+				$success = $legacy;
+			} elseif (($fail === null || $fail === '')) {
+				$fail = $legacy;
+			}
+		}
 
 		return array(
-			'success' => $CI->session->flashdata('store_message_success'),
-			'fail' => $CI->session->flashdata('store_message_fail'),
-			'info' => $CI->session->flashdata('store_message_info'),
+			'success' => $success,
+			'fail' => $fail,
+			'info' => $info,
 		);
+	}
+
+	if (!function_exists('load_store_flash_to')) {
+		function load_store_flash_to(array &$data)
+		{
+			$flash = get_store_flash();
+			$data['message_success'] = $flash['success'];
+			$data['message_fail'] = $flash['fail'];
+			$data['message_info'] = $flash['info'];
+		}
 	}
 
 	function set_product_flash($message)
@@ -308,7 +364,11 @@
 		$data['message_fail'] = $CI->session->flashdata('message_fail');
 		$legacy = $CI->session->flashdata('message');
 		if ($legacy !== null && $legacy !== '' && empty($data['message_success']) && empty($data['message_fail'])) {
-			$data['message_success'] = $legacy;
+			if (store_infer_flash_type($legacy) === 'success') {
+				$data['message_success'] = $legacy;
+			} else {
+				$data['message_fail'] = $legacy;
+			}
 		}
 	}
 ?>

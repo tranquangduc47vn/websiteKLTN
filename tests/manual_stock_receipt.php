@@ -16,7 +16,7 @@ ob_end_clean();
 $CI =& get_instance();
 $CI->load->library('stock_service');
 $CI->load->model('product_model');
-$CI->load->model('product_inventory_model');
+$CI->load->model('product_variant_model');
 $CI->load->model('stock_receipt_model');
 $CI->load->model('stock_movement_model');
 
@@ -31,8 +31,19 @@ function test_assert(&$results, $name, $condition, $detail = '')
 	);
 }
 
+function variant_stock($CI, $product_id, $size, $color)
+{
+	$row = $CI->db->where(array(
+		'product_id' => (int) $product_id,
+		'size' => (string) $size,
+		'color' => (string) $color,
+	))->get('product_variants')->row();
+
+	return $row ? (int) $row->stock : 0;
+}
+
 // Tables exist
-$tables = array('suppliers', 'stock_receipts', 'stock_receipt_items', 'product_inventory', 'stock_movements');
+$tables = array('suppliers', 'stock_receipts', 'stock_receipt_items', 'product_variants', 'stock_movements');
 foreach ($tables as $t) {
 	test_assert($results, 'table `' . $t . '` exists', $CI->db->table_exists($t));
 }
@@ -50,8 +61,7 @@ $variants = $CI->stock_service->parse_product_variants($product);
 $size = $variants['sizes'][0];
 $color = $variants['colors'][0];
 
-$row_before = $CI->product_inventory_model->get_variant($pid, $size, $color);
-$qty_before = $row_before ? (int) $row_before->quantity : 0;
+$qty_before = variant_stock($CI, $pid, $size, $color);
 
 $create = $CI->stock_service->create_draft_receipt(0, 'Test manual', array(
 	array('product_id' => $pid, 'size' => $size, 'color' => $color, 'qty' => 3, 'unit_cost' => 100000),
@@ -63,8 +73,7 @@ $receipt_id = !empty($create['receipt_id']) ? (int) $create['receipt_id'] : 0;
 $receipt = $receipt_id ? $CI->stock_receipt_model->get_info($receipt_id) : null;
 test_assert($results, 'draft status after create', $receipt && $receipt->status === 'draft');
 
-$row_after_draft = $CI->product_inventory_model->get_variant($pid, $size, $color);
-$qty_after_draft = $row_after_draft ? (int) $row_after_draft->quantity : 0;
+$qty_after_draft = variant_stock($CI, $pid, $size, $color);
 test_assert($results, 'draft does NOT add inventory', $qty_after_draft === $qty_before, $qty_before . ' vs ' . $qty_after_draft);
 
 $code1 = $CI->stock_service->generate_receipt_code();
@@ -78,8 +87,7 @@ if ($receipt_id) {
 	$receipt2 = $CI->stock_receipt_model->get_info($receipt_id);
 	test_assert($results, 'receipt locked confirmed', $receipt2 && $receipt2->status === 'confirmed');
 
-	$row_after = $CI->product_inventory_model->get_variant($pid, $size, $color);
-	$qty_after = $row_after ? (int) $row_after->quantity : 0;
+	$qty_after = variant_stock($CI, $pid, $size, $color);
 	test_assert($results, 'inventory increased by 3', $qty_after === $qty_before + 3, $qty_before . ' -> ' . $qty_after);
 
 	$mov = $CI->db->where('reference_type', 'stock_receipt')

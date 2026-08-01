@@ -1,22 +1,23 @@
 /* Storefront checkout — luxury layout (thanh-toan) */
 
 .jm-checkout-lux {
+	--checkout-scale: 1.2;
 	font-family: var(--wf-font);
 	color: #1a1a1a;
 	float: none;
 }
 
 .jm-checkout-lux__inner {
-	max-width: 640px;
+	max-width: calc(640px * var(--checkout-scale));
 	margin: 0 auto;
-	padding: 0 12px 2rem;
+	padding: 0 calc(12px * var(--checkout-scale)) calc(2rem * var(--checkout-scale));
 }
 
 .jm-checkout-breadcrumb {
 	background: transparent !important;
-	padding: 0 0 1rem !important;
-	margin: 0 0 0.5rem !important;
-	font-size: 12px;
+	padding: 0 0 calc(1rem * var(--checkout-scale)) !important;
+	margin: 0 0 calc(0.5rem * var(--checkout-scale)) !important;
+	font-size: calc(12px * var(--checkout-scale));
 }
 
 .jm-checkout-breadcrumb a {
@@ -29,14 +30,24 @@
 }
 
 .jm-checkout-flash {
-	margin-bottom: 1rem;
-	padding: 10px 14px;
-	font-size: 13px;
+	margin-bottom: calc(1rem * var(--checkout-scale));
+	padding: calc(10px * var(--checkout-scale)) calc(14px * var(--checkout-scale));
+	font-size: calc(13px * var(--checkout-scale));
+	border-radius: calc(8px * var(--checkout-scale));
+	text-align: center;
+	line-height: 1.5;
+}
+
+.jm-checkout-flash--success {
 	color: #1b5e20;
 	background: #f1f8f2;
 	border: 1px solid #c8e6c9;
-	border-radius: 8px;
-	text-align: center;
+}
+
+.jm-checkout-flash--error {
+	color: #b91c1c;
+	background: #fef2f2;
+	border: 1px solid #fecaca;
 }
 
 .jm-checkout-panel {
@@ -55,7 +66,7 @@
 
 .jm-checkout-panel__title {
 	font-family: var(--wf-display);
-	font-size: 1.375rem;
+	font-size: calc(1.375rem * var(--checkout-scale));
 	font-weight: 500;
 	margin: 0 0 0.75rem;
 	letter-spacing: 0.03em;
@@ -172,7 +183,7 @@
 }
 
 .jm-checkout-summary__label {
-	font-size: 12px;
+	font-size: calc(12px * var(--checkout-scale));
 	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.1em;
@@ -203,7 +214,7 @@
 
 .jm-checkout-panel__loyalty {
 	margin: 0.5rem 0 0;
-	font-size: 12px;
+	font-size: calc(12px * var(--checkout-scale));
 	color: #666;
 }
 
@@ -232,10 +243,10 @@
 
 .jm-checkout-field .form-control {
 	height: auto;
-	padding: 12px 14px;
-	font-size: 15px;
+	padding: calc(12px * var(--checkout-scale)) calc(14px * var(--checkout-scale));
+	font-size: calc(15px * var(--checkout-scale));
 	border: 1px solid #ddd;
-	border-radius: 8px;
+	border-radius: calc(8px * var(--checkout-scale));
 	box-shadow: none;
 	transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -253,7 +264,7 @@
 .jm-checkout-error {
 	display: block;
 	margin-top: 4px;
-	font-size: 12px;
+	font-size: calc(12px * var(--checkout-scale));
 	color: #c62828;
 }
 
@@ -304,7 +315,7 @@
 
 .jm-checkout-pay__hint {
 	display: block;
-	font-size: 12px;
+	font-size: calc(12px * var(--checkout-scale));
 	font-weight: 400;
 	color: #888;
 	margin-top: 2px;
@@ -313,10 +324,10 @@
 .jm-checkout-submit {
 	display: block;
 	width: 100%;
-	max-width: 360px;
+	max-width: calc(360px * var(--checkout-scale));
 	margin: 0 auto;
-	padding: 14px 24px;
-	font-size: 12px;
+	padding: calc(14px * var(--checkout-scale)) calc(24px * var(--checkout-scale));
+	font-size: calc(12px * var(--checkout-scale));
 	font-weight: 600;
 	letter-spacing: 0.12em;
 	text-transform: uppercase;
@@ -420,7 +431,7 @@
 }
 
 .jm-checkout-qr__link-home {
-	font-size: 12px;
+	font-size: calc(12px * var(--checkout-scale));
 	font-weight: 600;
 	letter-spacing: 0.06em;
 	text-transform: uppercase;

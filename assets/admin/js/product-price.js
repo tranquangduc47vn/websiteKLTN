@@ -15,6 +15,11 @@
 			return;
 		}
 		input.setAttribute('data-money-input', '1');
+		input.setAttribute('data-non-negative', '1');
+		input.setAttribute('data-non-negative-min', '0');
+		if (typeof window.adminBindNonNegativeInput === 'function') {
+			window.adminBindNonNegativeInput(input);
+		}
 		input.addEventListener('input', function () {
 			var pos = input.selectionStart;
 			var before = input.value.length;
@@ -22,6 +27,11 @@
 			var after = input.value.length;
 			if (pos !== null) {
 				input.setSelectionRange(Math.max(0, pos + (after - before)), Math.max(0, pos + (after - before)));
+			}
+		});
+		input.addEventListener('keydown', function (e) {
+			if (e.key === '-' || e.key === 'Minus') {
+				e.preventDefault();
 			}
 		});
 	}
@@ -72,6 +82,19 @@
 		form.setAttribute('data-product-price-init', '1');
 		bindMoneyInput(form.querySelector('#price'));
 		initDiscountField(form);
+
+		form.addEventListener('submit', function (e) {
+			var priceInput = form.querySelector('#price');
+			if (!priceInput) {
+				return;
+			}
+			var price = parseDigits(priceInput.value);
+			if (price < 0) {
+				e.preventDefault();
+				alert('Giá sản phẩm không được âm.');
+				priceInput.focus();
+			}
+		});
 	}
 
 	document.addEventListener('DOMContentLoaded', function () {

@@ -67,15 +67,23 @@ $info_section_open = in_array($current, $info_slugs, true);
 			<div class="admin-nav-section">Tổng quan</div>
 			<?php
 			$sidebar_login = $this->session->userdata('login');
+			$pending_orders_badge = admin_can('order.manage', $sidebar_login) ? admin_pending_orders_count() : 0;
 			foreach ($admin_menu_main as $item) {
 				if (!admin_sidebar_allowed($item['slug'], $sidebar_login)) {
 					continue;
 				}
+				$is_orders_menu = is_array($item['slug'])
+					? in_array('orders', $item['slug'], true)
+					: ($item['slug'] === 'orders');
 			?>
 				<a class="nav-link <?php echo admin_menu_active($current, $item['slug'], $segment3); ?>"
-					href="<?php echo $item['url']; ?>">
+					href="<?php echo $item['url']; ?>"
+					<?php if ($is_orders_menu) { ?>id="admin-orders-nav-link"<?php } ?>>
 					<i class="<?php echo $item['icon']; ?> admin-nav-icon" aria-hidden="true"></i>
 					<span><?php echo $item['label']; ?></span>
+					<?php if ($is_orders_menu && $pending_orders_badge > 0) { ?>
+						<span class="admin-nav-badge admin-nav-badge--urgent" id="admin-pending-orders-badge" title="Đơn chưa hoàn thành"><?php echo $pending_orders_badge > 99 ? '99+' : (int) $pending_orders_badge; ?></span>
+					<?php } ?>
 				</a>
 			<?php } ?>
 

@@ -117,9 +117,15 @@ class Product extends MY_Admin_Controller {
 		if ($this->input->post()) {
 			$this->form_validation->set_rules('name','Tên sản phẩm','required');
 			$this->form_validation->set_rules('catalog_id','Danh mục','required');
-			$this->form_validation->set_rules('price','Giá sản phẩm','required');
+			$this->form_validation->set_rules('price','Giá sản phẩm','required|callback__validate_non_negative_price');
 			
 			if ($this->form_validation->run()) {
+				$price_value = $this->_parse_price($this->input->post('price'));
+				if ($price_value < 0) {
+					admin_flash_fail('Giá sản phẩm không được âm.');
+					redirect(admin_url('products/add'));
+				}
+
 				$path = './upload/product/';
 				$image_link = $this->upload_library->upload($path, 'image');
 				if (empty($image_link)) {
@@ -149,7 +155,6 @@ class Product extends MY_Admin_Controller {
 					$size_string = NULL;
 				}
 
-				$price_value = $this->_parse_price($this->input->post('price'));
 				$discount_fields = $this->_build_discount_fields(
 					$price_value,
 					$this->input->post('discount')
@@ -206,11 +211,15 @@ class Product extends MY_Admin_Controller {
 
 		$this->form_validation->set_rules('name', 'Tên sản phẩm', 'required');
 		$this->form_validation->set_rules('catalog_id', 'Danh mục', 'required');
-		$this->form_validation->set_rules('price', 'Giá tiền', 'required');
+		$this->form_validation->set_rules('price', 'Giá tiền', 'required|callback__validate_non_negative_price');
 
 	if($this->form_validation->run())
 	{
 		$price    = $this->_parse_price($this->input->post('price'));
+		if ($price < 0) {
+			admin_flash_fail('Giá sản phẩm không được âm.');
+			redirect(admin_url('product/edit/' . $product->id));
+		}
 		$discount_fields = $this->_build_discount_fields(
 			$price,
 			$this->input->post('discount')
@@ -392,14 +401,24 @@ class Product extends MY_Admin_Controller {
 			$this->db->where('product_id', $product_id)->delete('product_review');
 		}
 
-		if ($this->db->table_exists('product_colors')) {
-			$this->db->where('product_id', $product_id)->delete('product_colors');
+		if ($this->db->table_exists('product_variants')) {
+			$this->db->where('product_id', $product_id)->delete('product_variants');
 		}
 	}
 
 	private function _parse_price($raw)
 	{
 		return (int) str_replace(',', '', (string) $raw);
+	}
+
+	public function _validate_non_negative_price($str)
+	{
+		$price = (int) str_replace(',', '', (string) $str);
+		if ($price < 0) {
+			$this->form_validation->set_message('_validate_non_negative_price', 'Giá sản phẩm không được âm.');
+			return false;
+		}
+		return true;
 	}
 
 	private function _parse_discount_amount($price, $raw_discount)

@@ -34,7 +34,8 @@ $tables = array(
 	'catalog',
 	'product',
 	'product_variant',
-	'product_inventory',
+	'product_variants',
+	'content_pages',
 	'product_image',
 	'slider',
 );

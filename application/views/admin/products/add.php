@@ -151,7 +151,7 @@ $old_sizes = (array) $this->input->post('size');
 	</div>
 </form>
 
-<script src="<?php echo base_url('assets/admin/js/product-price.js?v=2'); ?>"></script>
+<script src="<?php echo base_url('assets/admin/js/product-price.js?v=3'); ?>"></script>
 <script>
 (function () {
 	'use strict';

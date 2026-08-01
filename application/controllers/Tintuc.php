@@ -14,22 +14,12 @@ class Tintuc extends MY_Controller {
         $input_slider['order'] = array('sort_order', 'DESC');
         $this->data['slider'] = $this->slider_model->get_list($input_slider);
 
-        // Fallback bảng tin: news, posts, hoặc tintuc
-        $table_name = '';
-        if ($this->db->table_exists('news')) {
-            $table_name = 'news';
-        } elseif ($this->db->table_exists('posts')) {
-            $table_name = 'posts';
-        } elseif ($this->db->table_exists('tintuc')) {
-            $table_name = 'tintuc';
-        }
-
-        if (!empty($table_name)) {
-            $this->db->order_by('id', 'DESC');
-            $query = $this->db->get($table_name);
-            $this->data['list_news'] = $query->result_array();
-        } else {
-            $this->data['list_news'] = array();
+        $this->load->model('news_model');
+        $input = array('order' => array('id', 'DESC'));
+        $rows = $this->news_model->get_list($input);
+        $this->data['list_news'] = array();
+        foreach ($rows as $row) {
+            $this->data['list_news'][] = (array) $row;
         }
 
         $this->data['page_title'] = 'Tin tức & Sự kiện - ' . shop_name();

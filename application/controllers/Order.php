@@ -23,10 +23,11 @@ class Order extends MY_Frontend_Controller {
         $sanitize = $this->_sanitize_cart($carts);
         $carts = $sanitize['cart'];
         if (!empty($sanitize['removed']) || !empty($sanitize['changed'])) {
-            $this->session->set_userdata('custom_cart', $carts);
+            $this->load->helper('cart');
+            cart_persist_session($carts);
             if (!empty($sanitize['removed'])) {
-                $this->session->set_flashdata(
-                    'message',
+                set_store_flash(
+                    'fail',
                     'Một số sản phẩm không còn bán (' . implode(', ', $sanitize['removed']) . ') và đã được xóa khỏi giỏ hàng.'
                 );
             }
@@ -50,7 +51,7 @@ class Order extends MY_Frontend_Controller {
 
         if ($this->input->post()) {
             if (empty($carts)) {
-                $this->session->set_flashdata('message', 'Giỏ hàng trống, không thể đặt hàng.');
+                set_store_flash('fail', 'Giỏ hàng trống, không thể đặt hàng.');
                 redirect(build_cart_url());
             }
 
@@ -67,18 +68,20 @@ class Order extends MY_Frontend_Controller {
                 $sanitize = $this->_sanitize_cart($carts);
                 $carts = $sanitize['cart'];
                 if (!empty($sanitize['removed'])) {
-                    $this->session->set_userdata('custom_cart', $carts);
-                    $this->session->set_flashdata(
-                        'message',
-                        'Không thể đặt hàng: sản phẩm "' . implode('", "', $sanitize['removed']) . '" không còn tồn tại. Vui lòng kiểm tra lại giỏ hàng.'
+                    $this->load->helper('cart');
+                    cart_persist_session($carts);
+                    set_store_flash(
+                        'fail',
+                        'Không thể đặt hàng: một số sản phẩm không đủ tồn kho hoặc không còn bán (' . implode(', ', $sanitize['removed']) . '). Vui lòng kiểm tra lại giỏ hàng.'
                     );
                     redirect(build_cart_url());
                 }
                 if (!empty($sanitize['changed'])) {
-                    $this->session->set_userdata('custom_cart', $carts);
+                    $this->load->helper('cart');
+                    cart_persist_session($carts);
                 }
                 if (empty($carts)) {
-                    $this->session->set_flashdata('message', 'Giỏ hàng trống, không thể đặt hàng.');
+                    set_store_flash('fail', 'Giỏ hàng trống, không thể đặt hàng.');
                     redirect(build_cart_url());
                 }
 
@@ -101,7 +104,7 @@ class Order extends MY_Frontend_Controller {
                     $check = $this->voucher_model->validate_for_checkout($voucher_code, $user_id, $cart_subtotal);
                     if (!$check['ok']) {
                         $this->session->unset_userdata('checkout_voucher');
-                        $this->session->set_flashdata('message', $check['message']);
+                        set_store_flash('fail', $check['message']);
                         redirect(build_checkout_url());
                     }
                     $discount_amount = (int) $check['discount'];
@@ -112,6 +115,57 @@ class Order extends MY_Frontend_Controller {
 
                 $this->load->model('transaction_model');
                 $this->load->model('order_model');
+
+                $order_lines = array();
+                foreach ($carts as $items) {
+                    $product_info = $this->product_model->get_info($items['id']);
+                    if (empty($product_info)) {
+                        set_store_flash(
+                            'fail',
+                            'Không thể đặt hàng vì sản phẩm không còn tồn tại. Vui lòng cập nhật giỏ hàng.'
+                        );
+                        redirect(build_cart_url());
+                    }
+
+                    $size = isset($items['options']['size']) ? $items['options']['size'] : '';
+                    $color = isset($items['options']['color']) ? $items['options']['color'] : '';
+                    $variant_id = !empty($items['variant_id']) ? (int) $items['variant_id'] : 0;
+                    if ($variant_id <= 0) {
+                        $variant_id = $this->product_service->resolve_variant_id($items['id'], $color, $size, false);
+                    }
+                    if ($variant_id <= 0) {
+                        set_store_flash(
+                            'fail',
+                            'Không thể đặt hàng: biến thể sản phẩm "' . $product_info->name . '" không còn khả dụng.'
+                        );
+                        redirect(build_cart_url());
+                    }
+
+                    $qty = max(1, (int) $items['qty']);
+                    $check = $this->product_service->validate_cart_quantity($items['id'], $color, $size, $qty, 0, false);
+                    if (!$check['ok']) {
+                        set_store_flash('fail', $check['message']);
+                        redirect(build_checkout_url());
+                    }
+
+                    $order_lines[] = array(
+                        'items' => $items,
+                        'product_info' => $product_info,
+                        'variant_id' => (int) $check['variant_id'],
+                        'size' => $check['size'],
+                        'color' => $check['color'],
+                        'qty' => $qty,
+                    );
+                }
+
+                $deduct_by_variant = array();
+                foreach ($order_lines as $line) {
+                    $vid = (int) $line['variant_id'];
+                    if (!isset($deduct_by_variant[$vid])) {
+                        $deduct_by_variant[$vid] = 0;
+                    }
+                    $deduct_by_variant[$vid] += (int) $line['qty'];
+                }
 
                 $this->db->trans_start();
 
@@ -142,37 +196,37 @@ class Order extends MY_Frontend_Controller {
                     );
                 }
 
-                foreach ($carts as $items) {
-                    $product_info = $this->product_model->get_info($items['id']);
-                    if (empty($product_info)) {
-                        $this->db->trans_rollback();
-                        $this->session->set_flashdata(
-                            'message',
-                            'Không thể đặt hàng vì sản phẩm không còn tồn tại. Vui lòng cập nhật giỏ hàng.'
-                        );
-                        redirect(build_cart_url());
-                    }
-
-                    $size = isset($items['options']['size']) ? $items['options']['size'] : '';
-                    $color = isset($items['options']['color']) ? $items['options']['color'] : '';
-                    $variant_id = !empty($items['variant_id']) ? (int) $items['variant_id'] : 0;
-                    if ($variant_id <= 0) {
-                        $variant_id = $this->product_service->resolve_variant_id($items['id'], $color, $size, true);
-                    }
-
+                $sync_product_ids = array();
+                foreach ($deduct_by_variant as $variant_id => $deduct_qty) {
                     $deduct = $this->inventory_service->deduct_for_order(
-                        $variant_id,
-                        (int) $items['qty'],
+                        (int) $variant_id,
+                        (int) $deduct_qty,
                         (int) $transaction_id,
                         $user_id,
                         'Xuất kho đơn #' . (int) $transaction_id,
+                        false,
                         false
                     );
                     if (empty($deduct['ok'])) {
                         $this->db->trans_rollback();
-                        $this->session->set_flashdata('message', !empty($deduct['message']) ? $deduct['message'] : 'Không đủ tồn kho để đặt hàng.');
+                        set_store_flash(
+                            'fail',
+                            !empty($deduct['message'])
+                                ? $deduct['message']
+                                : 'Không đủ tồn kho để đặt hàng. Vui lòng giảm số lượng hoặc thử lại sau.'
+                        );
                         redirect(build_checkout_url());
                     }
+                    if (!empty($deduct['product_id'])) {
+                        $sync_product_ids[(int) $deduct['product_id']] = true;
+                    }
+                }
+
+                foreach ($order_lines as $line) {
+                    $items = $line['items'];
+                    $variant_id = (int) $line['variant_id'];
+                    $size = (string) $line['size'];
+                    $color = (string) $line['color'];
 
                     $order_data = array(
                         'transaction_id' => $transaction_id,
@@ -180,7 +234,7 @@ class Order extends MY_Frontend_Controller {
                         'variant_id'     => $variant_id,
                         'size'           => $size !== '' ? $size : 'Mặc định',
                         'color'          => $color !== '' ? $color : 'Mặc định',
-                        'qty'            => $items['qty'],
+                        'qty'            => $line['qty'],
                         'amount'         => $items['subtotal']
                     );
                     if ($this->db->field_exists('cost_price', 'order') && $variant_id > 0 && $this->db->table_exists('product_variants')) {
@@ -192,8 +246,12 @@ class Order extends MY_Frontend_Controller {
 
                 $this->db->trans_complete();
                 if ($this->db->trans_status() === FALSE) {
-                    $this->session->set_flashdata('message', 'Đặt hàng thất bại. Vui lòng thử lại sau.');
+                    set_store_flash('fail', 'Đặt hàng thất bại. Vui lòng thử lại sau.');
                     redirect(build_checkout_url());
+                }
+
+                foreach (array_keys($sync_product_ids) as $product_id) {
+                    $this->product_service->sync_product_quantity_cache((int) $product_id);
                 }
 
                 $this->_remember_order_access($transaction_id);
@@ -202,8 +260,9 @@ class Order extends MY_Frontend_Controller {
                 if ($payment_method == 'Chuyển khoản') {
                     redirect(build_checkout_qr_url($transaction_id));
                 } else {
-                    $this->session->unset_userdata('custom_cart');
-                    $this->session->set_flashdata('message', "Đặt hàng thành công! Đơn hàng của bạn sẽ được thanh toán bằng hình thức COD (Tiền mặt).");
+                    $this->load->helper('cart');
+                    cart_clear_session();
+                    set_store_flash('success', 'Đặt hàng thành công! Đơn hàng của bạn sẽ được thanh toán bằng hình thức COD (Tiền mặt).');
                     redirect(build_cart_url());
                 }
             }
@@ -215,6 +274,8 @@ class Order extends MY_Frontend_Controller {
 
         $this->data['checkout_voucher'] = $this->session->userdata('checkout_voucher');
         $this->data['checkout_apply_url'] = site_url('thanh-toan/apply_voucher');
+
+        load_store_flash_to($this->data);
 
         $this->render_frontend_sub('site/order/index');
     }
@@ -308,12 +369,12 @@ class Order extends MY_Frontend_Controller {
         }
 
         if ($transaction->payment !== 'Chuyển khoản' || (string) $transaction->status !== '0') {
-            $this->session->set_flashdata('message', 'Không thể xem mã QR cho đơn hàng này.');
+            set_store_flash('fail', 'Không thể xem mã QR cho đơn hàng này.');
             redirect(build_cart_url());
         }
 
         if (!$this->_can_access_order($transaction)) {
-            $this->session->set_flashdata('message', 'Bạn không có quyền xem thông tin thanh toán đơn hàng này.');
+            set_store_flash('fail', 'Bạn không có quyền xem thông tin thanh toán đơn hàng này.');
             redirect(base_url());
         }
 
@@ -330,7 +391,8 @@ class Order extends MY_Frontend_Controller {
         $this->data['transaction'] = $transaction;
 
         // Xóa giỏ sau khi hiển thị QR (chuyển khoản)
-        $this->session->unset_userdata('custom_cart');
+        $this->load->helper('cart');
+        cart_clear_session();
         
         $this->render_frontend_sub('site/order/checkout_qr');
     }
@@ -431,7 +493,8 @@ class Order extends MY_Frontend_Controller {
         }
         $sanitize = $this->_sanitize_cart($carts);
         if (!empty($sanitize['changed']) || !empty($sanitize['removed'])) {
-            $this->session->set_userdata('custom_cart', $sanitize['cart']);
+            $this->load->helper('cart');
+            cart_persist_session($sanitize['cart']);
         }
         $total = 0;
         foreach ($sanitize['cart'] as $value) {

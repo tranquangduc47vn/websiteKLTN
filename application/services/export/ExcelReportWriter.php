@@ -2,111 +2,149 @@
 defined('BASEPATH') OR exit('No direct script access allowed');
 
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ExcelReportWriter
 {
-	public function send(ExportContext $ctx, ExportReportDefinition $def, $filename)
+	public function write(ExportReportDefinition $def)
 	{
-		if (!class_exists(Spreadsheet::class)) {
-			show_error('Thư viện PhpSpreadsheet chưa được cài. Chạy composer install trong thư mục dự án.');
-		}
-
 		$spreadsheet = new Spreadsheet();
 		$sheet = $spreadsheet->getActiveSheet();
-		$sheet->setTitle('BaoCao');
+		$sheet->setTitle($this->_sheetTitle($def->title));
 
 		$row = 1;
-		if ($ctx->logoPath !== '' && is_file($ctx->logoPath)) {
-			$drawing = new \PhpOffice\PhpSpreadsheet\Worksheet\Drawing();
-			$drawing->setPath($ctx->logoPath);
-			$drawing->setHeight(48);
-			$drawing->setCoordinates('A1');
-			$drawing->setWorksheet($sheet);
-			$row = 4;
-		}
-
-		$sheet->setCellValue('A' . $row, $def->title);
-		$sheet->mergeCells('A' . $row . ':F' . $row);
+		$sheet->setCellValue('A' . $row, $def->shop_name);
 		$sheet->getStyle('A' . $row)->getFont()->setBold(true)->setSize(14);
 		$row++;
 
-		$meta = array(
-			'Cửa hàng: ' . $ctx->storeName,
-			'Xuất lúc: ' . date('d/m/Y H:i', $ctx->exportedAt),
-			'Người xuất: ' . $ctx->exporterName,
-			'Bộ lọc: ' . $ctx->filterText,
-		);
-		foreach ($meta as $line) {
-			$sheet->setCellValue('A' . $row, $line);
-			$sheet->mergeCells('A' . $row . ':F' . $row);
+		$sheet->setCellValue('A' . $row, $def->title);
+		$sheet->getStyle('A' . $row)->getFont()->setBold(true)->setSize(12);
+		$row++;
+
+		if ($def->subtitle !== '') {
+			$sheet->setCellValue('A' . $row, $def->subtitle);
 			$row++;
 		}
+
+		$sheet->setCellValue('A' . $row, 'Xuất lúc: ' . $def->generated_at . ' · ' . $def->scope_label);
 		$row++;
+
+		foreach ($def->filter_lines as $line) {
+			$sheet->setCellValue('A' . $row, $line['label'] . ': ' . $line['value']);
+			$row++;
+		}
+
+		if (!empty($def->summary_cards)) {
+			$row++;
+			$col = 1;
+			foreach ($def->summary_cards as $card) {
+				$cell = $this->_colLetter($col) . $row;
+				$sheet->setCellValue($cell, $card['label']);
+				$sheet->getStyle($cell)->getFont()->setBold(true);
+				$sheet->setCellValue($this->_colLetter($col) . ($row + 1), $this->_formatValue($card['value'], $card['type']));
+				$col++;
+			}
+			$row += 3;
+		}
 
 		$headerRow = $row;
 		$col = 1;
-		foreach ($def->headers as $h) {
-			$sheet->setCellValueByColumnAndRow($col, $row, $h);
+		foreach ($def->columns as $column) {
+			$cell = $this->_colLetter($col) . $headerRow;
+			$sheet->setCellValue($cell, $column['label']);
 			$col++;
 		}
-		$lastCol = count($def->headers);
-		$sheet->getStyleByColumnAndRow(1, $headerRow, $lastCol, $headerRow)->getFont()->setBold(true);
-		$sheet->getStyleByColumnAndRow(1, $headerRow, $lastCol, $headerRow)->getFill()
-			->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFE2E8F0');
-		$row++;
 
-		$dataStart = $row;
-		foreach ($def->rows as $r) {
-			$c = 1;
-			foreach ($r as $cell) {
-				$sheet->setCellValueByColumnAndRow($c, $row, $cell);
-				$c++;
+		$lastCol = $this->_colLetter(count($def->columns));
+		$headerRange = 'A' . $headerRow . ':' . $lastCol . $headerRow;
+		$sheet->getStyle($headerRange)->applyFromArray(array(
+			'font' => array('bold' => true, 'color' => array('rgb' => 'FFFFFF')),
+			'fill' => array(
+				'fillType' => Fill::FILL_SOLID,
+				'startColor' => array('rgb' => '1F2937'),
+			),
+			'alignment' => array('horizontal' => Alignment::HORIZONTAL_CENTER),
+			'borders' => array(
+				'allBorders' => array('borderStyle' => Border::BORDER_THIN),
+			),
+		));
+
+		$row = $headerRow + 1;
+		foreach ($def->rows as $dataRow) {
+			$col = 1;
+			foreach ($def->columns as $column) {
+				$key = $column['key'];
+				$value = isset($dataRow[$key]) ? $dataRow[$key] : '';
+				$cell = $this->_colLetter($col) . $row;
+				if ($column['type'] === 'money' && is_numeric($value)) {
+					$sheet->setCellValue($cell, (float) $value);
+					$sheet->getStyle($cell)->getNumberFormat()->setFormatCode('#,##0');
+				} elseif ($column['type'] === 'int' && is_numeric($value)) {
+					$sheet->setCellValue($cell, (int) $value);
+				} else {
+					$sheet->setCellValue($cell, $this->_formatValue($value, $column['type']));
+				}
+				$col++;
 			}
 			$row++;
-		}
-		$dataEnd = $row - 1;
-
-		if ($dataEnd >= $dataStart) {
-			foreach ($def->moneyColumns as $mc) {
-				$colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($mc + 1);
-				$sheet->getStyle($colLetter . $dataStart . ':' . $colLetter . $dataEnd)
-					->getNumberFormat()->setFormatCode('#,##0" ₫"');
-			}
-			foreach ($def->dateColumns as $dc) {
-				$colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($dc + 1);
-				$sheet->getStyle($colLetter . $dataStart . ':' . $colLetter . $dataEnd)
-					->getNumberFormat()->setFormatCode('dd/mm/yyyy hh:mm');
-			}
 		}
 
 		if (!empty($def->totals)) {
 			$row++;
-			foreach ($def->totals as $label => $value) {
-				$sheet->setCellValue('A' . $row, $label);
-				$sheet->setCellValue('B' . $row, $value);
-				$sheet->getStyle('A' . $row . ':B' . $row)->getFont()->setBold(true);
-				if (is_numeric($value)) {
-					$sheet->getStyle('B' . $row)->getNumberFormat()->setFormatCode('#,##0" ₫"');
+			foreach ($def->totals as $total) {
+				$sheet->setCellValue('A' . $row, $total['label']);
+				$sheet->getStyle('A' . $row)->getFont()->setBold(true);
+				$sheet->setCellValue('B' . $row, $this->_formatValue($total['value'], $total['type']));
+				if ($total['type'] === 'money' && is_numeric($total['value'])) {
+					$sheet->getStyle('B' . $row)->getNumberFormat()->setFormatCode('#,##0');
 				}
 				$row++;
 			}
 		}
 
-		$sheet->freezePane('A' . ($headerRow + 1));
-		for ($i = 1; $i <= $lastCol; $i++) {
-			$sheet->getColumnDimensionByColumn($i)->setAutoSize(true);
+		for ($c = 1; $c <= count($def->columns); $c++) {
+			$sheet->getColumnDimension($this->_colLetter($c))->setAutoSize(true);
 		}
 
-		header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-		header('Content-Disposition: attachment; filename="' . $filename . '"');
-		header('Cache-Control: max-age=0');
-
 		$writer = new Xlsx($spreadsheet);
+		ob_start();
 		$writer->save('php://output');
-		exit;
+		return ob_get_clean();
+	}
+
+	protected function _formatValue($value, $type)
+	{
+		if ($type === 'money' && is_numeric($value)) {
+			return number_format((float) $value, 0, ',', '.');
+		}
+		if ($type === 'int' && is_numeric($value)) {
+			return (int) $value;
+		}
+		return (string) $value;
+	}
+
+	protected function _colLetter($index)
+	{
+		$index = (int) $index;
+		$letter = '';
+		while ($index > 0) {
+			$mod = ($index - 1) % 26;
+			$letter = chr(65 + $mod) . $letter;
+			$index = (int) (($index - $mod) / 26);
+		}
+		return $letter;
+	}
+
+	protected function _sheetTitle($title)
+	{
+		$title = preg_replace('/[\\\\\\/*\\[\\]:?]/', ' ', (string) $title);
+		$title = trim($title);
+		if ($title === '') {
+			$title = 'Bao cao';
+		}
+		return mb_substr($title, 0, 31, 'UTF-8');
 	}
 }

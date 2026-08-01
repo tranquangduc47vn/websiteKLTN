@@ -184,7 +184,13 @@ class Cart extends MY_Frontend_Controller {
             'removed' => $removed,
             'changed' => $changed,
         );
-    }
+	}
+
+	private function _persist_cart(array $carts)
+	{
+		$this->load->helper('cart');
+		cart_persist_session($carts);
+	}
 
     private function _sanitize_cart_session()
     {
@@ -199,9 +205,9 @@ class Cart extends MY_Frontend_Controller {
         }
 
         $removed = count($carts) - count($items);
-        $this->session->set_userdata('custom_cart', $items);
-        $this->session->set_flashdata(
-            'message',
+        $this->_persist_cart($items);
+        set_store_flash(
+            'fail',
             $removed . ' sản phẩm trong giỏ không còn bán và đã được xóa tự động.'
         );
     }
@@ -325,7 +331,8 @@ class Cart extends MY_Frontend_Controller {
             return true;
         }
 
-        $this->session->set_flashdata('message', $message);
+        $this->load->helper('common');
+        set_store_flash('fail', $message);
         redirect(build_cart_url());
         return true;
     }
@@ -337,7 +344,9 @@ class Cart extends MY_Frontend_Controller {
             return;
         }
         if (!empty($payload['message'])) {
-            $this->session->set_flashdata('message', $payload['message']);
+            $type = (isset($payload['ok']) && $payload['ok'] === false) ? 'fail' : 'success';
+            $this->load->helper('common');
+            set_store_flash($type, $payload['message']);
         }
         redirect(build_cart_url());
     }
@@ -356,7 +365,8 @@ class Cart extends MY_Frontend_Controller {
             return false;
         }
         $this->session->set_userdata('redirect_back', current_url());
-        $this->session->set_flashdata('message', 'Bạn cần đăng nhập tài khoản để thực hiện chức năng này!');
+        $this->load->helper('common');
+        set_store_flash('fail', 'Bạn cần đăng nhập tài khoản để thực hiện chức năng này!');
         redirect(build_login_url());
         return false;
     }
@@ -365,7 +375,8 @@ class Cart extends MY_Frontend_Controller {
     {
         $this->_check_login();
 
-        $this->data['message'] = $this->session->flashdata('message');
+        $this->load->helper('common');
+        load_store_flash_to($this->data);
         // Cart never auto-shows stock_notice from flash (stale notices from failed add elsewhere).
         $this->session->flashdata('stock_notice');
 
@@ -383,11 +394,11 @@ class Cart extends MY_Frontend_Controller {
         $recalc = $this->_recalculate_cart_prices($carts);
         $carts = $recalc['cart'];
         if ($recalc['changed']) {
-            $this->session->set_userdata('custom_cart', $carts);
+            $this->_persist_cart($carts);
         }
         if (!empty($recalc['removed'])) {
-            $this->session->set_flashdata(
-                'message',
+            set_store_flash(
+                'fail',
                 'Một số sản phẩm đã được cập nhật giá hoặc không còn khả dụng: ' . implode(', ', $recalc['removed'])
             );
         }
@@ -422,7 +433,7 @@ class Cart extends MY_Frontend_Controller {
 
         $product = $this->product_model->get_info($id);
         if (empty($product)) {
-            $this->session->set_flashdata('message', 'Sản phẩm không tồn tại trong hệ thống!');
+            set_store_flash('fail', 'Sản phẩm không tồn tại trong hệ thống!');
             redirect(base_url());
         }
 
@@ -481,8 +492,8 @@ class Cart extends MY_Frontend_Controller {
             $current_cart[$rowid] = $item;
         }
 
-        $this->session->set_userdata('custom_cart', $current_cart);
-        $this->session->set_flashdata('message', 'Thêm vào giỏ hàng thành công');
+        $this->_persist_cart($current_cart);
+        set_store_flash('success', 'Thêm vào giỏ hàng thành công');
         
         redirect(build_cart_url());
     }
@@ -571,7 +582,7 @@ class Cart extends MY_Frontend_Controller {
             $qty = (int) $item['qty'];
         }
 
-        $this->session->set_userdata('custom_cart', $current_cart);
+        $this->_persist_cart($current_cart);
         $this->_cart_finish($this->_cart_success_payload($current_cart, 'Đã cập nhật size và màu sắc', array(
             'action' => 'options',
             'old_rowid' => $rowid,
@@ -655,7 +666,7 @@ class Cart extends MY_Frontend_Controller {
             }
         }
 
-        $this->session->set_userdata('custom_cart', $current_cart);
+        $this->_persist_cart($current_cart);
 
         if ($removed) {
             $this->_cart_finish($this->_cart_success_payload($current_cart, '', array(
@@ -701,11 +712,11 @@ class Cart extends MY_Frontend_Controller {
         if (!empty($rowid) && $rowid !== '0' && $rowid !== 'del') {
             if (isset($current_cart[$rowid])) {
                 unset($current_cart[$rowid]);
-                $this->session->set_userdata('custom_cart', $current_cart);
+                $this->_persist_cart($current_cart);
                 $message = 'Xóa sản phẩm thành công';
             }
         } else {
-            $this->session->unset_userdata('custom_cart');
+            $this->_persist_cart(array());
             $current_cart = array();
             $message = 'Xóa giỏ hàng thành công';
         }

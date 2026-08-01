@@ -57,10 +57,6 @@ $route['translate_uri_dashes'] = FALSE;
 // Admin
 $route['admin'] = 'admin/home/index';
 
-$route['admin/export/excel/(:any)'] = 'admin/export/excel/$1';
-$route['admin/export/pdf/(:any)'] = 'admin/export/pdf/$1';
-$route['admin/export/print_report/(:any)'] = 'admin/export/print_report/$1';
-
 // Alias plural URL → controller cũ
 $route['admin/branding'] = 'admin/site_branding/index';
 $route['admin/branding/(.+)'] = 'admin/site_branding/$1';
@@ -218,3 +214,7 @@ $route['admin/ai-assistant'] = 'admin/ai_assistant/settings';
 $route['admin/ai-assistant/(.+)'] = 'admin/ai_assistant/$1';
 $route['admin/support-chat'] = 'admin/support_chat/index';
 $route['admin/support-chat/(.+)'] = 'admin/support_chat/$1';
+
+$route['admin/export/excel/(:any)'] = 'admin/export/excel/$1';
+$route['admin/export/pdf/(:any)'] = 'admin/export/pdf/$1';
+$route['admin/export/preview/(:any)'] = 'admin/export/preview/$1';

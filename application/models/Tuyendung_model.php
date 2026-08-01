@@ -1,17 +1,14 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
-class Tuyendung_model extends MY_Model {
+require_once APPPATH . 'models/Content_page_model.php';
 
-    public $table = 'tuyendung';
+class Tuyendung_model extends Content_page_model {
+	protected $content_type = 'tuyendung';
+	protected $legacy_table = 'tuyendung';
 
-    public function __construct() {
-        parent::__construct();
-    }
-
-    public function get_list_tuyendung() {
-        $this->db->order_by('id', 'DESC');
-        $query = $this->db->get($this->table);
-        return $query->result_array();
-    }
+	public function get_list_tuyendung()
+	{
+		return $this->get_list(array('order' => array('id', 'DESC')));
+	}
 }

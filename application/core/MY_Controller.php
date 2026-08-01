@@ -63,9 +63,16 @@ class MY_Controller extends CI_Controller {
 				}
 				$this->data['user_order_badge'] = $user_order_badge;
 
-				$carts = $this->session->userdata('custom_cart');
-				if (!is_array($carts)) {
-					$carts = array();
+				$carts = array();
+				if (!empty($user)) {
+					$this->load->helper('cart');
+					cart_ensure_for_logged_in_user($user);
+					$session_carts = cart_get_session();
+					if (is_array($session_carts)) {
+						$carts = $session_carts;
+					}
+				} else {
+					$this->session->unset_userdata('custom_cart');
 				}
 				$total_items = 0;
 				foreach ($carts as $item) {

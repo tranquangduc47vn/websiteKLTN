@@ -297,8 +297,8 @@
 				'vanchuyen' => 'content',
 				'admin' => 'staff',
 				'home' => 'dashboard',
-				'export' => 'dashboard',
 				'login' => 'auth',
+				'export' => 'dashboard',
 			);
 
 			return isset($map[$seg2]) ? $map[$seg2] : 'dashboard';
@@ -606,6 +606,16 @@
 				. '<input type="hidden" name="reason" value="">'
 				. '<button type="button" class="' . htmlspecialchars($class, ENT_QUOTES, 'UTF-8') . '" onclick="adminPromptPost(' . json_encode($form_id) . ',' . json_encode($prompt, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) . ')">' . $inner_html . '</button>'
 				. '</form>';
+		}
+	}
+
+	if (!function_exists('admin_pending_orders_count')) {
+		function admin_pending_orders_count()
+		{
+			$CI =& get_instance();
+			$CI->load->model('transaction_model');
+
+			return $CI->transaction_model->count_pending_for_admin();
 		}
 	}
 ?>

@@ -144,6 +144,91 @@
 		});
 	}
 
+	function updateAdminOrdersBadge(count) {
+		var link = document.getElementById('admin-orders-nav-link');
+		if (!link) {
+			return;
+		}
+
+		count = parseInt(count, 10);
+		if (isNaN(count) || count < 0) {
+			count = 0;
+		}
+
+		var badge = document.getElementById('admin-pending-orders-badge');
+		var label = count > 99 ? '99+' : String(count);
+
+		if (count <= 0) {
+			if (badge) {
+				badge.remove();
+			}
+			return;
+		}
+
+		if (!badge) {
+			badge = document.createElement('span');
+			badge.id = 'admin-pending-orders-badge';
+			badge.className = 'admin-nav-badge admin-nav-badge--urgent';
+			badge.title = 'Đơn chưa hoàn thành';
+			link.appendChild(badge);
+		}
+
+		badge.textContent = label;
+	}
+
+	function initAdminOrdersPoll() {
+		var pollUrl = window.WEBSHOP_ADMIN_ORDERS_POLL_URL;
+		if (!pollUrl) {
+			return;
+		}
+
+		var POLL_MS = 8000;
+		var timer = null;
+		var inFlight = false;
+
+		function fetchCount() {
+			if (inFlight || document.hidden) {
+				return;
+			}
+			inFlight = true;
+
+			fetch(pollUrl, {
+				method: 'GET',
+				credentials: 'same-origin',
+				headers: { 'Accept': 'application/json' }
+			})
+				.then(function (res) {
+					if (!res.ok) {
+						throw new Error('poll failed');
+					}
+					return res.json();
+				})
+				.then(function (data) {
+					if (data && data.ok) {
+						updateAdminOrdersBadge(data.count);
+					}
+				})
+				.catch(function () {})
+				.finally(function () {
+					inFlight = false;
+				});
+		}
+
+		function schedulePoll() {
+			clearInterval(timer);
+			timer = setInterval(fetchCount, POLL_MS);
+		}
+
+		fetchCount();
+		schedulePoll();
+
+		document.addEventListener('visibilitychange', function () {
+			if (!document.hidden) {
+				fetchCount();
+			}
+		});
+	}
+
 	function initAutoFilterForms() {
 		var forms = document.querySelectorAll('main.admin-main form[method="get"]:not([data-admin-no-auto-filter])');
 		forms.forEach(function (form) {
@@ -205,6 +290,80 @@
 		});
 	}
 
+	function parseInputMin(input) {
+		var minAttr = input.getAttribute('min');
+		if (minAttr === null || minAttr === '') {
+			var dataMin = input.getAttribute('data-non-negative-min');
+			if (dataMin !== null && dataMin !== '') {
+				minAttr = dataMin;
+			}
+		}
+		var minVal = parseFloat(minAttr);
+		return isNaN(minVal) ? 0 : minVal;
+	}
+
+	function clampNonNegativeValue(input) {
+		if (!input || input.value === '' || input.value === '-') {
+			if (input && input.value === '-') {
+				input.value = '';
+			}
+			return;
+		}
+		var minVal = parseInputMin(input);
+		var raw = String(input.value).trim();
+		var parsed = input.type === 'number' ? parseFloat(raw) : parseFloat(raw.replace(/[^\d.-]/g, ''));
+		if (isNaN(parsed) || parsed < minVal) {
+			input.value = String(minVal);
+		}
+	}
+
+	function bindNonNegativeInput(input) {
+		if (!input || input.getAttribute('data-non-negative-init') === '1') {
+			return;
+		}
+		input.setAttribute('data-non-negative-init', '1');
+
+		input.addEventListener('keydown', function (e) {
+			if (e.key === '-' || e.key === 'Minus' || e.key === 'e' || e.key === 'E') {
+				e.preventDefault();
+			}
+		});
+
+		input.addEventListener('paste', function (e) {
+			var text = (e.clipboardData || window.clipboardData).getData('text');
+			if (/^-/.test(text)) {
+				e.preventDefault();
+				return;
+			}
+			var minVal = parseInputMin(input);
+			var pasted = parseFloat(String(text).replace(/[^\d.-]/g, ''));
+			if (!isNaN(pasted) && pasted < minVal) {
+				e.preventDefault();
+				input.value = String(minVal);
+				input.dispatchEvent(new Event('input', { bubbles: true }));
+			}
+		});
+
+		input.addEventListener('input', function () {
+			if (String(input.value).indexOf('-') !== -1) {
+				input.value = String(input.value).replace(/-/g, '');
+			}
+			clampNonNegativeValue(input);
+		});
+
+		input.addEventListener('blur', function () {
+			clampNonNegativeValue(input);
+		});
+	}
+
+	function initNonNegativeInputs(root) {
+		var scope = root && root.querySelectorAll ? root : document;
+		scope.querySelectorAll('input[type="number"][min], input[data-non-negative]').forEach(bindNonNegativeInput);
+	}
+
+	window.adminBindNonNegativeInput = bindNonNegativeInput;
+	window.adminInitNonNegativeInputs = initNonNegativeInputs;
+
 	window.adminPromptPost = function (formId, promptText) {
 		var reason = window.prompt(promptText);
 		if (reason === null || String(reason).trim() === '') {
@@ -229,6 +388,8 @@
 		initDarkModeToggle();
 		initTableSearch();
 		initAutoFilterForms();
+		initAdminOrdersPoll();
+		initNonNegativeInputs(document);
 
 		if (window.jQuery && jQuery.fn.datepicker) {
 			jQuery('#calendar').datepicker();

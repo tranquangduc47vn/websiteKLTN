@@ -1,3 +1,9 @@
+<?php
+$this->load->helper('permission');
+$login = $this->session->userdata('login');
+$can_delete_product = admin_can('product.delete_single', $login);
+$can_bulk_delete = admin_can('product.bulk_delete', $login);
+?>
 <div class="admin-breadcrumb">
 	<nav aria-label="breadcrumb">
 		<ol class="breadcrumb">
@@ -6,8 +12,6 @@
 		</ol>
 	</nav>
 </div>
-
-<?php $this->load->helper('export'); admin_export_toolbar('products'); ?>
 
 <div class="admin-card mb-3">
 	<div class="admin-card-body">
@@ -54,6 +58,8 @@
 	</div>
 </div>
 
+<?php $this->load->helper('export'); admin_export_toolbar('products'); ?>
+
 <div id="message"></div>
 
 <div class="admin-card">
@@ -67,7 +73,7 @@
 					<table class="table table-hover table-bordered admin-table">
 						<thead>
 							<tr class="info">
-								<?php if ($this->session->userdata('login')->level == ROLE_ADMIN): ?>
+								<?php if ($can_bulk_delete): ?>
 									<th width="3%" class="text-center"><input type="checkbox" id="select-all" /></th>
 								<?php endif; ?>
 								
@@ -86,7 +92,7 @@
 						<?php if(!empty($product)): ?>
 							<?php foreach ($product as $value) { ?>
 							<tr>
-								<?php if ($this->session->userdata('login')->level == ROLE_ADMIN): ?>
+								<?php if ($can_bulk_delete): ?>
 									<td style="vertical-align: middle; text-align: center;">
 										<input type="checkbox" name="checkbox[]" class="case" value="<?php echo $value->id; ?>" />
 									</td>
@@ -164,7 +170,7 @@
 										<a href="<?php echo admin_url('product/edit/'.$value->id); ?>" title="Sửa" class="btn btn-sm btn-outline-primary">
 											<i class="fa-solid fa-pen"></i>
 										</a>
-										<?php if ($this->session->userdata('login')->level == ROLE_ADMIN) { ?>
+										<?php if ($can_delete_product) { ?>
 											<a id="<?php echo $value->id; ?>" title="Xóa" class="btn btn-sm btn-outline-danger remove">
 												<i class="fa-solid fa-trash"></i>
 											</a>
@@ -177,14 +183,14 @@
 							<?php } ?>
 						<?php else: ?>
 							<tr>
-								<td colspan="<?php echo ($this->session->userdata('login')->level == ROLE_ADMIN) ? '12' : '11'; ?>" class="text-center">Không tìm thấy sản phẩm nào phù hợp với bộ lọc!</td>
+								<td colspan="<?php echo $can_bulk_delete ? '12' : '11'; ?>" class="text-center">Không tìm thấy sản phẩm nào phù hợp với bộ lọc!</td>
 							</tr>
 						<?php endif; ?>
 						</tbody>
 					</table>
 					
 					<div class="admin-table-footer">
-						<?php if ($this->session->userdata('login')->level == ROLE_ADMIN) { ?>
+						<?php if ($can_bulk_delete) { ?>
 							<button type="submit" class="btn btn-danger btn-sm" id="submit-del">Xóa mục đã chọn</button>
 						<?php } ?>
 						<div><?php echo $this->pagination->create_links(); ?></div>

@@ -92,12 +92,12 @@ $this->load->view('admin/partials/form_open');
 						</div>
 					</div>
 
-					<script src="<?php echo base_url('assets/admin/js/product-price.js?v=2'); ?>"></script>
+					<script src="<?php echo base_url('assets/admin/js/product-price.js?v=3'); ?>"></script>
 
 					<div class="form-group">
 						<label for="quantity" class="col-sm-2 control-label">Số lượng tồn kho</label>
 						<div class="col-sm-5">
-							<input type="number" name='quantity' class="form-control" id="quantity" placeholder="Ví dụ: 100" value="<?php echo set_value('quantity', 0); ?>" min="0">
+							<input type="number" name='quantity' class="form-control" id="quantity" placeholder="Ví dụ: 100" value="<?php echo set_value('quantity', 0); ?>" min="0" step="1">
 						</div>
 						<div class="col-sm-4 text-danger">
 							<?php echo form_error('quantity'); ?>

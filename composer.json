@@ -12,10 +12,9 @@
 	},
 	"require": {
 		"php": ">=7.4",
-		"phpoffice/phpspreadsheet": "^1.29",
-		"maennchen/zipstream-php": "^2.1",
-		"tecnickcom/tcpdf": "^6.7",
-		"phpmailer/phpmailer": "6.9"
+		"phpmailer/phpmailer": "6.9",
+		"mpdf/mpdf": "^8.3",
+		"phpoffice/phpspreadsheet": "^1.30"
 	},
 	"suggest": {
 		"paragonie/random_compat": "Provides better randomness in PHP 5.x"

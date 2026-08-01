@@ -37,17 +37,18 @@ $admin_asset_url = base_url('assets/admin/');
 	</nav>
 </div>
 
-<h1 class="h4 mb-3"><?php echo $is_edit ? 'Sửa phiếu nháp' : 'Tạo phiếu nhập (nháp)'; ?></h1>
+<h1 class="h4 mb-3"><?php echo $is_edit ? 'Sửa phiếu nháp (cũ)' : 'Tạo phiếu nhập kho'; ?></h1>
 
-<form method="post" action="<?php echo $action; ?>" id="stock-receipt-form">
+<form method="post" action="<?php echo $action; ?>" id="stock-receipt-form" novalidate>
+	<?php echo csrf_field(); ?>
 	<input type="hidden" name="submit" value="1">
 
 	<div class="admin-card mb-3">
 		<div class="admin-card-body row g-3">
 			<div class="col-md-4">
-				<label class="form-label">Nhà cung cấp</label>
-				<select name="supplier_id" class="form-select form-select-sm">
-					<option value="0">— Không chọn —</option>
+				<label class="form-label" for="supplier_id">Nhà cung cấp <span class="text-danger">*</span></label>
+				<select name="supplier_id" id="supplier_id" class="form-select form-select-sm" required>
+					<option value="">— Chọn nhà cung cấp —</option>
 					<?php foreach ($suppliers as $s) { ?>
 						<option value="<?php echo (int) $s->id; ?>" <?php echo ($is_edit && (int) $receipt->supplier_id === (int) $s->id) ? 'selected' : ''; ?>>
 							<?php echo htmlspecialchars($s->code . ' — ' . $s->name, ENT_QUOTES, 'UTF-8'); ?>
@@ -177,7 +178,7 @@ $admin_asset_url = base_url('assets/admin/');
 	</div>
 
 	<div class="d-flex gap-2">
-		<button type="submit" class="btn btn-primary" id="btn-save-receipt">Lưu phiếu nháp</button>
+		<button type="submit" class="btn btn-primary" id="btn-save-receipt"><?php echo $is_edit ? 'Lưu phiếu nháp' : 'Nhập kho'; ?></button>
 		<a href="<?php echo admin_url('stock-receipts'); ?>" class="btn btn-outline-secondary">Huỷ</a>
 	</div>
 </form>
@@ -189,4 +190,4 @@ window.STOCK_RECEIPT_FORM = <?php echo json_encode(array(
 ), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
 </script>
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/js/tom-select.complete.min.js"></script>
-<script src="<?php echo $admin_asset_url; ?>js/stock-receipt-form.js?v=2"></script>
+<script src="<?php echo $admin_asset_url; ?>js/stock-receipt-form.js?v=7"></script>

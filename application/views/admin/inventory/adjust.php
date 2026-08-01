@@ -17,11 +17,17 @@
 			· Size: <?php echo html_escape($variant->size ?: '—'); ?>
 			· Tồn hiện tại: <strong><?php echo number_format((int) $variant->stock); ?></strong></p>
 
-		<form method="post" action="<?php echo admin_url('inventory/adjust/' . (int) $variant->id); ?>" class="row g-3" style="max-width: 520px;">
+		<?php if (empty($can_adjust)) { ?>
+			<div class="alert alert-info">
+				Bạn chỉ được <strong>xem kiểm kê</strong>. Điều chỉnh số lượng tồn cần quyền Admin — vui lòng liên hệ quản trị viên nếu phát hiện chênh lệch.
+			</div>
+			<a href="<?php echo admin_url('inventory'); ?>" class="btn btn-outline-secondary">Quay lại tồn kho</a>
+		<?php } else { ?>
+		<form method="post" action="<?php echo admin_url('inventory/adjust/' . (int) $variant->id); ?>" class="row g-3" style="max-width: 520px;" data-inventory-adjust-form>
 			<input type="hidden" name="variant_id" value="<?php echo (int) $variant->id; ?>">
 			<div class="col-12">
 				<label class="form-label">Tồn sau điều chỉnh</label>
-				<input type="number" name="new_qty" class="form-control" min="0" required
+				<input type="number" name="new_qty" class="form-control" min="0" step="1" required
 					value="<?php echo (int) $variant->stock; ?>">
 			</div>
 			<div class="col-12">
@@ -33,5 +39,22 @@
 				<a href="<?php echo admin_url('inventory'); ?>" class="btn btn-outline-secondary">Hủy</a>
 			</div>
 		</form>
+		<script>
+		(function () {
+			var form = document.querySelector('[data-inventory-adjust-form]');
+			if (!form) return;
+			form.addEventListener('submit', function (e) {
+				var input = form.querySelector('[name="new_qty"]');
+				if (!input) return;
+				var qty = parseInt(input.value, 10);
+				if (isNaN(qty) || qty < 0) {
+					e.preventDefault();
+					alert('Số lượng tồn không được âm.');
+					input.focus();
+				}
+			});
+		})();
+		</script>
+		<?php } ?>
 	</div>
 </div>

@@ -7,13 +7,16 @@ $display_final = $has_applied ? (int) $cv['final'] : (int) $total_amount;
 $display_final_fmt = number_format($display_final, 0, ',', '.') . ' ₫';
 $voucher_init_code = $has_applied ? $cv['code'] : set_value('voucher_code');
 ?>
-<link rel="stylesheet" href="<?php echo $checkout_asset; ?>css/checkout-luxury.css?v=5">
+<link rel="stylesheet" href="<?php echo $checkout_asset; ?>css/checkout-luxury.css?v=7">
 
 <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12 clearpadding jm-checkout-lux">
 	<div class="jm-checkout-lux__inner">
 
-		<?php if (isset($message) && !empty($message)) { ?>
-			<div class="jm-checkout-flash" role="alert"><?php echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8'); ?></div>
+		<?php if (!empty($message_success)) { ?>
+			<div class="jm-checkout-flash jm-checkout-flash--success" role="alert"><?php echo htmlspecialchars($message_success, ENT_QUOTES, 'UTF-8'); ?></div>
+		<?php } ?>
+		<?php if (!empty($message_fail)) { ?>
+			<div class="jm-checkout-flash jm-checkout-flash--error" role="alert"><?php echo htmlspecialchars($message_fail, ENT_QUOTES, 'UTF-8'); ?></div>
 		<?php } ?>
 
 		<section class="jm-checkout-panel" aria-labelledby="jm-checkout-title">

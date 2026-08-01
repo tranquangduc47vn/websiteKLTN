@@ -42,6 +42,7 @@ class Inventory extends MY_Admin_Controller {
 		$this->data['filters'] = $filters;
 		$this->data['stats'] = $this->inventory_model->get_stats();
 		$this->data['catalog'] = $this->_list_catalog();
+		$this->data['can_count'] = admin_can('inventory.count', $this->currentUser);
 		$this->data['can_adjust'] = admin_can('inventory.adjust', $this->currentUser);
 
 		$this->render_admin('admin/inventory/index');
@@ -58,6 +59,10 @@ class Inventory extends MY_Admin_Controller {
 	{
 		$variant_id = (int) $variant_id;
 		if (!$this->input->post()) {
+			if (!admin_can('inventory.count', $this->currentUser) && !admin_can('inventory.adjust', $this->currentUser)) {
+				admin_flash_fail('Bạn không có quyền kiểm kê tồn kho.', 'inventory');
+				redirect(admin_url('inventory'));
+			}
 			if ($variant_id <= 0) {
 				redirect(admin_url('inventory'));
 			}
@@ -73,18 +78,24 @@ class Inventory extends MY_Admin_Controller {
 
 			$this->data['variant'] = $variant;
 			$this->data['product_name'] = $row ? $row->product_name : '';
+			$this->data['can_adjust'] = admin_can('inventory.adjust', $this->currentUser);
 			$this->render_admin('admin/inventory/adjust');
 			return;
 		}
 
 		if (!admin_can('inventory.adjust', $this->currentUser)) {
-			admin_flash_fail( 'Bạn không có quyền kiểm kê tồn kho.');
+			admin_flash_fail('Chỉ Admin mới được điều chỉnh số lượng tồn. Mod chỉ xem kiểm kê.', 'inventory');
 			redirect(admin_url('inventory'));
 		}
 
 		$variant_id = (int) $this->input->post('variant_id');
 		$new_qty = (int) $this->input->post('new_qty');
 		$note = trim((string) $this->input->post('note'));
+
+		if ($new_qty < 0) {
+			admin_flash_fail('Số lượng tồn không được âm.');
+			redirect(admin_url('inventory/adjust/' . $variant_id));
+		}
 
 		$result = $this->inventory_service->adjust_stock(
 			$variant_id,

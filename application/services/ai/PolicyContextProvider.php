@@ -29,18 +29,16 @@ class PolicyContextProvider {
 			$lines[] = 'Giờ làm việc: ' . $hours;
 		}
 
-		if ($db->table_exists('van_chuyen')) {
-			$vc = $db->select('title, intro')->from('van_chuyen')->limit(1)->get()->row();
-			if ($vc) {
-				$lines[] = 'Chính sách vận chuyển (' . $vc->title . '): ' . $this->plain($vc->intro, 400);
-			}
+		$CI->load->model('vanchuyen_model');
+		$vc = $CI->vanchuyen_model->get_row(array('order' => array('id', 'ASC')));
+		if ($vc) {
+			$lines[] = 'Chính sách vận chuyển (' . $vc->title . '): ' . $this->plain($vc->intro, 400);
 		}
 
-		if ($db->table_exists('pages')) {
-			$page = $db->select('content')->from('pages')->where('slug', 'gioi-thieu')->limit(1)->get()->row();
-			if ($page && !empty($page->content)) {
-				$lines[] = 'Giới thiệu cửa hàng: ' . $this->plain($page->content, 400);
-			}
+		$CI->load->model('page_model');
+		$page = $CI->page_model->get_by_slug('gioi-thieu');
+		if ($page && !empty($page->content)) {
+			$lines[] = 'Giới thiệu cửa hàng: ' . $this->plain($page->content, 400);
 		}
 
 		$lines[] = 'Email hỗ trợ: marketing@jm.com.vn';

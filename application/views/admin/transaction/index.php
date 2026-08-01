@@ -7,8 +7,6 @@
 	</nav>
 </div>
 
-<?php $this->load->helper('export'); admin_export_toolbar('orders'); ?>
-
 <div class="admin-card mb-3">
 	<div class="admin-card-body">
 		<form class="row g-2 align-items-end" action="<?php echo admin_url('orders'); ?>" method="get" data-admin-auto-filter>
@@ -74,6 +72,8 @@
 		</form>
 	</div>
 </div>
+
+<?php $this->load->helper('export'); admin_export_toolbar('orders'); ?>
 
 <div class="admin-card">
 	<div class="admin-card-header">

@@ -5,7 +5,8 @@
  *   php databaseaddphpmyadmin/run_migrations.php
  *
  * Lưu ý: webshop.sql (bản FULL) đã gộp schema + biến thể — import một lần trên hosting.
- * Script này chỉ cần khi nâng cấp DB cũ hoặc sau khi sửa schema mà chưa tái tạo dump.
+ * Script này chỉ cần khi nâng cấp DB cũ hoặc sau khi import webshop.sql.
+ * Bắt buộc chạy sau mỗi lần import dump: php databaseaddphpmyadmin/run_migrations.php
  */
 define('BASEPATH', true);
 define('ENVIRONMENT', 'development');
@@ -34,6 +35,59 @@ function column_exists($mysqli, $table, $column)
 	$column = $mysqli->real_escape_string($column);
 	$r = $mysqli->query("SHOW COLUMNS FROM `{$table}` LIKE '{$column}'");
 	return $r && $r->num_rows > 0;
+}
+
+function index_exists($mysqli, $table, $indexName)
+{
+	$table = $mysqli->real_escape_string($table);
+	$indexName = $mysqli->real_escape_string($indexName);
+	$r = $mysqli->query("SHOW INDEX FROM `{$table}` WHERE Key_name = '{$indexName}'");
+	return $r && $r->num_rows > 0;
+}
+
+function fk_exists($mysqli, $table, $constraintName)
+{
+	$table = $mysqli->real_escape_string($table);
+	$constraintName = $mysqli->real_escape_string($constraintName);
+	$r = $mysqli->query("
+		SELECT CONSTRAINT_NAME FROM information_schema.TABLE_CONSTRAINTS
+		WHERE TABLE_SCHEMA = DATABASE()
+			AND TABLE_NAME = '{$table}'
+			AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+			AND CONSTRAINT_NAME = '{$constraintName}'
+	");
+	return $r && $r->num_rows > 0;
+}
+
+function table_engine($mysqli, $table)
+{
+	$table = $mysqli->real_escape_string($table);
+	$r = $mysqli->query("SHOW TABLE STATUS LIKE '{$table}'");
+	if (!$r || !($row = $r->fetch_assoc())) {
+		return '';
+	}
+	return isset($row['Engine']) ? strtoupper((string) $row['Engine']) : '';
+}
+
+function run_sql_or_skip($mysqli, $sql, $okLabel, $skipLabel = null)
+{
+	if ($mysqli->query($sql)) {
+		echo "OK: {$okLabel}\n";
+		return true;
+	}
+	$msg = $skipLabel ?: $okLabel;
+	echo "SKIP: {$msg} — " . $mysqli->error . "\n";
+	return false;
+}
+
+function count_query($mysqli, $sql)
+{
+	$r = $mysqli->query($sql);
+	if (!$r || !($row = $r->fetch_assoc())) {
+		return 0;
+	}
+	$key = key($row);
+	return (int) $row[$key];
 }
 
 $schemaSql = <<<'SQL'
@@ -94,7 +148,7 @@ CREATE TABLE IF NOT EXISTS `suppliers` (
 CREATE TABLE IF NOT EXISTS `stock_receipts` (
   `id` int NOT NULL AUTO_INCREMENT,
   `receipt_code` varchar(20) COLLATE utf8mb3_unicode_ci NOT NULL,
-  `supplier_id` int NOT NULL DEFAULT '0',
+  `supplier_id` int DEFAULT NULL,
   `status` enum('draft','confirmed','cancelled') COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT 'draft',
   `note` text COLLATE utf8mb3_unicode_ci,
   `total_qty` int NOT NULL DEFAULT '0',
@@ -122,18 +176,6 @@ CREATE TABLE IF NOT EXISTS `stock_receipt_items` (
   PRIMARY KEY (`id`),
   KEY `idx_sri_receipt` (`receipt_id`),
   KEY `idx_sri_product` (`product_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS `product_inventory` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `product_id` int NOT NULL,
-  `size` varchar(64) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
-  `color` varchar(64) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
-  `quantity` int NOT NULL DEFAULT '0',
-  `updated` int NOT NULL DEFAULT '0',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_product_inventory_variant` (`product_id`,`size`,`color`),
-  KEY `idx_pi_product` (`product_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `stock_movements` (
@@ -167,7 +209,7 @@ do {
 	}
 } while ($m->more_results() && $m->next_result());
 
-foreach (array('password_resets', 'user_phone', 'product_review', 'suppliers', 'stock_receipts', 'stock_receipt_items', 'product_inventory', 'stock_movements') as $t) {
+foreach (array('password_resets', 'user_phone', 'product_review', 'suppliers', 'stock_receipts', 'stock_receipt_items', 'stock_movements') as $t) {
 	echo (table_exists($m, $t) ? 'OK' : 'FAIL') . ": table `{$t}`" . PHP_EOL;
 }
 
@@ -253,7 +295,7 @@ $alterSpecs = array(
 		'subtotal' => "decimal(15,2) NOT NULL DEFAULT '0.00'",
 	),
 	'stock_movements' => array(
-		'variant_id' => "int NOT NULL DEFAULT '0'",
+		'variant_id' => "int DEFAULT NULL",
 	),
 	'order' => array(
 		'variant_id' => "int NOT NULL DEFAULT '0'",
@@ -334,13 +376,6 @@ if (table_exists($m, 'product') && table_exists($m, 'product_variants')) {
 					}
 
 					$stock = 0;
-					if (table_exists($m, 'product_inventory')) {
-						$inv = $m->query("SELECT quantity FROM product_inventory WHERE product_id = {$pid} AND color = '{$cEsc}' AND size = '{$sEsc}' LIMIT 1");
-						if ($inv && ($invRow = $inv->fetch_assoc())) {
-							$stock = (int) $invRow['quantity'];
-						}
-					}
-
 					$price = (float) $p['price'];
 					$skuEsc = $m->real_escape_string($sku);
 					$m->query("INSERT INTO product_variants (product_id, sku, color, size, price, cost_price, stock, min_stock, image, status, created, updated)
@@ -373,6 +408,397 @@ if (table_exists($m, 'product') && table_exists($m, 'product_variants')) {
 			SET sm.variant_id = pv.id
 			WHERE sm.variant_id = 0");
 		echo "OK: stock_movements variant_id mapped\n";
+	}
+}
+
+if (table_exists($m, 'user') && !column_exists($m, 'user', 'saved_cart')) {
+	if (!$m->query("ALTER TABLE `user` ADD COLUMN `saved_cart` LONGTEXT NULL AFTER `created`")) {
+		fwrite(STDERR, 'ALTER user.saved_cart: ' . $m->error . PHP_EOL);
+		exit(1);
+	}
+	echo "OK: user.saved_cart column added\n";
+} elseif (table_exists($m, 'user')) {
+	echo "SKIP: user.saved_cart exists\n";
+} else {
+	echo "WARN: table `user` not found — import webshop.sql first\n";
+}
+
+if (!table_exists($m, 'user_saved_cart')) {
+	if (!$m->query("CREATE TABLE `user_saved_cart` (
+		`user_id` int NOT NULL,
+		`cart_json` longtext COLLATE utf8mb3_unicode_ci NOT NULL,
+		`updated` int NOT NULL DEFAULT '0',
+		PRIMARY KEY (`user_id`)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci")) {
+		fwrite(STDERR, 'CREATE user_saved_cart: ' . $m->error . PHP_EOL);
+		exit(1);
+	}
+	echo "OK: table user_saved_cart created\n";
+} else {
+	echo "SKIP: user_saved_cart exists\n";
+}
+
+echo (table_exists($m, 'user_saved_cart') ? 'OK' : 'FAIL') . ": table `user_saved_cart`" . PHP_EOL;
+if (table_exists($m, 'user')) {
+	echo (column_exists($m, 'user', 'saved_cart') ? 'OK' : 'FAIL') . ": column `user.saved_cart`" . PHP_EOL;
+}
+
+if (table_exists($m, 'order') && column_exists($m, 'order', 'variant_id') && !index_exists($m, 'order', 'idx_order_variant_id')) {
+	if (!$m->query('ALTER TABLE `order` ADD KEY `idx_order_variant_id` (`variant_id`)')) {
+		fwrite(STDERR, 'ALTER order.idx_order_variant_id: ' . $m->error . PHP_EOL);
+		exit(1);
+	}
+	echo "OK: order.idx_order_variant_id added\n";
+} elseif (table_exists($m, 'order')) {
+	echo "SKIP: order.idx_order_variant_id exists or variant_id missing\n";
+}
+
+// --- DB refactor: indexes, data backfill, FKs (idempotent) ---
+
+if (table_exists($m, 'catalog') && !index_exists($m, 'catalog', 'idx_catalog_parent_id')) {
+	run_sql_or_skip($m, 'ALTER TABLE `catalog` ADD KEY `idx_catalog_parent_id` (`parent_id`)', 'catalog.idx_catalog_parent_id added');
+} elseif (table_exists($m, 'catalog')) {
+	echo "SKIP: catalog.idx_catalog_parent_id exists\n";
+}
+
+if (table_exists($m, 'transaction') && column_exists($m, 'transaction', 'created') && !index_exists($m, 'transaction', 'idx_transaction_created')) {
+	run_sql_or_skip($m, 'ALTER TABLE `transaction` ADD KEY `idx_transaction_created` (`created`)', 'transaction.idx_transaction_created added');
+} elseif (table_exists($m, 'transaction')) {
+	echo "SKIP: transaction.idx_transaction_created exists or created column missing\n";
+}
+
+if (table_exists($m, 'product_variants') && !index_exists($m, 'product_variants', 'idx_pv_product')) {
+	run_sql_or_skip($m, 'ALTER TABLE `product_variants` ADD KEY `idx_pv_product` (`product_id`)', 'product_variants.idx_pv_product added');
+} elseif (table_exists($m, 'product_variants')) {
+	echo "SKIP: product_variants.idx_pv_product exists\n";
+}
+
+// Backfill order.variant_id from product_id + color + size
+if (table_exists($m, 'order') && table_exists($m, 'product_variants') && column_exists($m, 'order', 'variant_id')) {
+	$m->query("UPDATE `order` o
+		INNER JOIN product_variants pv
+			ON pv.product_id = o.product_id
+			AND pv.color = COALESCE(o.color, '')
+			AND pv.size = COALESCE(o.size, '')
+		SET o.variant_id = pv.id
+		WHERE o.variant_id = 0");
+	$remaining = count_query($m, 'SELECT COUNT(*) AS c FROM `order` WHERE variant_id = 0');
+	echo "OK: order.variant_id backfill (remaining without variant: {$remaining})\n";
+} else {
+	echo "SKIP: order.variant_id backfill — tables/columns missing\n";
+}
+
+// Migrate legacy user.saved_cart JSON → user_saved_cart
+if (table_exists($m, 'user') && table_exists($m, 'user_saved_cart') && column_exists($m, 'user', 'saved_cart')) {
+	$r = $m->query("SELECT u.id, u.saved_cart
+		FROM `user` u
+		LEFT JOIN user_saved_cart usc ON usc.user_id = u.id
+		WHERE u.saved_cart IS NOT NULL
+			AND TRIM(u.saved_cart) != ''
+			AND (usc.user_id IS NULL OR TRIM(usc.cart_json) = '')");
+	$migrated = 0;
+	if ($r) {
+		$now = time();
+		while ($row = $r->fetch_assoc()) {
+			$uid = (int) $row['id'];
+			$json = $row['saved_cart'];
+			$esc = $m->real_escape_string($json);
+			if ($m->query("REPLACE INTO user_saved_cart (user_id, cart_json, updated) VALUES ({$uid}, '{$esc}', {$now})")) {
+				$migrated++;
+			}
+		}
+	}
+	echo "OK: migrated {$migrated} user.saved_cart row(s) to user_saved_cart\n";
+} else {
+	echo "SKIP: user.saved_cart migration — tables/columns missing\n";
+}
+
+// Sync product.quantity cache from SUM(product_variants.stock)
+if (table_exists($m, 'product') && table_exists($m, 'product_variants')) {
+	$m->query("UPDATE product p
+		SET p.quantity = (
+			SELECT COALESCE(SUM(pv.stock), 0)
+			FROM product_variants pv
+			WHERE pv.product_id = p.id
+		)");
+	$mismatches = count_query($m, "
+		SELECT COUNT(*) AS c FROM product p
+		LEFT JOIN (
+			SELECT product_id, COALESCE(SUM(stock), 0) AS variant_sum
+			FROM product_variants GROUP BY product_id
+		) vs ON vs.product_id = p.id
+		WHERE p.quantity != COALESCE(vs.variant_sum, 0)
+	");
+	echo "OK: product.quantity synced from product_variants (mismatches: {$mismatches})\n";
+} else {
+	echo "SKIP: product.quantity sync — tables missing\n";
+}
+
+// Foreign keys (InnoDB only, after orphan cleanup)
+if (table_exists($m, 'product_variants') && table_engine($m, 'product_variants') === 'INNODB') {
+	$orphans = count_query($m, 'SELECT COUNT(*) AS c FROM product_variants pv LEFT JOIN product p ON p.id = pv.product_id WHERE p.id IS NULL');
+	if ($orphans > 0) {
+		$m->query('DELETE pv FROM product_variants pv LEFT JOIN product p ON p.id = pv.product_id WHERE p.id IS NULL');
+		echo "OK: removed {$orphans} orphan product_variants row(s)\n";
+	}
+	if (!fk_exists($m, 'product_variants', 'fk_pv_product')) {
+		run_sql_or_skip($m,
+			'ALTER TABLE `product_variants` ADD CONSTRAINT `fk_pv_product` FOREIGN KEY (`product_id`) REFERENCES `product` (`id`) ON DELETE CASCADE ON UPDATE CASCADE',
+			'FK product_variants.product_id → product.id',
+			'FK product_variants.product_id'
+		);
+	} else {
+		echo "SKIP: fk_pv_product exists\n";
+	}
+} else {
+	echo "SKIP: FK product_variants — table missing or not InnoDB\n";
+}
+
+if (table_exists($m, 'user_saved_cart') && table_engine($m, 'user_saved_cart') === 'INNODB') {
+	$orphans = count_query($m, 'SELECT COUNT(*) AS c FROM user_saved_cart usc LEFT JOIN `user` u ON u.id = usc.user_id WHERE u.id IS NULL');
+	if ($orphans > 0) {
+		$m->query('DELETE usc FROM user_saved_cart usc LEFT JOIN `user` u ON u.id = usc.user_id WHERE u.id IS NULL');
+		echo "OK: removed {$orphans} orphan user_saved_cart row(s)\n";
+	}
+	if (!fk_exists($m, 'user_saved_cart', 'fk_user_saved_cart_user')) {
+		run_sql_or_skip($m,
+			'ALTER TABLE `user_saved_cart` ADD CONSTRAINT `fk_user_saved_cart_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE CASCADE ON UPDATE CASCADE',
+			'FK user_saved_cart.user_id → user.id',
+			'FK user_saved_cart.user_id'
+		);
+	} else {
+		echo "SKIP: fk_user_saved_cart_user exists\n";
+	}
+} else {
+	echo "SKIP: FK user_saved_cart — table missing or not InnoDB\n";
+}
+
+if (table_exists($m, 'stock_receipt_items') && table_engine($m, 'stock_receipt_items') === 'INNODB') {
+	$orphans = count_query($m, 'SELECT COUNT(*) AS c FROM stock_receipt_items sri LEFT JOIN stock_receipts sr ON sr.id = sri.receipt_id WHERE sr.id IS NULL');
+	if ($orphans > 0) {
+		$m->query('DELETE sri FROM stock_receipt_items sri LEFT JOIN stock_receipts sr ON sr.id = sri.receipt_id WHERE sr.id IS NULL');
+		echo "OK: removed {$orphans} orphan stock_receipt_items row(s)\n";
+	}
+	if (!fk_exists($m, 'stock_receipt_items', 'fk_sri_receipt')) {
+		run_sql_or_skip($m,
+			'ALTER TABLE `stock_receipt_items` ADD CONSTRAINT `fk_sri_receipt` FOREIGN KEY (`receipt_id`) REFERENCES `stock_receipts` (`id`) ON DELETE CASCADE ON UPDATE CASCADE',
+			'FK stock_receipt_items.receipt_id → stock_receipts.id',
+			'FK stock_receipt_items.receipt_id'
+		);
+	} else {
+		echo "SKIP: fk_sri_receipt exists\n";
+	}
+} else {
+	echo "SKIP: FK stock_receipt_items — table missing or not InnoDB\n";
+}
+
+if (table_exists($m, 'stock_receipts') && table_engine($m, 'stock_receipts') === 'INNODB') {
+	if (column_exists($m, 'stock_receipts', 'supplier_id')) {
+		$badSuppliers = count_query($m, 'SELECT COUNT(*) AS c FROM stock_receipts sr LEFT JOIN suppliers s ON s.id = sr.supplier_id WHERE sr.supplier_id > 0 AND s.id IS NULL');
+		if ($badSuppliers > 0) {
+			$m->query('UPDATE stock_receipts sr LEFT JOIN suppliers s ON s.id = sr.supplier_id SET sr.supplier_id = 0 WHERE sr.supplier_id > 0 AND s.id IS NULL');
+			echo "OK: zeroed {$badSuppliers} stock_receipts row(s) with invalid supplier_id\n";
+		}
+		// Allow NULL for optional supplier FK
+		if (!$m->query('ALTER TABLE `stock_receipts` MODIFY `supplier_id` int DEFAULT NULL')) {
+			echo "SKIP: stock_receipts.supplier_id nullable — " . $m->error . "\n";
+		} else {
+			$m->query('UPDATE stock_receipts SET supplier_id = NULL WHERE supplier_id = 0');
+		}
+	}
+	if (!fk_exists($m, 'stock_receipts', 'fk_sr_supplier')) {
+		run_sql_or_skip($m,
+			'ALTER TABLE `stock_receipts` ADD CONSTRAINT `fk_sr_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE SET NULL ON UPDATE CASCADE',
+			'FK stock_receipts.supplier_id → suppliers.id',
+			'FK stock_receipts.supplier_id'
+		);
+	} else {
+		echo "SKIP: fk_sr_supplier exists\n";
+	}
+} else {
+	echo "SKIP: FK stock_receipts.supplier_id — table missing or not InnoDB\n";
+}
+
+if (table_exists($m, 'stock_movements') && table_engine($m, 'stock_movements') === 'INNODB' && column_exists($m, 'stock_movements', 'variant_id')) {
+	$badVariants = count_query($m, 'SELECT COUNT(*) AS c FROM stock_movements sm LEFT JOIN product_variants pv ON pv.id = sm.variant_id WHERE sm.variant_id > 0 AND pv.id IS NULL');
+	if ($badVariants > 0) {
+		$m->query('UPDATE stock_movements sm LEFT JOIN product_variants pv ON pv.id = sm.variant_id SET sm.variant_id = 0 WHERE sm.variant_id > 0 AND pv.id IS NULL');
+		echo "OK: nulled variant_id on {$badVariants} stock_movements row(s)\n";
+	}
+	if (!$m->query('ALTER TABLE `stock_movements` MODIFY `variant_id` int DEFAULT NULL')) {
+		echo "SKIP: stock_movements.variant_id nullable — " . $m->error . "\n";
+	} else {
+		$m->query('UPDATE stock_movements SET variant_id = NULL WHERE variant_id = 0');
+	}
+	if (!fk_exists($m, 'stock_movements', 'fk_sm_variant')) {
+		run_sql_or_skip($m,
+			'ALTER TABLE `stock_movements` ADD CONSTRAINT `fk_sm_variant` FOREIGN KEY (`variant_id`) REFERENCES `product_variants` (`id`) ON DELETE SET NULL ON UPDATE CASCADE',
+			'FK stock_movements.variant_id → product_variants.id',
+			'FK stock_movements.variant_id'
+		);
+	} else {
+		echo "SKIP: fk_sm_variant exists\n";
+	}
+} else {
+	echo "SKIP: FK stock_movements.variant_id — table/column missing or not InnoDB\n";
+}
+
+// --- Phase 3: Unified CMS, drop legacy tables, InnoDB + FK hardening ---
+
+if (!table_exists($m, 'content_pages')) {
+	run_sql_or_skip($m, "CREATE TABLE `content_pages` (
+		`id` int NOT NULL AUTO_INCREMENT,
+		`type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+		`legacy_id` int NOT NULL DEFAULT '0',
+		`title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+		`slug` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+		`intro` text COLLATE utf8mb4_unicode_ci,
+		`content` longtext COLLATE utf8mb4_unicode_ci,
+		`image` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+		`created_at` datetime DEFAULT NULL,
+		PRIMARY KEY (`id`),
+		UNIQUE KEY `uk_content_type_legacy` (`type`,`legacy_id`),
+		KEY `idx_content_type` (`type`),
+		KEY `idx_content_type_slug` (`type`,`slug`)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci", 'table content_pages created');
+} else {
+	echo "SKIP: content_pages exists\n";
+}
+
+if (table_exists($m, 'content_pages')) {
+	$cmsMigrations = array(
+		array('news', "INSERT IGNORE INTO content_pages (type, legacy_id, title, slug, intro, content, image, created_at)
+			SELECT 'news', id, title, CONCAT('tin-tuc-', id), intro, content, image_link, created FROM `news`"),
+		array('hop_tac', "INSERT IGNORE INTO content_pages (type, legacy_id, title, slug, intro, content, image, created_at)
+			SELECT 'hop_tac', id, title, slug, intro, content, image, created_at FROM hop_tac"),
+		array('tuyendung', "INSERT IGNORE INTO content_pages (type, legacy_id, title, slug, intro, content, image, created_at)
+			SELECT 'tuyendung', id, title, slug, intro, content, image, created_at FROM tuyendung"),
+		array('van_chuyen', "INSERT IGNORE INTO content_pages (type, legacy_id, title, slug, intro, content, image, created_at)
+			SELECT 'van_chuyen', id, title, slug, intro, content, image, created_at FROM van_chuyen"),
+		array('pages', "INSERT IGNORE INTO content_pages (type, legacy_id, title, slug, intro, content, image, created_at)
+			SELECT 'page', id, title, slug, '', content, NULL, created_at FROM pages"),
+	);
+	foreach ($cmsMigrations as $cms) {
+		list($src, $sql) = $cms;
+		if (table_exists($m, $src)) {
+			run_sql_or_skip($m, $sql, "content_pages migrated from {$src}");
+		}
+	}
+	$m->query("UPDATE content_pages SET legacy_id = id WHERE legacy_id = 0");
+}
+
+$legacyCms = array('news', 'hop_tac', 'tuyendung', 'van_chuyen', 'pages');
+foreach ($legacyCms as $tbl) {
+	if (table_exists($m, 'content_pages') && table_exists($m, $tbl)) {
+		run_sql_or_skip($m, "DROP TABLE `{$tbl}`", "dropped legacy CMS table {$tbl}");
+	}
+}
+
+if (table_exists($m, 'product_colors')) {
+	if (fk_exists($m, 'product_colors', 'fk_product_colors_product')) {
+		run_sql_or_skip($m, 'ALTER TABLE `product_colors` DROP FOREIGN KEY `fk_product_colors_product`', 'dropped FK fk_product_colors_product');
+	}
+	run_sql_or_skip($m, 'DROP TABLE IF EXISTS `product_colors`', 'dropped product_colors');
+}
+
+if (table_exists($m, 'product_inventory')) {
+	run_sql_or_skip($m, 'DROP TABLE IF EXISTS `product_inventory`', 'dropped product_inventory');
+}
+
+if (table_exists($m, 'user') && column_exists($m, 'user', 'saved_cart') && table_exists($m, 'user_saved_cart')) {
+	run_sql_or_skip($m, 'ALTER TABLE `user` DROP COLUMN `saved_cart`', 'dropped user.saved_cart column');
+}
+
+$innodbTargets = array(
+	'password_resets', 'user_phone', 'product_review', 'voucher', 'voucher_use',
+	'user_point_log', 'ai_conversation', 'ai_faq', 'ai_message',
+);
+foreach ($innodbTargets as $tbl) {
+	if (table_exists($m, $tbl) && table_engine($m, $tbl) === 'MYISAM') {
+		run_sql_or_skip($m, "ALTER TABLE `{$tbl}` ENGINE=InnoDB", "{$tbl} converted to InnoDB");
+	}
+}
+
+if (table_exists($m, 'password_resets') && table_engine($m, 'password_resets') === 'INNODB') {
+	$orphans = count_query($m, 'SELECT COUNT(*) AS c FROM password_resets pr LEFT JOIN `user` u ON u.id = pr.user_id WHERE u.id IS NULL');
+	if ($orphans > 0) {
+		$m->query('DELETE pr FROM password_resets pr LEFT JOIN `user` u ON u.id = pr.user_id WHERE u.id IS NULL');
+		echo "OK: removed {$orphans} orphan password_resets row(s)\n";
+	}
+	if (!fk_exists($m, 'password_resets', 'fk_password_resets_user')) {
+		run_sql_or_skip($m,
+			'ALTER TABLE `password_resets` ADD CONSTRAINT `fk_password_resets_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE CASCADE ON UPDATE CASCADE',
+			'FK password_resets.user_id → user.id');
+	}
+}
+
+if (table_exists($m, 'user_phone') && table_engine($m, 'user_phone') === 'INNODB') {
+	$orphans = count_query($m, 'SELECT COUNT(*) AS c FROM user_phone up LEFT JOIN `user` u ON u.id = up.user_id WHERE u.id IS NULL');
+	if ($orphans > 0) {
+		$m->query('DELETE up FROM user_phone up LEFT JOIN `user` u ON u.id = up.user_id WHERE u.id IS NULL');
+		echo "OK: removed {$orphans} orphan user_phone row(s)\n";
+	}
+	if (!fk_exists($m, 'user_phone', 'fk_user_phone_user')) {
+		run_sql_or_skip($m,
+			'ALTER TABLE `user_phone` ADD CONSTRAINT `fk_user_phone_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE CASCADE ON UPDATE CASCADE',
+			'FK user_phone.user_id → user.id');
+	}
+}
+
+if (table_exists($m, 'product_review') && table_engine($m, 'product_review') === 'INNODB') {
+	$orphans = count_query($m, 'SELECT COUNT(*) AS c FROM product_review pr LEFT JOIN product p ON p.id = pr.product_id WHERE p.id IS NULL');
+	if ($orphans > 0) {
+		$m->query('DELETE pr FROM product_review pr LEFT JOIN product p ON p.id = pr.product_id WHERE p.id IS NULL');
+		echo "OK: removed {$orphans} orphan product_review row(s)\n";
+	}
+	if (!fk_exists($m, 'product_review', 'fk_product_review_product')) {
+		run_sql_or_skip($m,
+			'ALTER TABLE `product_review` ADD CONSTRAINT `fk_product_review_product` FOREIGN KEY (`product_id`) REFERENCES `product` (`id`) ON DELETE CASCADE ON UPDATE CASCADE',
+			'FK product_review.product_id → product.id');
+	}
+}
+
+if (table_exists($m, 'user_point_log') && table_engine($m, 'user_point_log') === 'INNODB') {
+	$orphans = count_query($m, 'SELECT COUNT(*) AS c FROM user_point_log upl LEFT JOIN `user` u ON u.id = upl.user_id WHERE u.id IS NULL');
+	if ($orphans > 0) {
+		$m->query('DELETE upl FROM user_point_log upl LEFT JOIN `user` u ON u.id = upl.user_id WHERE u.id IS NULL');
+		echo "OK: removed {$orphans} orphan user_point_log row(s)\n";
+	}
+	if (!fk_exists($m, 'user_point_log', 'fk_user_point_log_user')) {
+		run_sql_or_skip($m,
+			'ALTER TABLE `user_point_log` ADD CONSTRAINT `fk_user_point_log_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE CASCADE ON UPDATE CASCADE',
+			'FK user_point_log.user_id → user.id');
+	}
+}
+
+if (table_exists($m, 'voucher_use') && table_engine($m, 'voucher_use') === 'INNODB') {
+	$orphans = count_query($m, 'SELECT COUNT(*) AS c FROM voucher_use vu LEFT JOIN voucher v ON v.id = vu.voucher_id WHERE v.id IS NULL');
+	if ($orphans > 0) {
+		$m->query('DELETE vu FROM voucher_use vu LEFT JOIN voucher v ON v.id = vu.voucher_id WHERE v.id IS NULL');
+		echo "OK: removed {$orphans} orphan voucher_use row(s)\n";
+	}
+	if (!fk_exists($m, 'voucher_use', 'fk_voucher_use_voucher')) {
+		run_sql_or_skip($m,
+			'ALTER TABLE `voucher_use` ADD CONSTRAINT `fk_voucher_use_voucher` FOREIGN KEY (`voucher_id`) REFERENCES `voucher` (`id`) ON DELETE CASCADE ON UPDATE CASCADE',
+			'FK voucher_use.voucher_id → voucher.id');
+	}
+	if (!fk_exists($m, 'voucher_use', 'fk_voucher_use_transaction')) {
+		run_sql_or_skip($m,
+			'ALTER TABLE `voucher_use` ADD CONSTRAINT `fk_voucher_use_transaction` FOREIGN KEY (`transaction_id`) REFERENCES `transaction` (`id`) ON DELETE CASCADE ON UPDATE CASCADE',
+			'FK voucher_use.transaction_id → transaction.id');
+	}
+}
+
+if (table_exists($m, 'ai_message') && table_engine($m, 'ai_message') === 'INNODB') {
+	$orphans = count_query($m, 'SELECT COUNT(*) AS c FROM ai_message am LEFT JOIN ai_conversation ac ON ac.id = am.conversation_id WHERE ac.id IS NULL');
+	if ($orphans > 0) {
+		$m->query('DELETE am FROM ai_message am LEFT JOIN ai_conversation ac ON ac.id = am.conversation_id WHERE ac.id IS NULL');
+		echo "OK: removed {$orphans} orphan ai_message row(s)\n";
+	}
+	if (!fk_exists($m, 'ai_message', 'fk_ai_message_conversation')) {
+		run_sql_or_skip($m,
+			'ALTER TABLE `ai_message` ADD CONSTRAINT `fk_ai_message_conversation` FOREIGN KEY (`conversation_id`) REFERENCES `ai_conversation` (`id`) ON DELETE CASCADE ON UPDATE CASCADE',
+			'FK ai_message.conversation_id → ai_conversation.id');
 	}
 }
 

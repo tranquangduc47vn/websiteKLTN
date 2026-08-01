@@ -204,10 +204,18 @@ a:hover { text-decoration: none; }
     font-size: 13px !important;
     color: #444444 !important;
     text-decoration: none !important;
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
 }
-.jm-user-popover li a:hover {
+.jm-user-popover li a:hover,
+.jm-user-popover li a:focus,
+.jm-user-popover li a:focus-visible {
     background: #f9f9f9 !important;
     color: #000000 !important;
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 .jm-search-popover form {
     display: flex !important;
@@ -245,10 +253,18 @@ a:hover { text-decoration: none; }
     font-size: 13px !important;
     color: #333 !important;
     text-decoration: none !important;
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
 }
-.jm-user-popover li a:hover {
+.jm-user-popover li a:hover,
+.jm-user-popover li a:focus,
+.jm-user-popover li a:focus-visible {
     background: #f7f7f7 !important;
     color: #111 !important;
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 .jm-cart-mini-list {
     list-style: none !important;
@@ -298,9 +314,17 @@ a:hover { text-decoration: none; }
     font-weight: 600 !important;
     color: #111 !important;
     text-decoration: underline !important;
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
 }
-.jm-cart-mini-link:hover {
+.jm-cart-mini-link:hover,
+.jm-cart-mini-link:focus,
+.jm-cart-mini-link:focus-visible {
     color: #555 !important;
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 /* Trang đăng nhập / đăng ký khách hàng */

@@ -808,7 +808,8 @@ CREATE TABLE `user` (
   `loyalty_lifetime_spend` int NOT NULL DEFAULT '0',
   `loyalty_completed_orders` int NOT NULL DEFAULT '0',
   `loyalty_tier` varchar(20) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT 'member',
-  `created` int NOT NULL
+  `created` int NOT NULL,
+  `saved_cart` longtext COLLATE utf8mb3_unicode_ci
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
 
 --
@@ -819,6 +820,19 @@ INSERT INTO `user` (`id`, `name`, `email`, `password`, `phone`, `address`, `loya
 (10, 'Nguyen Van Du', 'khachhang1@gmail.com', 'e10adc3949ba59abbe56e057f20f883e', '+84978057956', 'D3 Street, Phường Hiệp Phú, Thành phố Thủ Đức, Thành phố Hồ Chí Minh', 38, 387600, 2, 'member', 2026),
 (11, 'Nguyễn Công Quốc', 'khachhang2@gmail.com', 'e10adc3949ba59abbe56e057f20f883e', '+84978057956', 'Huyện Ea Kar, Xã Phú Tân, Huyện Phú Tân, Tỉnh Cà Mau', 0, 0, 0, 'member', 2026),
 (12, 'Tran Quang Duc', 'khachhang3@gmail.com', 'e10adc3949ba59abbe56e057f20f883e', '0765809354', 'Thôn 2, Xã Ea Sô, Huyện Ea Kar, Tỉnh Đắk Lắk', 0, 0, 0, 'member', 2026);
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `user_saved_cart`
+--
+
+CREATE TABLE `user_saved_cart` (
+  `user_id` int NOT NULL,
+  `cart_json` longtext COLLATE utf8mb3_unicode_ci NOT NULL,
+  `updated` int NOT NULL DEFAULT '0',
+  PRIMARY KEY (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -935,7 +949,7 @@ CREATE TABLE `suppliers` (
 CREATE TABLE `stock_receipts` (
   `id` int NOT NULL AUTO_INCREMENT,
   `receipt_code` varchar(20) COLLATE utf8mb3_unicode_ci NOT NULL,
-  `supplier_id` int NOT NULL DEFAULT '0',
+  `supplier_id` int DEFAULT NULL,
   `status` enum('draft','confirmed','cancelled') COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT 'draft',
   `receipt_date` date DEFAULT NULL,
   `note` text COLLATE utf8mb3_unicode_ci,
@@ -1002,7 +1016,7 @@ CREATE TABLE `product_inventory` (
 CREATE TABLE `stock_movements` (
   `id` int NOT NULL AUTO_INCREMENT,
   `product_id` int NOT NULL,
-  `variant_id` int NOT NULL DEFAULT '0',
+  `variant_id` int DEFAULT NULL,
   `size` varchar(64) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
   `color` varchar(64) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
   `movement_type` varchar(16) COLLATE utf8mb3_unicode_ci NOT NULL,
@@ -1202,7 +1216,8 @@ ALTER TABLE `banner`
 -- Chỉ mục cho bảng `catalog`
 --
 ALTER TABLE `catalog`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_catalog_parent_id` (`parent_id`);
 
 --
 -- Chỉ mục cho bảng `hop_tac`
@@ -1222,7 +1237,8 @@ ALTER TABLE `news`
 ALTER TABLE `order`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_order_transaction_id` (`transaction_id`),
-  ADD KEY `idx_order_product_id` (`product_id`);
+  ADD KEY `idx_order_product_id` (`product_id`),
+  ADD KEY `idx_order_variant_id` (`variant_id`);
 
 --
 -- Chỉ mục cho bảng `pages`
@@ -1263,7 +1279,8 @@ ALTER TABLE `stores`
 ALTER TABLE `transaction`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_transaction_user_id` (`user_id`),
-  ADD KEY `idx_transaction_status` (`status`);
+  ADD KEY `idx_transaction_status` (`status`),
+  ADD KEY `idx_transaction_created` (`created`);
 
 --
 -- Chỉ mục cho bảng `tuyendung`
@@ -2228,6 +2245,19 @@ UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `produc
 UPDATE `product` SET `quantity` = (SELECT COALESCE(SUM(`stock`), 0) FROM `product_variants` WHERE `product_id` = 128) WHERE `id` = 128;
 INSERT INTO `suppliers` (`id`, `code`, `name`, `contact_name`, `phone`, `email`, `address`, `note`, `status`, `created`, `updated`) VALUES (1, 'NCC001', 'Nhà cung cấp mẫu qD Design', 'Nguyễn Văn A', '0901234567', 'ncc@example.com', 'TP.HCM', 'Dữ liệu demo nhập kho', 1, 1784891527, 1784891527);
 
+UPDATE `order` o
+INNER JOIN `product_variants` pv
+  ON pv.product_id = o.product_id
+  AND pv.color = COALESCE(o.color, '')
+  AND pv.size = COALESCE(o.size, '')
+SET o.variant_id = pv.id
+WHERE o.variant_id = 0;
+
+UPDATE `product` p
+SET p.quantity = (
+  SELECT COALESCE(SUM(pv.stock), 0) FROM `product_variants` pv WHERE pv.product_id = p.id
+);
+
 ALTER TABLE `product_variants` AUTO_INCREMENT = 573;
 
 --
@@ -2252,6 +2282,36 @@ ALTER TABLE `product`
 --
 ALTER TABLE `product_colors`
   ADD CONSTRAINT `fk_product_colors_product` FOREIGN KEY (`product_id`) REFERENCES `product` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Ràng buộc cho bảng `product_variants`
+--
+ALTER TABLE `product_variants`
+  ADD CONSTRAINT `fk_pv_product` FOREIGN KEY (`product_id`) REFERENCES `product` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Ràng buộc cho bảng `user_saved_cart`
+--
+ALTER TABLE `user_saved_cart`
+  ADD CONSTRAINT `fk_user_saved_cart_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Ràng buộc cho bảng `stock_receipt_items`
+--
+ALTER TABLE `stock_receipt_items`
+  ADD CONSTRAINT `fk_sri_receipt` FOREIGN KEY (`receipt_id`) REFERENCES `stock_receipts` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Ràng buộc cho bảng `stock_receipts`
+--
+ALTER TABLE `stock_receipts`
+  ADD CONSTRAINT `fk_sr_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+--
+-- Ràng buộc cho bảng `stock_movements`
+--
+ALTER TABLE `stock_movements`
+  ADD CONSTRAINT `fk_sm_variant` FOREIGN KEY (`variant_id`) REFERENCES `product_variants` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

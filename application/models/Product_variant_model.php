@@ -69,6 +69,37 @@ class Product_variant_model extends MY_Model {
 		return true;
 	}
 
+	/**
+	 * Trừ tồn kho một lần (UPDATE ... WHERE stock >= qty). Gọi trong transaction sau get_for_update().
+	 */
+	public function deduct_stock_if_available($variant_id, $qty)
+	{
+		$variant_id = (int) $variant_id;
+		$qty = (int) $qty;
+		if ($variant_id <= 0 || $qty <= 0) {
+			return array('ok' => false, 'before_qty' => 0, 'after_qty' => 0);
+		}
+
+		$before_row = $this->db->select('stock')->where('id', $variant_id)->get($this->table)->row();
+		$before_qty = $before_row ? (int) $before_row->stock : 0;
+
+		$now = time();
+		$this->db->set('stock', 'stock - ' . $qty, false);
+		$this->db->set('updated', $now);
+		$this->db->where('id', $variant_id);
+		$this->db->where('stock >=', $qty);
+		$this->db->update($this->table);
+
+		if ($this->db->affected_rows() <= 0) {
+			return array('ok' => false, 'before_qty' => $before_qty, 'after_qty' => $before_qty);
+		}
+
+		$after_row = $this->db->select('stock')->where('id', $variant_id)->get($this->table)->row();
+		$after_qty = $after_row ? (int) $after_row->stock : max(0, $before_qty - $qty);
+
+		return array('ok' => true, 'before_qty' => $before_qty, 'after_qty' => $after_qty);
+	}
+
 	public function sum_stock_by_product($product_id)
 	{
 		$row = $this->db->select_sum('stock')

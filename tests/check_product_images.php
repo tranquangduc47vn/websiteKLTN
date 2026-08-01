@@ -39,4 +39,24 @@ function check_table_images($m, $table, $dir, $col = 'image_link')
 check_table_images($m, 'product', 'upload/product');
 check_table_images($m, 'slider', 'upload/slider');
 check_table_images($m, 'banner', 'upload/banner');
-check_table_images($m, 'news', 'upload/news', 'image_link');
+if ($m->query("SHOW TABLES LIKE 'content_pages'")->num_rows > 0) {
+	$uploadDir = realpath(__DIR__ . '/../upload/news');
+	$diskFiles = array();
+	if ($uploadDir && is_dir($uploadDir)) {
+		foreach (glob($uploadDir . '/*') as $f) {
+			$diskFiles[basename($f)] = true;
+		}
+	}
+	$r = $m->query("SELECT id, image FROM content_pages WHERE type = 'news'");
+	$missing = 0;
+	$total = 0;
+	while ($r && ($row = $r->fetch_assoc())) {
+		$total++;
+		if (empty($row['image']) || !isset($diskFiles[$row['image']])) {
+			$missing++;
+		}
+	}
+	echo "CONTENT_PAGES_NEWS: total={$total}, disk=" . count($diskFiles) . ", missing={$missing}" . PHP_EOL;
+} elseif ($m->query("SHOW TABLES LIKE 'news'")->num_rows > 0) {
+	check_table_images($m, 'news', 'upload/news', 'image_link');
+}

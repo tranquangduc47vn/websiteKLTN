@@ -59,10 +59,8 @@ $steps = array(
 	'order' => 'DELETE FROM `order`',
 	'stock_movements' => table_exists($m, 'stock_movements') ? 'DELETE FROM `stock_movements`' : null,
 	'stock_receipt_items' => table_exists($m, 'stock_receipt_items') ? 'DELETE FROM `stock_receipt_items`' : null,
-	'product_inventory' => table_exists($m, 'product_inventory') ? 'DELETE FROM `product_inventory`' : null,
 	'product_variants' => table_exists($m, 'product_variants') ? 'DELETE FROM `product_variants`' : null,
 	'product_review' => table_exists($m, 'product_review') ? 'DELETE FROM `product_review`' : null,
-	'product_colors' => table_exists($m, 'product_colors') ? 'DELETE FROM `product_colors`' : null,
 	'product' => 'DELETE FROM `product`',
 );
 

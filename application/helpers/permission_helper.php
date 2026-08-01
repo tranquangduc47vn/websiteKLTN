@@ -55,24 +55,32 @@ if (!function_exists('admin_can')) {
 				return $is_admin || $is_mod || $is_user;
 
 			case 'inventory.view':
+			case 'stock.view':
 				return $is_admin || $is_mod || $is_user;
+
+			// Mod: xem / kiểm kê tồn; không điều chỉnh số lượng.
+			case 'inventory.count':
+				return $is_admin || $is_mod;
 
 			case 'inventory.adjust':
 			case 'inventory.manage':
-			case 'stock.view':
-				return $is_admin || $is_mod || $is_user;
+				return $is_admin;
+
+			// Phiếu nhập kho — Admin + Mod.
+			case 'stock.receipt':
+				return $is_admin || $is_mod;
 
 			case 'stock.manage':
 			case 'product.manage':
 			case 'catalog.manage':
 			case 'banner.manage':
 			case 'content.manage':
-			case 'voucher.manage':
 				return $is_staff;
+
+			case 'voucher.manage':
+				return $is_admin;
 
 			case 'product.delete_single':
-				return $is_staff;
-
 			case 'product.delete':
 			case 'product.bulk_delete':
 			case 'catalog.delete':
@@ -80,13 +88,9 @@ if (!function_exists('admin_can')) {
 				return $is_admin;
 
 			case 'staff.grant_admin':
-				return $is_admin;
-
 			case 'staff.edit_admin':
-				return $is_admin;
-
 			case 'staff.manage':
-				return $is_staff;
+				return $is_admin;
 
 			case 'ai.manage':
 				return $is_staff;
@@ -97,6 +101,22 @@ if (!function_exists('admin_can')) {
 	}
 }
 
+if (!function_exists('admin_sidebar_slug_permission')) {
+	/**
+	 * Slug menu yêu cầu quyền riêng (khác mặc định Mod/Admin).
+	 */
+	function admin_sidebar_slug_permission($slug)
+	{
+		$map = array(
+			'voucher' => 'voucher.manage',
+			'admin' => 'staff.manage',
+			'inventory-adjust' => 'inventory.count',
+		);
+
+		return isset($map[$slug]) ? $map[$slug] : null;
+	}
+}
+
 if (!function_exists('admin_sidebar_allowed')) {
 	function admin_sidebar_allowed($slug, $login = null)
 	{
@@ -104,6 +124,15 @@ if (!function_exists('admin_sidebar_allowed')) {
 			$login = get_instance()->session->userdata('login');
 		}
 		if (!admin_can_access_panel($login)) {
+			return false;
+		}
+
+		if (is_array($slug)) {
+			foreach ($slug as $s) {
+				if (admin_sidebar_allowed($s, $login)) {
+					return true;
+				}
+			}
 			return false;
 		}
 
@@ -125,6 +154,11 @@ if (!function_exists('admin_sidebar_allowed')) {
 			return false;
 		}
 
+		$required = admin_sidebar_slug_permission($slug);
+		if ($required !== null) {
+			return admin_can($required, $login);
+		}
+
 		if (in_array($slug, $user_only, true) || in_array($slug, $staff, true)) {
 			return true;
 		}
@@ -133,13 +167,6 @@ if (!function_exists('admin_sidebar_allowed')) {
 		}
 		if ($slug === 'orders' || $slug === 'report') {
 			return admin_can('order.manage', $login);
-		}
-		if (is_array($slug)) {
-			foreach ($slug as $s) {
-				if (admin_sidebar_allowed($s, $login)) {
-					return true;
-				}
-			}
 		}
 		return false;
 	}

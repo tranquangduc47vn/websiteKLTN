@@ -48,6 +48,7 @@ class Stock_receipt extends MY_Admin_Controller {
 		$this->data['list'] = $list;
 		$this->data['filter_status'] = $status;
 		$this->data['filter_code'] = $code;
+		$this->data['can_receipt'] = admin_can('stock.receipt', $this->currentUser);
 		$this->data['can_manage'] = admin_can('stock.manage', $this->currentUser);
 
 		$this->render_admin('admin/stock_receipt/index');
@@ -55,20 +56,20 @@ class Stock_receipt extends MY_Admin_Controller {
 
 	public function add()
 	{
-		if (!admin_can('stock.manage', $this->currentUser)) {
-			admin_flash_fail( 'Bạn không có quyền tạo phiếu nhập.');
+		if (!admin_can('stock.receipt', $this->currentUser)) {
+			admin_flash_fail('Bạn không có quyền tạo phiếu nhập kho.', 'inventory');
 			redirect(admin_url('stock-receipts'));
 		}
 
 		if ($this->input->post('submit')) {
-			$result = $this->stock_service->create_draft_receipt(
+			$result = $this->stock_service->create_confirmed_receipt(
 				(int) $this->input->post('supplier_id'),
 				$this->input->post('note'),
 				$this->_lines_from_post(),
 				(int) $this->currentUser->id
 			);
 			if ($result['ok']) {
-				admin_flash_info( 'Đã tạo phiếu nháp ' . $result['receipt_code'] . '.');
+				admin_flash_info(!empty($result['message']) ? $result['message'] : 'Đã nhập kho thành công.');
 				redirect(admin_url('stock-receipts/view/' . $result['receipt_id']));
 			}
 			admin_flash_fail( $result['message']);
@@ -76,13 +77,14 @@ class Stock_receipt extends MY_Admin_Controller {
 		}
 
 		$this->_form_data(null, array());
+		$this->data['can_receipt'] = true;
 		$this->render_admin('admin/stock_receipt/form');
 	}
 
 	public function edit()
 	{
-		if (!admin_can('stock.manage', $this->currentUser)) {
-			admin_flash_fail( 'Bạn không có quyền sửa phiếu nhập.');
+		if (!admin_can('stock.receipt', $this->currentUser)) {
+			admin_flash_fail('Bạn không có quyền sửa phiếu nhập kho.', 'inventory');
 			redirect(admin_url('stock-receipts'));
 		}
 
@@ -128,6 +130,7 @@ class Stock_receipt extends MY_Admin_Controller {
 
 		$this->data['receipt'] = $receipt;
 		$this->data['items'] = $this->stock_receipt_item_model->get_by_receipt($id);
+		$this->data['can_receipt'] = admin_can('stock.receipt', $this->currentUser);
 		$this->data['can_manage'] = admin_can('stock.manage', $this->currentUser);
 
 		$this->render_admin('admin/stock_receipt/view');
@@ -138,8 +141,8 @@ class Stock_receipt extends MY_Admin_Controller {
 		if (!$this->input->post()) {
 			redirect(admin_url('stock-receipts'));
 		}
-		if (!admin_can('stock.manage', $this->currentUser)) {
-			admin_flash_fail( 'Bạn không có quyền xác nhận phiếu.');
+		if (!admin_can('stock.receipt', $this->currentUser)) {
+			admin_flash_fail('Bạn không có quyền xác nhận phiếu nhập.', 'inventory');
 			redirect(admin_url('stock-receipts'));
 		}
 
@@ -158,8 +161,8 @@ class Stock_receipt extends MY_Admin_Controller {
 		if (!$this->input->post()) {
 			redirect(admin_url('stock-receipts'));
 		}
-		if (!admin_can('stock.manage', $this->currentUser)) {
-			admin_flash_fail( 'Bạn không có quyền hủy phiếu.');
+		if (!admin_can('stock.receipt', $this->currentUser)) {
+			admin_flash_fail('Bạn không có quyền hủy phiếu nhập.', 'inventory');
 			redirect(admin_url('stock-receipts'));
 		}
 
@@ -287,7 +290,9 @@ class Stock_receipt extends MY_Admin_Controller {
 
 	private function _receipt_picker_allowed()
 	{
-		return admin_can('stock.manage', $this->currentUser) || admin_can('stock.view', $this->currentUser);
+		return admin_can('stock.receipt', $this->currentUser)
+			|| admin_can('stock.manage', $this->currentUser)
+			|| admin_can('stock.view', $this->currentUser);
 	}
 
 	private function _receipt_picker_filters_from_request()

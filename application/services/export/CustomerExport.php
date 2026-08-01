@@ -5,32 +5,43 @@ require_once APPPATH . 'services/export/AbstractModuleExport.php';
 
 class CustomerExport extends AbstractModuleExport
 {
-	public function build()
+	public function moduleKey()
 	{
-		$CI = $this->ci();
-		$CI->load->model('user_model');
+		return 'customers';
+	}
 
-		$input = array('order' => array('id', 'DESC'));
-		$limit = $this->filter->paginationLimit(10);
-		if ($limit !== null) {
-			$input['limit'] = array($limit[0], $limit[1]);
-		}
+	public function buildDefinition()
+	{
+		$ci = $this->ci();
+		$ci->load->model('user_model');
 
-		$list = $CI->user_model->get_list($input);
-		$def = new ExportReportDefinition('Báo cáo khách hàng');
-		$def->headers = array('Mã', 'Họ tên', 'Email', 'Điện thoại', 'Ngày đăng ký');
-		$def->dateColumns = array(4);
+		$def = $this->newDefinition('Báo cáo khách hàng', 'khach-hang');
 
-		foreach ($list as $u) {
+		$def->columns = array(
+			array('key' => 'stt', 'label' => 'STT', 'align' => 'center', 'type' => 'int'),
+			array('key' => 'id', 'label' => 'Mã KH', 'align' => 'center', 'type' => 'int'),
+			array('key' => 'name', 'label' => 'Họ tên', 'align' => 'left', 'type' => 'text'),
+			array('key' => 'email', 'label' => 'Email', 'align' => 'left', 'type' => 'text'),
+			array('key' => 'phone', 'label' => 'Điện thoại', 'align' => 'left', 'type' => 'text'),
+			array('key' => 'address', 'label' => 'Địa chỉ', 'align' => 'left', 'type' => 'text'),
+		);
+
+		$rows = $ci->user_model->get_list(array('order' => array('id', 'DESC')));
+		$stt = 0;
+		foreach ($rows as $row) {
+			$stt++;
 			$def->rows[] = array(
-				(int) $u->id,
-				$u->name,
-				$u->email,
-				$u->phone,
-				$u->created,
+				'stt' => $stt,
+				'id' => (int) $row->id,
+				'name' => (string) $row->name,
+				'email' => (string) $row->email,
+				'phone' => isset($row->phone) ? (string) $row->phone : '',
+				'address' => (string) $row->address,
 			);
 		}
-		$def->totals = array('Tổng khách hàng' => count($def->rows));
+
+		$def->addTotal('Tổng khách hàng', count($def->rows), 'int');
+
 		return $def;
 	}
 }

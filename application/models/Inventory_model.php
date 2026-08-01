@@ -253,7 +253,8 @@ class Inventory_model extends CI_Model {
 				$this->db->where('product_variants.stock >', 0);
 				$this->db->where('product_variants.stock <= product_variants.min_stock', null, false);
 			} elseif ($filters['stock'] === 'ok') {
-				$this->db->where('product_variants.stock > product_variants.min_stock', null, false);
+				// Còn hàng = mọi biến thể còn tồn (>0), gồm cả sắp hết.
+				$this->db->where('product_variants.stock >', 0);
 			}
 		}
 	}

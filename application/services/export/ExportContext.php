@@ -3,27 +3,23 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class ExportContext
 {
+	/** @var CI_Controller */
+	public $ci;
+
+	/** @var ExportFilter */
+	public $filter;
+
+	/** @var string */
 	public $module;
-	public $format;
-	public $storeName;
-	public $logoPath;
-	public $exporterName;
-	public $exportedAt;
-	public $filterText;
 
-	public function __construct($module, $format)
+	/** @var object|null */
+	public $login;
+
+	public function __construct($ci, $module, ExportFilter $filter, $login = null)
 	{
-		$this->module = $module;
-		$this->format = $format;
-		$this->exportedAt = time();
-		$this->storeName = defined('SHOP_NAME') ? SHOP_NAME : 'qD Design';
-		$this->logoPath = '';
-		$this->exporterName = '';
-		$this->filterText = '';
-
-		$logo = function_exists('site_logo_absolute_path') ? site_logo_absolute_path() : (FCPATH . 'upload/logo.png');
-		if (is_file($logo)) {
-			$this->logoPath = $logo;
-		}
+		$this->ci = $ci;
+		$this->module = (string) $module;
+		$this->filter = $filter;
+		$this->login = $login;
 	}
 }

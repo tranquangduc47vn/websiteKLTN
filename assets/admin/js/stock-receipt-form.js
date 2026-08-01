@@ -78,6 +78,21 @@
 		return (parseFloat(qty) || 0) * (parseFloat(cost) || 0);
 	}
 
+	function requireSupplierSelected(focus) {
+		if (!els.supplier) {
+			return true;
+		}
+		var val = parseInt(els.supplier.value, 10);
+		if (val > 0) {
+			return true;
+		}
+		alert('Vui lòng chọn nhà cung cấp trước khi thêm sản phẩm vào phiếu nhập.');
+		if (focus !== false) {
+			els.supplier.focus();
+		}
+		return false;
+	}
+
 	function updatePickerRowSubtotal(row) {
 		var qtyInput = row.querySelector('.picker-qty');
 		var costInput = row.querySelector('.picker-cost');
@@ -119,18 +134,28 @@
 				'<td>' + escHtml(item.color || '—') + '</td>' +
 				'<td>' + escHtml(item.size || '—') + '</td>' +
 				'<td class="text-end">' + stockCell(item) + '</td>' +
-				'<td><input type="number" class="form-control form-control-sm picker-cost" min="0" step="1000" value="' + escHtml(cost) + '"></td>' +
+				'<td><input type="number" class="form-control form-control-sm picker-cost" min="1" step="1000" placeholder="Bắt buộc" value="' + escHtml(cost) + '" tabindex="0"></td>' +
 				'<td><input type="number" class="form-control form-control-sm picker-qty" min="1" max="999999" value="1"></td>' +
 				'<td class="text-end picker-subtotal small">' + formatMoney(sub) + '</td>' +
 				'<td><button type="button" class="btn btn-sm ' + btnClass + ' btn-picker-add"' + btnDisabled + '>' + btnLabel + '</button></td>' +
 				'</tr>';
 		}).join('');
 
-		els.pickerBody.querySelectorAll('tr[data-variant-id]').forEach(function (row) {
-			row.querySelectorAll('.picker-qty, .picker-cost').forEach(function (input) {
-				input.addEventListener('input', function () {
-					updatePickerRowSubtotal(row);
-				});
+		els.pickerBody.querySelectorAll('tr[data-variant-id]').forEach(bindPickerRowInputs);
+	}
+
+	function bindQtyCostInput(input) {
+		if (!input || typeof window.adminBindNonNegativeInput !== 'function') {
+			return;
+		}
+		window.adminBindNonNegativeInput(input);
+	}
+
+	function bindPickerRowInputs(row) {
+		row.querySelectorAll('.picker-qty, .picker-cost').forEach(function (input) {
+			bindQtyCostInput(input);
+			input.addEventListener('input', function () {
+				updatePickerRowSubtotal(row);
 			});
 		});
 	}
@@ -222,7 +247,7 @@
 				'<td>' + escHtml(line.size || '—') + '</td>' +
 				'<td><input type="number" name="qty[]" class="form-control form-control-sm line-qty" min="1" max="999999" value="' + line.qty + '" required></td>' +
 				'<td class="line-subtotal text-end small">' + formatMoney(sub) + '</td>' +
-				'<td><input type="number" name="unit_cost[]" class="form-control form-control-sm line-cost" min="0" step="1000" value="' + line.unit_cost + '"></td>' +
+				'<td><input type="number" name="unit_cost[]" class="form-control form-control-sm line-cost" min="1" step="1000" value="' + line.unit_cost + '"></td>' +
 				'<td>' +
 					'<input type="hidden" name="variant_id[]" value="' + id + '">' +
 					'<button type="button" class="btn btn-sm btn-outline-danger btn-remove-line" title="Xóa">&times;</button>' +
@@ -236,13 +261,23 @@
 
 	function bindReceiptRow(row) {
 		var id = parseInt(row.getAttribute('data-variant-id'), 10);
-		row.querySelector('.line-qty').addEventListener('input', function () {
-			state.lines[id].qty = parseInt(this.value, 10) || 0;
+		var qtyInput = row.querySelector('.line-qty');
+		var costInput = row.querySelector('.line-cost');
+		bindQtyCostInput(qtyInput);
+		bindQtyCostInput(costInput);
+		qtyInput.addEventListener('input', function () {
+			var parsed = parseInt(this.value, 10);
+			if (isNaN(parsed) || parsed < 1) {
+				state.lines[id].qty = parsed < 1 ? 1 : 0;
+			} else {
+				state.lines[id].qty = parsed;
+			}
 			recalcRow(row);
 			recalcTotal();
 		});
-		row.querySelector('.line-cost').addEventListener('input', function () {
-			state.lines[id].unit_cost = parseFloat(this.value) || 0;
+		costInput.addEventListener('input', function () {
+			var parsed = parseFloat(this.value);
+			state.lines[id].unit_cost = isNaN(parsed) || parsed < 0 ? 0 : parsed;
 			recalcRow(row);
 			recalcTotal();
 		});
@@ -255,9 +290,24 @@
 	}
 
 	function addLineFromItem(item, qty, unitCost) {
+		if (!requireSupplierSelected()) {
+			return false;
+		}
 		var id = item.id;
 		if (state.lines[id]) {
 			return;
+		}
+		var cost = unitCost != null && String(unitCost).trim() !== ''
+			? parseFloat(unitCost)
+			: (parseFloat(item.cost_price) || 0);
+		if (!(cost > 0)) {
+			alert('Vui lòng nhập giá nhập (lớn hơn 0) trước khi thêm dòng.');
+			return false;
+		}
+		var parsedQty = Math.max(1, parseInt(qty, 10) || 1);
+		if (parsedQty <= 0 || parsedQty > 999999) {
+			alert('Số lượng nhập phải từ 1 đến 999.999.');
+			return false;
 		}
 		state.lines[id] = {
 			variant_id: id,
@@ -265,11 +315,12 @@
 			product_name: item.product_name,
 			color: item.color,
 			size: item.size,
-			qty: Math.max(1, parseInt(qty, 10) || 1),
-			unit_cost: unitCost != null && unitCost !== '' ? parseFloat(unitCost) || 0 : (parseFloat(item.cost_price) || 0),
+			qty: parsedQty,
+			unit_cost: cost,
 		};
 		renderReceiptLines();
 		refreshPickerAddButtons();
+		return true;
 	}
 
 	function renderRecentVariants(items) {
@@ -408,7 +459,13 @@
 			var item = (window.__pickerItems || {})[id];
 			if (!item) return;
 			var qty = row.querySelector('.picker-qty').value;
-			var cost = row.querySelector('.picker-cost').value;
+			var costInput = row.querySelector('.picker-cost');
+			var cost = costInput.value;
+			if (!(parseFloat(cost) > 0)) {
+				alert('Vui lòng nhập giá nhập (lớn hơn 0) trước khi thêm dòng.');
+				costInput.focus();
+				return;
+			}
 			addLineFromItem(item, qty, cost);
 		});
 
@@ -420,16 +477,45 @@
 			var items = (window.__recentVariantCache || []).filter(function (x) {
 				return x.id === id;
 			});
-			if (items.length) {
-				addLineFromItem(items[0], 1, items[0].cost_price);
+			if (!items.length) return;
+			var item = items[0];
+			if (!(parseFloat(item.cost_price) > 0)) {
+				alert('Biến thể này chưa có giá nhập. Hãy tìm trong bảng phía trên và nhập giá trước khi thêm.');
+				return;
 			}
+			addLineFromItem(item, 1, item.cost_price);
 		});
 
 		els.form.addEventListener('submit', function (e) {
-			if (!Object.keys(state.lines).length) {
-				e.preventDefault();
-				alert('Vui lòng thêm ít nhất một dòng biến thể vào phiếu nhập.');
+			if (els.form.getAttribute('data-receipt-validated') === '1') {
+				els.form.removeAttribute('data-receipt-validated');
+				return;
 			}
+			e.preventDefault();
+			if (!requireSupplierSelected()) {
+				return;
+			}
+			if (!Object.keys(state.lines).length) {
+				alert('Vui lòng thêm ít nhất một dòng biến thể vào phiếu nhập.');
+				return;
+			}
+			var badLineId = Object.keys(state.lines).find(function (lineId) {
+				var line = state.lines[lineId];
+				return !(line.qty > 0) || !(line.unit_cost > 0);
+			});
+			if (badLineId) {
+				alert('Mỗi dòng nhập phải có số lượng và giá nhập lớn hơn 0 (không được nhập số âm).');
+				var badRow = els.linesBody.querySelector('.receipt-line[data-variant-id="' + badLineId + '"]');
+				if (badRow) {
+					var costInput = badRow.querySelector('.line-cost');
+					if (costInput) {
+						costInput.focus();
+					}
+				}
+				return;
+			}
+			els.form.setAttribute('data-receipt-validated', '1');
+			els.form.submit();
 		});
 	}
 
@@ -452,6 +538,7 @@
 		els.form = $('stock-receipt-form');
 		if (!els.form || !urls.search_variants) return;
 
+		els.supplier = $('supplier_id');
 		els.catalog = $('filter-catalog');
 		els.product = $('filter-product');
 		els.color = $('filter-color');

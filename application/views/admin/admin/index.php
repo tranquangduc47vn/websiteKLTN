@@ -1,3 +1,7 @@
+<?php
+$this->load->helper('permission');
+$can_manage_staff = admin_can('staff.manage', $this->session->userdata('login'));
+?>
 <div class="admin-breadcrumb">
 	<nav aria-label="breadcrumb">
 		<ol class="breadcrumb">
@@ -8,7 +12,9 @@
 </div>
 
 <div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
+	<?php if ($can_manage_staff) { ?>
 	<a href="<?php echo admin_url('admin/add'); ?>" class="btn btn-primary"><i class="fa-solid fa-plus me-1"></i> Thêm mới</a>
+	<?php } ?>
 </div>
 
 <div class="admin-card">
@@ -44,11 +50,15 @@
 							</td>
 							<td class="text-center">
 								<div class="admin-table-actions">
+									<?php if ($can_manage_staff) { ?>
 									<a class="btn btn-sm btn-outline-primary" href="<?php echo admin_url('admin/edit/' . $value->id); ?>" title="Sửa"><i class="fa-solid fa-pen"></i></a>
-									<?php if ($value->level != ROLE_ADMIN && (int) $this->session->userdata('login')->level === ROLE_ADMIN) { ?>
+									<?php if ($value->level != ROLE_ADMIN && admin_can('staff.delete', $this->session->userdata('login'))) { ?>
 										<?php echo admin_csrf_post_button(admin_url('admin/del/' . $value->id), '<i class="fa-solid fa-trash"></i>', array('title' => 'Xóa', 'confirm' => 'Bạn chắc chắn muốn xóa tài khoản này?')); ?>
 									<?php } else { ?>
 										<span class="admin-table-actions-slot" aria-hidden="true"></span>
+									<?php } ?>
+									<?php } else { ?>
+										<span class="text-muted small">—</span>
 									<?php } ?>
 								</div>
 							</td>

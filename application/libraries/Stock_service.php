@@ -2,7 +2,7 @@
 defined('BASEPATH') OR exit('No direct script access allowed');
 
 /**
- * Nghiệp vụ nhập kho: phiếu draft, xác nhận, hủy, biến động tồn theo variant.
+ * Nghiệp vụ nhập kho: tạo phiếu và cộng tồn ngay (không cần xác nhận riêng).
  */
 class Stock_service {
 
@@ -75,12 +75,20 @@ class Stock_service {
 				continue;
 			}
 
+			if ($qty < 0) {
+				$errors[] = 'Dòng ' . ($idx + 1) . ': số lượng không được âm.';
+				continue;
+			}
 			if ($qty <= 0 || $qty > 999999) {
 				$errors[] = 'Dòng ' . ($idx + 1) . ': số lượng phải từ 1 đến 999.999.';
 				continue;
 			}
 			if ($unit_cost < 0) {
 				$errors[] = 'Dòng ' . ($idx + 1) . ': giá nhập không được âm.';
+				continue;
+			}
+			if ($unit_cost <= 0) {
+				$errors[] = 'Dòng ' . ($idx + 1) . ': giá nhập phải lớn hơn 0.';
 				continue;
 			}
 
@@ -112,8 +120,13 @@ class Stock_service {
 		return array('ok' => true, 'errors' => array(), 'lines' => array_values($normalized));
 	}
 
-	public function create_draft_receipt($supplier_id, $note, $lines, $admin_id, $receipt_date = null)
+	public function create_draft_receipt($supplier_id, $note, $lines, $admin_id, $receipt_date = null, $auto_confirm = false)
 	{
+		$supplier_check = $this->_validate_supplier_required($supplier_id);
+		if (!$supplier_check['ok']) {
+			return $supplier_check;
+		}
+
 		$validation = $this->validate_line_items($lines);
 		if (!$validation['ok']) {
 			return array('ok' => false, 'message' => implode(' ', $validation['errors']));
@@ -136,10 +149,10 @@ class Stock_service {
 			$receipt_code = $this->generate_receipt_code();
 		}
 
-		$this->CI->stock_receipt_model->create(array(
+		$receipt_data = array(
 			'receipt_code' => $receipt_code,
-			'supplier_id' => max(0, (int) $supplier_id),
-			'status' => 'draft',
+			'supplier_id' => $this->_normalize_supplier_id($supplier_id),
+			'status' => $auto_confirm ? 'confirmed' : 'draft',
 			'note' => trim((string) $note),
 			'total_qty' => $total_qty,
 			'total_amount' => $total_amount,
@@ -147,12 +160,20 @@ class Stock_service {
 			'created_by' => (int) $admin_id,
 			'created' => $now,
 			'updated' => $now,
-		));
+		);
+		if ($auto_confirm) {
+			$receipt_data['confirmed_by'] = (int) $admin_id;
+			$receipt_data['confirmed_at'] = $now;
+		}
+
+		$this->CI->stock_receipt_model->create($receipt_data);
 
 		$receipt_id = (int) $this->CI->db->insert_id();
 		if ($receipt_id <= 0) {
+			$err = $this->CI->db->error();
+			log_message('error', 'stock_receipt insert failed: ' . (isset($err['message']) ? $err['message'] : 'unknown'));
 			$this->CI->db->trans_complete();
-			return array('ok' => false, 'message' => 'Không tạo được phiếu nhập.');
+			return array('ok' => false, 'message' => 'Không tạo được phiếu nhập. Kiểm tra nhà cung cấp hoặc chạy migration kho.');
 		}
 
 		foreach ($validation['lines'] as $line) {
@@ -168,17 +189,75 @@ class Stock_service {
 			));
 		}
 
+		if ($auto_confirm) {
+			$apply = $this->_apply_receipt_stock($receipt_id, $receipt_code, $validation['lines'], (int) $admin_id, $now);
+			if (!$apply['ok']) {
+				$this->CI->db->trans_complete();
+				return $apply;
+			}
+			if ($apply['total_amount'] > 0) {
+				$this->CI->stock_receipt_model->update($receipt_id, array(
+					'total_amount' => $apply['total_amount'],
+					'updated' => $now,
+				));
+			}
+		}
+
 		$this->CI->db->trans_complete();
 
 		if ($this->CI->db->trans_status() === false) {
 			return array('ok' => false, 'message' => 'Lỗi khi lưu phiếu nhập.');
 		}
 
-		return array('ok' => true, 'receipt_id' => $receipt_id, 'receipt_code' => $receipt_code);
+		$message = $auto_confirm
+			? 'Đã nhập kho thành công. Mã phiếu ' . $receipt_code . '.'
+			: null;
+
+		return array(
+			'ok' => true,
+			'receipt_id' => $receipt_id,
+			'receipt_code' => $receipt_code,
+			'message' => $message,
+			'confirmed' => (bool) $auto_confirm,
+		);
+	}
+
+	/**
+	 * Tạo phiếu nhập và cộng tồn kho ngay (Admin + Mod).
+	 */
+	public function create_confirmed_receipt($supplier_id, $note, $lines, $admin_id, $receipt_date = null)
+	{
+		return $this->create_draft_receipt($supplier_id, $note, $lines, $admin_id, $receipt_date, true);
+	}
+
+	protected function _normalize_supplier_id($supplier_id)
+	{
+		$supplier_id = (int) $supplier_id;
+		return $supplier_id > 0 ? $supplier_id : null;
+	}
+
+	protected function _validate_supplier_required($supplier_id)
+	{
+		if ((int) $supplier_id <= 0) {
+			return array('ok' => false, 'message' => 'Vui lòng chọn nhà cung cấp trước khi nhập kho.');
+		}
+
+		$this->CI->load->model('supplier_model');
+		$supplier = $this->CI->supplier_model->get_info((int) $supplier_id);
+		if (!$supplier || (isset($supplier->status) && (int) $supplier->status !== 1)) {
+			return array('ok' => false, 'message' => 'Nhà cung cấp không hợp lệ hoặc đã ngưng hoạt động.');
+		}
+
+		return array('ok' => true);
 	}
 
 	public function update_draft_receipt($receipt_id, $supplier_id, $note, $lines, $receipt_date = null)
 	{
+		$supplier_check = $this->_validate_supplier_required($supplier_id);
+		if (!$supplier_check['ok']) {
+			return $supplier_check;
+		}
+
 		$receipt_id = (int) $receipt_id;
 		$receipt = $this->CI->stock_receipt_model->get_info($receipt_id);
 		if (!$receipt) {
@@ -204,7 +283,7 @@ class Stock_service {
 		$this->CI->db->trans_start();
 
 		$this->CI->stock_receipt_model->update($receipt_id, array(
-			'supplier_id' => max(0, (int) $supplier_id),
+			'supplier_id' => $this->_normalize_supplier_id($supplier_id),
 			'note' => trim((string) $note),
 			'total_qty' => $total_qty,
 			'total_amount' => $total_amount,
@@ -263,35 +342,81 @@ class Stock_service {
 		}
 
 		$now = time();
+		$lines = array();
+		foreach ($items as $item) {
+			$lines[] = array(
+				'variant_id' => (int) $item->variant_id,
+				'product_id' => (int) $item->product_id,
+				'size' => $item->size,
+				'color' => $item->color,
+				'qty' => (int) $item->qty,
+				'unit_cost' => (float) $item->unit_cost,
+				'subtotal' => (float) $item->subtotal,
+			);
+		}
+
+		$apply = $this->_apply_receipt_stock($receipt_id, $receipt->receipt_code, $lines, $admin_id, $now);
+		if (!$apply['ok']) {
+			$this->CI->db->trans_complete();
+			return $apply;
+		}
+
+		$this->CI->stock_receipt_model->update($receipt_id, array(
+			'status' => 'confirmed',
+			'confirmed_by' => $admin_id,
+			'confirmed_at' => $now,
+			'total_amount' => $apply['total_amount'],
+			'updated' => $now,
+		));
+
+		$this->CI->db->trans_complete();
+
+		if ($this->CI->db->trans_status() === false) {
+			return array('ok' => false, 'message' => 'Xác nhận phiếu thất bại (transaction rollback).');
+		}
+
+		return array('ok' => true, 'message' => 'Đã xác nhận phiếu ' . $receipt->receipt_code . ' và cộng tồn kho.');
+	}
+
+	/**
+	 * Cộng tồn kho theo các dòng phiếu nhập.
+	 *
+	 * @param array $lines Mảng dòng đã chuẩn hóa hoặc object từ DB.
+	 */
+	protected function _apply_receipt_stock($receipt_id, $receipt_code, array $lines, $admin_id, $now)
+	{
 		$product_ids = array();
 		$total_amount = 0;
 
-		foreach ($items as $item) {
-			$variant_id = (int) $item->variant_id;
+		foreach ($lines as $item) {
+			$variant_id = is_array($item)
+				? (int) (isset($item['variant_id']) ? $item['variant_id'] : 0)
+				: (int) $item->variant_id;
+
 			if ($variant_id <= 0) {
-				$variant_id = $this->CI->product_service->resolve_variant_id(
-					(int) $item->product_id,
-					$item->color,
-					$item->size,
-					true
-				);
+				$product_id = is_array($item) ? (int) (isset($item['product_id']) ? $item['product_id'] : 0) : (int) $item->product_id;
+				$color = is_array($item) ? (isset($item['color']) ? $item['color'] : '') : $item->color;
+				$size = is_array($item) ? (isset($item['size']) ? $item['size'] : '') : $item->size;
+				$variant_id = $this->CI->product_service->resolve_variant_id($product_id, $color, $size, true);
 			}
 
 			$variant = $this->CI->product_variant_model->get_for_update($variant_id);
 			if (!$variant) {
-				$this->CI->db->trans_complete();
 				return array('ok' => false, 'message' => 'Biến thể không tồn tại trên phiếu.');
 			}
 
-			$qty = (int) $item->qty;
+			$qty = is_array($item) ? (int) (isset($item['qty']) ? $item['qty'] : 0) : (int) $item->qty;
+			$unit_cost = is_array($item) ? (float) (isset($item['unit_cost']) ? $item['unit_cost'] : 0) : (float) $item->unit_cost;
+			$subtotal = is_array($item) ? (float) (isset($item['subtotal']) ? $item['subtotal'] : 0) : (float) $item->subtotal;
+
 			$before_qty = (int) $variant->stock;
 			$after_qty = $before_qty + $qty;
 
 			$this->CI->product_variant_model->set_stock($variant_id, $after_qty, $now);
 
-			if ((float) $item->unit_cost > 0) {
+			if ($unit_cost > 0) {
 				$this->CI->product_variant_model->update($variant_id, array(
-					'cost_price' => (float) $item->unit_cost,
+					'cost_price' => $unit_cost,
 					'updated' => $now,
 				));
 			}
@@ -306,38 +431,22 @@ class Stock_service {
 				'before_qty' => $before_qty,
 				'after_qty' => $after_qty,
 				'reference_type' => 'receipt',
-				'reference_id' => $receipt_id,
-				'note' => 'Nhập kho ' . $receipt->receipt_code,
-				'created_by' => $admin_id,
+				'reference_id' => (int) $receipt_id,
+				'note' => 'Nhập kho ' . $receipt_code,
+				'created_by' => (int) $admin_id,
 				'created' => $now,
 			));
 
-			$total_amount += (float) $item->subtotal;
-			if ($total_amount <= 0) {
-				$total_amount += (float) $item->unit_cost * $qty;
-			}
+			$line_amount = $subtotal > 0 ? $subtotal : ($unit_cost * $qty);
+			$total_amount += $line_amount;
 			$product_ids[(int) $variant->product_id] = true;
-		}
-
-		$this->CI->stock_receipt_model->update($receipt_id, array(
-			'status' => 'confirmed',
-			'confirmed_by' => $admin_id,
-			'confirmed_at' => $now,
-			'total_amount' => $total_amount,
-			'updated' => $now,
-		));
-
-		$this->CI->db->trans_complete();
-
-		if ($this->CI->db->trans_status() === false) {
-			return array('ok' => false, 'message' => 'Xác nhận phiếu thất bại (transaction rollback).');
 		}
 
 		foreach (array_keys($product_ids) as $pid) {
 			$this->CI->product_service->sync_product_quantity_cache($pid);
 		}
 
-		return array('ok' => true, 'message' => 'Đã xác nhận phiếu ' . $receipt->receipt_code . ' và cộng tồn kho.');
+		return array('ok' => true, 'total_amount' => $total_amount);
 	}
 
 	public function cancel_receipt($receipt_id, $admin_id)
@@ -367,7 +476,7 @@ class Stock_service {
 			case 'draft':
 				return 'Nháp';
 			case 'confirmed':
-				return 'Đã xác nhận';
+				return 'Đã nhập';
 			case 'cancelled':
 				return 'Đã hủy';
 			default:

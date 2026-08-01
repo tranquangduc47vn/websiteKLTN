@@ -144,7 +144,7 @@ $this->load->view('admin/partials/form_open');
 						</div>
 					</div>
 
-					<script src="<?php echo base_url('assets/admin/js/product-price.js?v=2'); ?>"></script>
+					<script src="<?php echo base_url('assets/admin/js/product-price.js?v=3'); ?>"></script>
 
 					<div class="form-group">
 						<label class="col-sm-2 control-label">Màu sắc</label>

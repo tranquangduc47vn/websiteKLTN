@@ -7,8 +7,6 @@
 	</nav>
 </div>
 
-<p class="admin-page-subtitle mb-3">Bật/tắt Trợ lý AI và chuyển giao nhân viên nội bộ.</p>
-
 <div class="admin-card">
 	<div class="admin-card-body">
 		<form class="admin-form" action="" method="post">
@@ -20,7 +18,6 @@
 						<input type="checkbox" name="ai_enabled" value="1" class="form-check-input" role="switch" <?php echo $settings['ai_enabled'] ? 'checked' : ''; ?>>
 						<span class="form-check-label"><strong>Bật Trợ lý AI</strong></span>
 					</label>
-					<div class="form-text">Hiện widget Hỗ trợ khách hàng trên storefront.</div>
 				</div>
 				<div class="col-md-4 mb-3">
 					<label class="form-check form-switch">
@@ -28,7 +25,6 @@
 						<input type="checkbox" name="staff_support_enabled" value="1" class="form-check-input" role="switch" <?php echo $settings['staff_support_enabled'] ? 'checked' : ''; ?>>
 						<span class="form-check-label"><strong>Bật chuyển giao nhân viên</strong></span>
 					</label>
-					<div class="form-text">Cho phép chuyển sang nhân viên trong cùng cửa sổ chat.</div>
 				</div>
 				<div class="col-md-4 mb-3">
 					<label class="form-check form-switch">
@@ -50,8 +46,6 @@
 				<input type="text" name="working_hours_text" class="form-control" maxlength="255"
 					value="<?php echo htmlspecialchars($settings['working_hours_text'], ENT_QUOTES, 'UTF-8'); ?>">
 			</div>
-
-			<p class="form-text text-muted mb-3">Sau khi bật/tắt công tắc, nhấn <strong>Lưu cấu hình</strong> — F5 không tự lưu. Widget storefront chỉ ẩn khi tắt cả Trợ lý AI và chuyển giao nhân viên.</p>
 
 			<div class="admin-form-actions">
 				<button type="submit" name="submit" value="1" class="btn btn-primary">Lưu cấu hình</button>

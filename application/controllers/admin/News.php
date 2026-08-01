@@ -105,15 +105,9 @@ class News extends MY_Admin_Controller {
 				
 
 				if ($this->news_model->create($data)) {
-
 					admin_flash_success( 'Thêm tin tức thành công');
-
 				} else {
-
-					$this->db->insert('news', $data);
-
-					admin_flash_success( 'Thêm tin tức thành công');
-
+					admin_flash_fail( 'Thêm tin tức thất bại');
 				}
 
 				redirect(admin_url('news'));

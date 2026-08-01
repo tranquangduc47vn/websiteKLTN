@@ -1,7 +1,7 @@
 <?php
 $account_asset = site_asset_url('');
 ?>
-<link rel="stylesheet" href="<?php echo $account_asset; ?>css/account-luxury.css?v=8">
+<link rel="stylesheet" href="<?php echo $account_asset; ?>css/account-luxury.css?v=12">
 
 <div class="col-xs-12 jm-account-lux">
 	<div class="jm-account-lux__inner">
@@ -146,11 +146,24 @@ $account_asset = site_asset_url('');
 		</section>
 		<?php } ?>
 
-		<section class="jm-account-panel">
+		<section class="jm-account-panel" id="orders">
 			<div class="jm-account-panel__head">
 				<h2 class="jm-account-panel__title">Lịch sử đơn hàng</h2>
 			</div>
 			<div class="jm-account-panel__body">
+				<form method="get" action="<?php echo base_url('user#orders'); ?>" class="jm-account-orders-filter">
+					<select name="order_status" id="orderStatusFilter" class="jm-account-orders-filter__select" aria-label="Trạng thái đơn hàng" onchange="this.form.submit()">
+						<option value=""<?php echo ($order_status_filter === '') ? ' selected' : ''; ?>>Tất cả</option>
+						<option value="0"<?php echo ($order_status_filter === '0') ? ' selected' : ''; ?>>Chờ xử lý</option>
+						<option value="1"<?php echo ($order_status_filter === '1') ? ' selected' : ''; ?>>Đã xác nhận</option>
+						<option value="2"<?php echo ($order_status_filter === '2') ? ' selected' : ''; ?>>Đang giao</option>
+						<option value="3"<?php echo ($order_status_filter === '3') ? ' selected' : ''; ?>>Hoàn thành</option>
+						<option value="4"<?php echo ($order_status_filter === '4') ? ' selected' : ''; ?>>Đã hủy</option>
+					</select>
+					<?php if (!empty($order_total)) { ?>
+						<p class="jm-account-orders-filter__meta"><?php echo (int) $order_total; ?> đơn · Trang <?php echo (int) $order_page; ?>/<?php echo max(1, (int) ceil($order_total / 5)); ?></p>
+					<?php } ?>
+				</form>
 				<div class="jm-account-orders-wrap">
 					<?php if (!empty($list_transaction)) { ?>
 						<table class="jm-account-orders">
@@ -166,7 +179,7 @@ $account_asset = site_asset_url('');
 							</thead>
 							<tbody>
 								<?php
-								$stt = 0;
+								$stt = isset($order_stt_offset) ? (int) $order_stt_offset : 0;
 								foreach ($list_transaction as $value) {
 									$stt++;
 									$status_class = 'jm-account-status--wait';
@@ -205,23 +218,29 @@ $account_asset = site_asset_url('');
 												<div style="margin-top:6px;font-size:11px;color:#888;max-width:180px;margin-left:auto;margin-right:auto;"><?php echo htmlspecialchars($value->reason, ENT_QUOTES, 'UTF-8'); ?></div>
 											<?php } ?>
 										</td>
-										<td>
-											<?php if ($value->status == '0') { ?>
-												<button type="button" class="jm-account-btn jm-account-btn--danger" onclick="moModalHuyDon(<?php echo (int) $value->id; ?>)">Hủy đơn</button>
-											<?php } elseif ($value->status == '4') { ?>
-												<span style="font-size:12px;color:#999;">—</span>
-											<?php } elseif ($value->status == '3') { ?>
-												<span style="font-size:12px;color:#558b2f;">✓</span>
-											<?php } else { ?>
-												<span style="font-size:11px;color:#888;">Đang xử lý</span>
-											<?php } ?>
+										<td class="jm-account-orders__actions">
+											<div class="jm-account-orders__action-stack">
+												<button type="button" class="jm-account-btn jm-account-btn--ghost" onclick="moModalChiTietDon(<?php echo (int) $value->id; ?>)">Chi tiết</button>
+												<?php if ($value->status == '0') { ?>
+													<button type="button" class="jm-account-btn jm-account-btn--danger" onclick="moModalHuyDon(<?php echo (int) $value->id; ?>)">Hủy đơn</button>
+												<?php } ?>
+											</div>
 										</td>
 									</tr>
 								<?php } ?>
 							</tbody>
 						</table>
+						<?php if (!empty($order_pagination) && $order_total > 5) { ?>
+							<?php echo $order_pagination; ?>
+						<?php } ?>
 					<?php } else { ?>
-						<p class="jm-account-orders-empty">Bạn chưa đặt đơn hàng nào trên hệ thống của chúng tôi.</p>
+						<p class="jm-account-orders-empty">
+							<?php if (!empty($order_status_filter)) { ?>
+								Không có đơn hàng nào với trạng thái đã chọn.
+							<?php } else { ?>
+								Bạn chưa đặt đơn hàng nào trên hệ thống của chúng tôi.
+							<?php } ?>
+						</p>
 					<?php } ?>
 				</div>
 			</div>
@@ -419,6 +438,23 @@ $account_asset = site_asset_url('');
 	</div>
 </div>
 
+<div class="modal fade" id="modalOrderDetail" tabindex="-1" role="dialog" aria-labelledby="modalOrderDetailLabel" aria-hidden="true">
+	<div class="modal-dialog jm-phone-modal-dialog jm-order-detail-dialog" role="document">
+		<div class="modal-content jm-phone-modal">
+			<div class="modal-header jm-phone-modal__head">
+				<button type="button" class="close" data-dismiss="modal" aria-label="Đóng">
+					<span aria-hidden="true">&times;</span>
+				</button>
+				<h4 class="modal-title" id="modalOrderDetailLabel">Chi tiết đơn hàng</h4>
+				<p class="jm-phone-modal__sub">Danh sách sản phẩm và thông tin giao hàng</p>
+			</div>
+			<div class="modal-body jm-phone-modal__body" id="modalOrderDetailBody">
+				<p class="jm-account-order-detail__loading">Đang tải...</p>
+			</div>
+		</div>
+	</div>
+</div>
+
 <div class="modal fade" id="modalHuyDonHang" tabindex="-1" role="dialog" aria-labelledby="modalHuyDonLabel" aria-hidden="true">
   <div class="modal-dialog" role="document">
     <div class="modal-content">
@@ -574,6 +610,19 @@ function moModalHuyDon(id) {
     $('#text_ly_do_khac').val('');
     $('#khungLyDoKhac').hide();
     $('#modalHuyDonHang').modal('show');
+}
+
+function moModalChiTietDon(id) {
+    var $body = $('#modalOrderDetailBody');
+    $body.html('<p class="jm-account-order-detail__loading">Đang tải...</p>');
+    $('#modalOrderDetail').modal('show');
+    $.get('<?php echo site_url('user/order_detail'); ?>/' + encodeURIComponent(id))
+        .done(function (html) {
+            $body.html(html);
+        })
+        .fail(function () {
+            $body.html('<p class="jm-account-flash jm-account-flash--err">Không tải được chi tiết đơn hàng. Vui lòng thử lại.</p>');
+        });
 }
 $(document).ready(function() {
     $('input[name="ly_do_mac_dinh"]').change(function() {

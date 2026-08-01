@@ -4,7 +4,6 @@ $search_name = isset($filters['name']) ? $filters['name'] : '';
 $search_catalog = isset($filters['catalog_id']) ? $filters['catalog_id'] : '';
 $search_sku = isset($filters['sku']) ? $filters['sku'] : '';
 $stock_filter = isset($filters['stock']) ? $filters['stock'] : '';
-$this->load->helper('export');
 ?>
 <div class="admin-breadcrumb">
 	<nav aria-label="breadcrumb">
@@ -22,8 +21,6 @@ $this->load->helper('export');
 		<a href="<?php echo admin_url('stock-movements'); ?>" class="btn btn-outline-secondary btn-sm">Lịch sử biến động</a>
 	</div>
 </div>
-
-<?php admin_export_toolbar('inventory'); ?>
 
 <div class="row g-3 mb-3">
 	<div class="col-md-3">
@@ -96,6 +93,8 @@ $this->load->helper('export');
 	</div>
 </div>
 
+<?php $this->load->helper('export'); admin_export_toolbar('inventory'); ?>
+
 <div class="admin-card">
 	<div class="table-responsive">
 		<table class="table table-sm table-hover align-middle mb-0">
@@ -108,7 +107,7 @@ $this->load->helper('export');
 					<th class="text-end">Tồn</th>
 					<th class="text-end">Tối thiểu</th>
 					<th>Trạng thái</th>
-					<?php if (!empty($can_adjust)) { ?><th></th><?php } ?>
+					<?php if (!empty($can_count) || !empty($can_adjust)) { ?><th></th><?php } ?>
 				</tr>
 			</thead>
 			<tbody>
@@ -133,7 +132,7 @@ $this->load->helper('export');
 					<td class="text-end fw-semibold"><?php echo number_format((int) $row->stock); ?></td>
 					<td class="text-end"><?php echo number_format((int) $row->min_stock); ?></td>
 					<td><span class="badge text-bg-<?php echo $st['class']; ?>"><?php echo $st['label']; ?></span></td>
-					<?php if (!empty($can_adjust)) { ?>
+					<?php if (!empty($can_count) || !empty($can_adjust)) { ?>
 					<td class="text-end">
 						<a href="<?php echo admin_url('inventory/adjust/' . (int) $row->id); ?>" class="btn btn-outline-secondary btn-sm">Kiểm kê</a>
 					</td>
@@ -141,7 +140,7 @@ $this->load->helper('export');
 				</tr>
 			<?php }
 			} else { ?>
-				<tr><td colspan="<?php echo !empty($can_adjust) ? 8 : 7; ?>" class="text-center text-muted py-4">Không có dữ liệu.</td></tr>
+				<tr><td colspan="<?php echo (!empty($can_count) || !empty($can_adjust)) ? 8 : 7; ?>" class="text-center text-muted py-4">Không có dữ liệu.</td></tr>
 			<?php } ?>
 			</tbody>
 		</table>

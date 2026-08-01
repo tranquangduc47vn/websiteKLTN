@@ -1,6 +1,16 @@
 <?php
 $this->load->library('stock_service');
+$this->load->helper('permission');
 $status_label = $this->stock_service->status_label($receipt->status);
+$is_confirmed = ($receipt->status === 'confirmed');
+$actor_name = $is_confirmed && !empty($receipt->confirmed_by) && !empty($receipt->confirmer_name)
+	? $receipt->confirmer_name
+	: ($receipt->creator_name ?? '');
+$actor_level = $is_confirmed && !empty($receipt->confirmed_by) && isset($receipt->confirmer_level)
+	? $receipt->confirmer_level
+	: ($receipt->creator_level ?? null);
+$actor_role = admin_role_label($actor_level);
+$actor_field_label = $is_confirmed ? 'Người nhập kho' : 'Người tạo';
 ?>
 <div class="admin-breadcrumb">
 	<nav aria-label="breadcrumb">
@@ -20,9 +30,9 @@ $status_label = $this->stock_service->status_label($receipt->status);
 		</span>
 	</div>
 	<div class="d-flex flex-wrap gap-2">
-		<?php if ($receipt->status === 'draft' && !empty($can_manage)) { ?>
-			<a href="<?php echo admin_url('stock-receipts/edit/' . (int) $receipt->id); ?>" class="btn btn-outline-primary btn-sm">Sửa</a>
-			<form method="post" action="<?php echo admin_url('stock-receipts/confirm'); ?>" class="d-inline" onsubmit="return confirm('Xác nhận phiếu và cộng tồn kho?');">
+		<?php if ($receipt->status === 'draft' && !empty($can_receipt)) { ?>
+			<a href="<?php echo admin_url('stock-receipts/edit/' . (int) $receipt->id); ?>" class="btn btn-outline-primary btn-sm">Sửa nháp</a>
+			<form method="post" action="<?php echo admin_url('stock-receipts/confirm'); ?>" class="d-inline" onsubmit="return confirm('Xác nhận phiếu nháp cũ và cộng tồn kho?');">
 				<input type="hidden" name="receipt_id" value="<?php echo (int) $receipt->id; ?>">
 				<button type="submit" class="btn btn-success btn-sm">Xác nhận nhập kho</button>
 			</form>
@@ -50,10 +60,19 @@ $status_label = $this->stock_service->status_label($receipt->status);
 			<div class="fs-5 fw-semibold"><?php echo number_format((int) $receipt->total_qty); ?></div>
 			<div class="small text-muted mt-2">Tổng tiền nhập</div>
 			<div class="fs-5 fw-semibold"><?php echo number_format((float) ($receipt->total_amount ?? 0), 0, ',', '.'); ?> ₫</div>
+			<div class="small text-muted mt-2"><?php echo htmlspecialchars($actor_field_label, ENT_QUOTES, 'UTF-8'); ?></div>
+			<div>
+				<?php if ($actor_name !== '') { ?>
+					<?php echo htmlspecialchars($actor_name, ENT_QUOTES, 'UTF-8'); ?>
+					<span class="badge text-bg-secondary ms-1"><?php echo htmlspecialchars($actor_role, ENT_QUOTES, 'UTF-8'); ?></span>
+				<?php } else { ?>
+					—
+				<?php } ?>
+			</div>
 			<div class="small text-muted mt-2">Thời gian</div>
 			<div>Tạo: <?php echo date('d/m/Y H:i', (int) $receipt->created); ?></div>
 			<?php if (!empty($receipt->confirmed_at)) { ?>
-				<div>Xác nhận: <?php echo date('d/m/Y H:i', (int) $receipt->confirmed_at); ?></div>
+				<div>Nhập kho: <?php echo date('d/m/Y H:i', (int) $receipt->confirmed_at); ?></div>
 			<?php } ?>
 		</div></div>
 	</div>
