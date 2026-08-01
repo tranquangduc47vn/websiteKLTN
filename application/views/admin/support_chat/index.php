@@ -7,7 +7,16 @@
 	</nav>
 </div>
 
-<p class="admin-page-subtitle mb-3">Quản lý hội thoại AI và nhân viên trong một luồng chat thống nhất.</p>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+	<p class="admin-page-subtitle mb-0">Quản lý hội thoại AI và nhân viên trong một luồng chat thống nhất.</p>
+	<?php if (!empty($login) && (int) $login->level === ROLE_ADMIN) { ?>
+		<form method="post" action="<?php echo admin_url('support-chat/purge'); ?>" class="d-inline"
+			onsubmit="return confirm('Xóa TOÀN BỘ lịch sử hội thoại và tin nhắn? Thao tác không thể hoàn tác.');">
+			<?php echo csrf_field(); ?>
+			<button type="submit" class="btn btn-outline-danger btn-sm">Xóa toàn bộ lịch sử</button>
+		</form>
+	<?php } ?>
+</div>
 
 <?php if (empty($schema_ready)) { ?>
 <div class="alert alert-warning">
@@ -108,7 +117,8 @@ $waiting_count = isset($waiting_count) ? (int) $waiting_count : 0;
 				<tbody>
 				<?php if (empty($list)) { ?>
 					<tr><td colspan="6" class="text-center text-muted py-4">Chưa có hội thoại.</td></tr>
-				<?php } else {
+				<?php 				} else {
+					$this->load->helper('ai');
 					require_once APPPATH . 'services/support/SupportChatService.php';
 					$svc = new SupportChatService();
 					foreach ($list as $row) {
@@ -119,7 +129,7 @@ $waiting_count = isset($waiting_count) ? (int) $waiting_count : 0;
 						elseif ($st === 'staff_joined') { $badge = 'success'; $label = 'Đang hỗ trợ'; }
 						elseif ($st === 'ai_active') { $badge = 'primary'; $label = 'AI'; }
 						elseif ($st === 'closed') { $badge = 'secondary'; $label = 'Đã kết thúc'; }
-						$guest = (int) $row->user_id > 0 ? 'User #' . (int) $row->user_id : 'Khách #' . (int) $row->id;
+						$guest = support_chat_customer_label($row);
 				?>
 					<tr class="<?php echo (property_exists($row, 'unread_staff') && !empty($row->unread_staff)) ? 'table-warning' : ''; ?>">
 						<td><?php echo (int) $row->id; ?></td>
@@ -127,8 +137,13 @@ $waiting_count = isset($waiting_count) ? (int) $waiting_count : 0;
 						<td><span class="badge bg-<?php echo $badge; ?>"><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></span></td>
 						<td><?php echo htmlspecialchars((string) (isset($row->staff_name) ? $row->staff_name : ''), ENT_QUOTES, 'UTF-8'); ?></td>
 						<td class="small text-muted"><?php echo date('d/m/Y H:i', (int) $row->last_message); ?></td>
-						<td class="text-end">
+						<td class="text-end text-nowrap">
 							<a class="btn btn-outline-primary btn-sm" href="<?php echo admin_url('support-chat/chat/' . (int) $row->id); ?>">Mở chat</a>
+							<form method="post" action="<?php echo admin_url('support-chat/delete/' . (int) $row->id); ?>" class="d-inline"
+								onsubmit="return confirm('Xóa hội thoại #<?php echo (int) $row->id; ?> và mọi tin nhắn?');">
+								<?php echo csrf_field(); ?>
+								<button type="submit" class="btn btn-outline-danger btn-sm" title="Xóa hội thoại">Xóa</button>
+							</form>
 						</td>
 					</tr>
 				<?php } } ?>

@@ -135,6 +135,9 @@
 		if (!msg || !msg.content) {
 			return null;
 		}
+		if (msg.id && msg.id > lastMessageId) {
+			lastMessageId = msg.id;
+		}
 		if (msg.id && document.querySelector('[data-msg-id="' + msg.id + '"]')) {
 			return null;
 		}
@@ -158,9 +161,6 @@
 			+ '</div>';
 
 		messagesEl.appendChild(el);
-		if (msg.id && msg.id > lastMessageId) {
-			lastMessageId = msg.id;
-		}
 		scrollToBottom();
 		return el;
 	}
@@ -284,6 +284,7 @@
 		if (!conversationId || !cfg.pollUrl) {
 			return;
 		}
+		pollOnce();
 		pollTimer = window.setInterval(pollOnce, cfg.pollIntervalMs || 1500);
 	}
 
@@ -341,6 +342,7 @@
 		panel.hidden = true;
 		toggleBtn.setAttribute('aria-expanded', 'false');
 		stopPolling();
+		historyLoaded = false;
 	}
 
 	function loadHistory() {
@@ -361,18 +363,16 @@
 					updateStatus(data.status, data.staff_name);
 				}
 				if (data && data.ok && Array.isArray(data.messages) && data.messages.length) {
+					messagesEl.innerHTML = '';
+					welcomeShown = false;
 					ingestMessages(data.messages);
 				} else if (conversationId > 0 && data && data.ok && (!data.messages || !data.messages.length)) {
-					resetConversationStorage();
 					showWelcomeIntro();
 				} else {
 					showWelcomeIntro();
 				}
 			})
 			.catch(function () {
-				if (conversationId > 0) {
-					resetConversationStorage();
-				}
 				showWelcomeIntro();
 			});
 	}

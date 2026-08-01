@@ -1,7 +1,7 @@
 <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12 clearpaddingr jm-pdp-lux">
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12 clearpadding">
         
-        <link rel="stylesheet" href="<?php echo site_asset_url('css/style-detail.css'); ?>?v=16" type="text/css">
+        <link rel="stylesheet" href="<?php echo site_asset_url('css/style-detail.css'); ?>?v=17" type="text/css">
         <link rel="stylesheet" href="<?php echo site_asset_url('css/stock-notice-modal.css'); ?>?v=1" type="text/css">
 
         <script src="<?php echo site_asset_url('js/product-detail.js'); ?>?v=3" type="text/javascript"></script>
@@ -9,7 +9,9 @@
         <script type="text/javascript">
         $(document).ready(function() {
             var alreadyRated = <?php echo !empty($user_already_rated) ? 'true' : 'false'; ?>;
+            var reviewPending = <?php echo !empty($user_review_pending) ? 'true' : 'false'; ?>;
             var myScore = <?php echo (!empty($user_review) && isset($user_review->stars)) ? (int) $user_review->stars : 0; ?>;
+            var selectedScore = myScore > 0 ? myScore : 0;
 
             $('.raty_big_summary').raty({
                 score: function() {
@@ -19,8 +21,16 @@
                 readOnly: true
             });
 
+            $('.raty_detailt').raty({
+                score: function() {
+                    return $(this).attr('data-score');
+                },
+                half: true,
+                readOnly: true
+            });
+
             function showReviewThankYou(score, isUpdate) {
-                var title = isUpdate ? 'Cảm ơn quý khách!' : 'Cảm ơn quý khách!';
+                var title = 'Cảm ơn quý khách!';
                 var text = isUpdate
                     ? 'Đánh giá của quý khách đã được cập nhật thành ' + score + ' sao. Ý kiến quý khách giúp chúng tôi cải thiện chất lượng sản phẩm và dịch vụ.'
                     : 'Cảm ơn quý khách đã dành thời gian đánh giá sản phẩm. Ý kiến của quý khách rất quý giá và giúp chúng tôi phục vụ tốt hơn mỗi ngày.';
@@ -57,38 +67,48 @@
                 }
             }
 
-            $('.raty_detailt').raty({
-                score: function() {
-                    if (alreadyRated && myScore > 0) {
-                        return myScore;
-                    }
-                    return $(this).attr('data-score');
-                },
+            $('.raty_input').raty({
+                score: myScore > 0 ? myScore : undefined,
                 half: false,
                 readOnly: false,
-                click: function(score, evt) {
-                    $.ajax({
-                        url: '<?php echo base_url('product/raty'); ?>',
-                        type: 'POST',
-                        data: ratyPostData({'id': '<?php echo $product->id; ?>', 'score': score}),
-                        dataType: 'json',
-                        success: function(data) {
-                            applyRatyCsrf(data);
-                            if (data.complete) {
-                                if (data.updated || !alreadyRated) {
-                                    showReviewThankYou(score, !!data.updated);
-                                } else {
-                                    alert(data.msg);
-                                }
-                                return;
-                            }
-                            alert(data.msg);
-                        },
-                        error: function() {
-                            alert('Không gửi được đánh giá, vui lòng thử lại.');
-                        }
-                    });
+                click: function(score) {
+                    selectedScore = score;
                 }
+            });
+
+            $('#jmReviewSubmit').on('click', function(e) {
+                e.preventDefault();
+                var comment = $.trim($('#jmReviewComment').val());
+                if (selectedScore < 1 || selectedScore > 5) {
+                    alert('Vui lòng chọn số sao đánh giá.');
+                    return;
+                }
+                if (comment === '') {
+                    alert('Vui lòng nhập nội dung đánh giá.');
+                    $('#jmReviewComment').focus();
+                    return;
+                }
+                $.ajax({
+                    url: '<?php echo base_url('product/raty'); ?>',
+                    type: 'POST',
+                    data: ratyPostData({
+                        'id': '<?php echo $product->id; ?>',
+                        'score': selectedScore,
+                        'comment': comment
+                    }),
+                    dataType: 'json',
+                    success: function(data) {
+                        applyRatyCsrf(data);
+                        if (data.complete) {
+                            showReviewThankYou(selectedScore, !!data.updated);
+                            return;
+                        }
+                        alert(data.msg);
+                    },
+                    error: function() {
+                        alert('Không gửi được đánh giá, vui lòng thử lại.');
+                    }
+                });
             });
 
             $('#btn-raty-undo').on('click', function(e) {
@@ -204,6 +224,7 @@
                         }
                         $raty_tb = ($product->rate_count > 0) ? ($product->rate_total / $product->rate_count) : 0;
                         $my_review_stars = (!empty($user_review) && isset($user_review->stars)) ? (int) $user_review->stars : 0;
+                        $my_review_comment = (!empty($user_review) && isset($user_review->comment)) ? (string) $user_review->comment : '';
                         ?>
                         
                         <p class="style2-meta-item style2-rating">
@@ -537,15 +558,21 @@
                     </div>
                 </div>
 
-                <?php if (!empty($user_already_rated)) { ?>
-                    <p class="jm-review-note">
-                        Bạn đã đánh giá <?php echo (int) $my_review_stars; ?> sao.
-                        Nhấn sao khác để đổi hoặc
-                        <button type="button" class="jm-review-undo-btn" id="btn-raty-undo">Hoàn tác đánh giá</button>
-                    </p>
-                <?php } else { ?>
-                    <p class="jm-review-note">Nhấn vào sao phía trên để đánh giá sản phẩm.</p>
-                <?php } ?>
+                <div class="jm-review-form">
+                    <h4 class="jm-review-form-title"><?php echo !empty($user_already_rated) ? 'Cập nhật đánh giá của bạn' : 'Viết đánh giá'; ?></h4>
+                    <div class="jm-review-form-stars">
+                        <span class="jm-review-form-label">Chọn số sao:</span>
+                        <span class="raty_input"></span>
+                    </div>
+                    <label class="jm-review-form-label" for="jmReviewComment">Nội dung đánh giá</label>
+                    <textarea id="jmReviewComment" class="jm-review-form-textarea" rows="4" maxlength="2000" placeholder="Chia sẻ trải nghiệm về sản phẩm (bắt buộc)..."><?php echo htmlspecialchars($my_review_comment, ENT_QUOTES, 'UTF-8'); ?></textarea>
+                    <div class="jm-review-form-actions">
+                        <button type="button" class="btn btn-dark btn-sm" id="jmReviewSubmit"><?php echo !empty($user_already_rated) ? 'Cập nhật đánh giá' : 'Gửi đánh giá'; ?></button>
+                        <?php if (!empty($user_already_rated)) { ?>
+                            <button type="button" class="jm-review-undo-btn" id="btn-raty-undo">Hoàn tác đánh giá</button>
+                        <?php } ?>
+                    </div>
+                </div>
 
                 <?php if (!empty($product_reviews)) { ?>
                 <div class="jm-review-history">
@@ -561,6 +588,9 @@
                                 <span class="jm-review-stars-text"><?php echo (int) $review->stars; ?>/5 sao</span>
                                 <span class="jm-review-date"><?php echo date('d/m/Y H:i', (int) $review->created); ?></span>
                             </div>
+                            <?php if (!empty($review->comment)) { ?>
+                            <p class="jm-review-comment"><?php echo nl2br(htmlspecialchars($review->comment, ENT_QUOTES, 'UTF-8')); ?></p>
+                            <?php } ?>
                         </li>
                         <?php } ?>
                     </ul>

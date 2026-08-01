@@ -20,20 +20,23 @@ class Home extends MY_Frontend_Controller {
 
 		$this->load->model('product_model');
 		
-		$input_new = array();
-		$input_new['order'] = array('id', 'DESC');
-		$input_new['limit'] = array('6', '0'); 
+		$input_new = product_storefront_input(array(
+			'order' => array('id', 'DESC'),
+			'limit' => array('6', '0'),
+		));
 		$this->data['new_product'] = $this->product_model->get_list($input_new);
 
-		$input_hot = array();
-		$input_hot['where'] = array('buyed >' => 0);
-		$input_hot['order'] = array('buyed', 'DESC');
-		$input_hot['limit'] = array('6', '0');
+		$input_hot = product_storefront_input(array(
+			'where' => array('buyed >' => 0),
+			'order' => array('buyed', 'DESC'),
+			'limit' => array('6', '0'),
+		));
 		$this->data['hot_product'] = $this->product_model->get_list($input_hot);
 
-		$input_view = array();
-		$input_view['order'] = array('view', 'DESC');
-		$input_view['limit'] = array('6', '0'); 
+		$input_view = product_storefront_input(array(
+			'order' => array('view', 'DESC'),
+			'limit' => array('6', '0'),
+		));
 		$this->data['view_product'] = $this->product_model->get_list($input_view);
 
 		$this->render_frontend_main('site/home/index');

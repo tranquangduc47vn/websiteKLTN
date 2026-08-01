@@ -153,4 +153,12 @@ class Ai_conversation_model extends MY_Model {
 	{
 		return $this->db->field_exists('staff_id', $this->table);
 	}
+
+	public function delete_all()
+	{
+		if (!$this->db->table_exists($this->table)) {
+			return false;
+		}
+		return $this->db->empty_table($this->table);
+	}
 }

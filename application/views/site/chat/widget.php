@@ -87,5 +87,5 @@ window.__SUPPORT_CHAT_CONFIG__ = {
 };
 </script>
 <link rel="stylesheet" href="<?php echo site_asset_url('css/ai-chat.css'); ?>?v=2">
-<script src="<?php echo site_asset_url('js/ai-chat.js'); ?>?v=6" defer></script>
+<script src="<?php echo site_asset_url('js/ai-chat.js'); ?>?v=7" defer></script>
 <?php endif; ?>

@@ -106,36 +106,7 @@ class Transaction extends MY_Admin_Controller {
 	public function del()
 	{
 		admin_require_post();
-		// URI segment 3 hoặc 4 tùy route
-		$id = $this->uri->segment(4);
-		if (empty($id)) {
-			$id = $this->uri->segment(3); 
-		}
-
-		$transaction = $this->transaction_model->get_info($id);
-		
-		if (empty($transaction)) {
-			admin_flash_fail('Đơn đặt hàng không tồn tại!');
-			redirect(admin_url('transaction'));
-		}
-
-		if ((string) $transaction->status !== '4') {
-			$reverse_buyed = ((string) $transaction->status === '3');
-			$this->transaction_model->release_stock_for_transaction($id, $reverse_buyed);
-			$this->load->model('loyalty_model');
-			$this->loyalty_model->on_order_cancelled($transaction, $reverse_buyed);
-		}
-
-		$this->db->where('transaction_id', $id);
-		$this->db->delete('order');
-
-		// Xóa transaction sau khi đã xóa order con
-		if ($this->transaction_model->delete($id)) {
-			admin_flash_success('Xóa đơn đặt hàng và chi tiết sản phẩm thành công.');
-		} else {
-			admin_flash_fail('Lỗi hệ thống! Không thể xóa đơn đặt hàng này.');
-		}
-		
+		admin_flash_fail('Đơn hàng không được xóa. Hãy cập nhật trạng thái (ví dụ: Đã hủy / Hoàn) thay vì xóa.');
 		redirect(admin_url('transaction'));
 	}
 

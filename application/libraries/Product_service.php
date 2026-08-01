@@ -77,7 +77,7 @@ class Product_service {
 		return $sku;
 	}
 
-	public function sync_variants($product_id, array $colors, array $sizes, $base_price = null, $cost_price = 0)
+	public function sync_variants($product_id, array $colors, array $sizes, $base_price = null, $cost_price = 0, $old_base_price = null)
 	{
 		$product_id = (int) $product_id;
 		$product = $this->CI->product_model->get_info($product_id);
@@ -97,17 +97,39 @@ class Product_service {
 		if ($base_price === null) {
 			$base_price = (float) $product->price;
 		}
+		if ($old_base_price === null) {
+			$old_base_price = (float) $product->price;
+		}
 
 		$min_stock = (int) $this->CI->config->item('default_min_stock');
 		$now = time();
 		$created = 0;
+		$updated = 0;
+		$deactivated = 0;
+		$valid_combos = array();
 
 		foreach ($colors as $color) {
 			foreach ($sizes as $size) {
+				$combo_key = (string) $color . '||' . (string) $size;
+				$valid_combos[$combo_key] = true;
+
 				$existing = $this->CI->product_variant_model->find_variant($product_id, $color, $size);
 				if ($existing) {
+					$patch = array('updated' => $now);
+					$variant_price = (float) $existing->price;
+					if (abs($variant_price - (float) $old_base_price) < 0.01) {
+						$patch['price'] = (float) $base_price;
+					}
+					if ((int) $existing->status !== 1) {
+						$patch['status'] = 1;
+					}
+					if (count($patch) > 1) {
+						$this->CI->product_variant_model->update((int) $existing->id, $patch);
+						$updated++;
+					}
 					continue;
 				}
+
 				$this->CI->product_variant_model->create(array(
 					'product_id' => $product_id,
 					'sku' => $this->generate_sku($product_id, $color, $size),
@@ -126,6 +148,18 @@ class Product_service {
 			}
 		}
 
+		$all_variants = $this->CI->product_variant_model->get_by_product($product_id);
+		foreach ($all_variants as $variant_row) {
+			$combo_key = (string) $variant_row->color . '||' . (string) $variant_row->size;
+			if (!isset($valid_combos[$combo_key]) && (int) $variant_row->status === 1) {
+				$this->CI->product_variant_model->update((int) $variant_row->id, array(
+					'status' => 0,
+					'updated' => $now,
+				));
+				$deactivated++;
+			}
+		}
+
 		$this->CI->product_model->update($product_id, array(
 			'color' => implode(',', array_filter($colors, function ($c) { return $c !== ''; })) ?: null,
 			'size' => implode(',', array_filter($sizes, function ($s) { return $s !== ''; })) ?: null,
@@ -133,7 +167,12 @@ class Product_service {
 
 		$this->sync_product_quantity_cache($product_id);
 
-		return array('ok' => true, 'created' => $created);
+		return array(
+			'ok' => true,
+			'created' => $created,
+			'updated' => $updated,
+			'deactivated' => $deactivated,
+		);
 	}
 
 	public function sync_product_quantity_cache($product_id)

@@ -5,6 +5,29 @@ class Product_review_model extends MY_Model {
 	var $table = 'product_review';
 	var $order = array('created', 'DESC');
 
+	const STATUS_PENDING = 0;
+	const STATUS_APPROVED = 1;
+	const STATUS_REJECTED = 2;
+
+	public function status_label($status)
+	{
+		switch ((int) $status) {
+			case self::STATUS_APPROVED:
+				return 'Đã duyệt';
+			case self::STATUS_REJECTED:
+				return 'Từ chối';
+			default:
+				return 'Chờ duyệt';
+		}
+	}
+
+	protected function approved_where()
+	{
+		if ($this->db->field_exists('status', $this->table)) {
+			$this->db->where('status', self::STATUS_APPROVED);
+		}
+	}
+
 	public function get_by_product($product_id, $limit = 50)
 	{
 		$product_id = (int) $product_id;
@@ -12,34 +35,16 @@ class Product_review_model extends MY_Model {
 			return array();
 		}
 
-		return $this->get_list(array(
-			'where' => array('product_id' => $product_id),
-			'limit' => array((int) $limit, 0),
-		));
+		$this->db->where('product_id', $product_id);
+		$this->approved_where();
+		$this->db->order_by('created', 'DESC');
+		$this->db->limit((int) $limit);
+		return $this->db->get($this->table)->result();
 	}
 
 	public function has_reviewed($product_id, $user_id = 0, $session_token = '')
 	{
-		$product_id = (int) $product_id;
-		if ($product_id <= 0) {
-			return FALSE;
-		}
-
-		if ($user_id > 0) {
-			return $this->check_exists(array(
-				'product_id' => $product_id,
-				'user_id' => (int) $user_id,
-			));
-		}
-
-		if ($session_token !== '') {
-			return $this->check_exists(array(
-				'product_id' => $product_id,
-				'session_token' => $session_token,
-			));
-		}
-
-		return FALSE;
+		return $this->get_user_review($product_id, $user_id, $session_token) !== FALSE;
 	}
 
 	public function get_star_breakdown($product_id)
@@ -53,6 +58,7 @@ class Product_review_model extends MY_Model {
 
 		$this->db->select('stars, COUNT(*) AS total');
 		$this->db->where('product_id', $product_id);
+		$this->approved_where();
 		$this->db->group_by('stars');
 		$rows = $this->db->get($this->table)->result();
 
@@ -100,6 +106,97 @@ class Product_review_model extends MY_Model {
 		return $this->delete($review->id);
 	}
 
+	public function count_by_status($status)
+	{
+		if (!$this->db->field_exists('status', $this->table)) {
+			return 0;
+		}
+		$this->db->where('status', (int) $status);
+		return (int) $this->db->count_all_results($this->table);
+	}
+
+	public function count_pending()
+	{
+		return $this->count_by_status(self::STATUS_PENDING);
+	}
+
+	public function list_admin($filters = array())
+	{
+		$this->db->select('product_review.*, product.name AS product_name');
+		$this->db->from($this->table);
+		$this->db->join('product', 'product.id = product_review.product_id', 'left');
+
+		if ($this->db->field_exists('status', $this->table)) {
+			$status = isset($filters['status']) ? (string) $filters['status'] : 'all';
+			if ($status === 'pending') {
+				$this->db->where('product_review.status', self::STATUS_PENDING);
+			} elseif ($status === 'approved') {
+				$this->db->where('product_review.status', self::STATUS_APPROVED);
+			} elseif ($status === 'rejected') {
+				$this->db->where('product_review.status', self::STATUS_REJECTED);
+			}
+		}
+
+		if (!empty($filters['q'])) {
+			$q = trim((string) $filters['q']);
+			$this->db->group_start();
+			$this->db->like('product.name', $q);
+			$this->db->or_like('product_review.user_name', $q);
+			if ($this->db->field_exists('comment', $this->table)) {
+				$this->db->or_like('product_review.comment', $q);
+			}
+			$this->db->or_where('product_review.product_id', (int) $q);
+			$this->db->group_end();
+		}
+
+		$limit = isset($filters['limit']) ? (int) $filters['limit'] : 100;
+		$this->db->order_by('product_review.created', 'DESC');
+		$this->db->limit($limit);
+		return $this->db->get()->result();
+	}
+
+	public function set_status($id, $status, $admin_id = 0)
+	{
+		$id = (int) $id;
+		if ($id <= 0 || !$this->db->field_exists('status', $this->table)) {
+			return FALSE;
+		}
+
+		$data = array(
+			'status' => (int) $status,
+			'reviewed_at' => time(),
+			'reviewed_by' => (int) $admin_id,
+		);
+		return $this->update($id, $data);
+	}
+
+	public function get_pending_with_product($limit = 10, $range_start = 0, $range_end = 0)
+	{
+		if (!$this->db->field_exists('status', $this->table)) {
+			return array();
+		}
+
+		$limit = (int) $limit;
+		if ($limit <= 0) {
+			$limit = 10;
+		}
+
+		$this->db->select('product_review.*, product.name AS product_name');
+		$this->db->from($this->table);
+		$this->db->join('product', 'product.id = product_review.product_id', 'left');
+		$this->db->where('product_review.status', self::STATUS_PENDING);
+		if ($range_start > 0) {
+			$this->db->where('product_review.created >=', (int) $range_start);
+		}
+		if ($range_end > 0) {
+			$this->db->where('product_review.created <=', (int) $range_end);
+		}
+		$this->db->order_by('product_review.created', 'DESC');
+		$this->db->limit($limit);
+
+		return $this->db->get()->result();
+	}
+
 	public function get_recent_with_product($limit = 10, $range_start = 0, $range_end = 0)
 	{
 		$limit = (int) $limit;
@@ -110,6 +207,7 @@ class Product_review_model extends MY_Model {
 		$this->db->select('product_review.*, product.name AS product_name');
 		$this->db->from($this->table);
 		$this->db->join('product', 'product.id = product_review.product_id', 'left');
+		$this->approved_where();
 		if ($range_start > 0) {
 			$this->db->where('product_review.created >=', (int) $range_start);
 		}
@@ -124,6 +222,9 @@ class Product_review_model extends MY_Model {
 
 	public function count_in_range($range_start = 0, $range_end = 0)
 	{
+		if ($this->db->field_exists('status', $this->table)) {
+			$this->db->where('status', self::STATUS_PENDING);
+		}
 		if ($range_start > 0) {
 			$this->db->where('created >=', (int) $range_start);
 		}
@@ -142,6 +243,7 @@ class Product_review_model extends MY_Model {
 
 		$this->db->select('COUNT(*) AS rate_count, COALESCE(SUM(stars), 0) AS rate_total', FALSE);
 		$this->db->where('product_id', $product_id);
+		$this->approved_where();
 		$row = $this->db->get($this->table)->row();
 
 		$rate_count = $row ? (int) $row->rate_count : 0;

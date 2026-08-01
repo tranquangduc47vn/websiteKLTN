@@ -60,6 +60,11 @@ class Product extends MY_Frontend_Controller {
             redirect(base_url());
         }
 
+        if (!product_is_active($product)) {
+            set_store_flash('fail', 'Sản phẩm này hiện không còn bán');
+            redirect(base_url());
+        }
+
         if ($this->uri->segment(1) === 'product' && in_array($this->uri->segment(2), array('view', 'detail'), true)) {
             seo_redirect(build_product_url($product));
         }
@@ -107,13 +112,13 @@ class Product extends MY_Frontend_Controller {
         $input = array();
         $input['where'] = array('catalog_id' => $product->catalog_id);
         $input['limit'] = array('4','0');
-        $productsub = $this->product_model->get_list($input);
+        $productsub = $this->product_model->get_list(product_storefront_input($input));
         $this->data['productsub'] = $productsub;
         
         $input = array();
         $input['order'] = array('buyed', 'DESC');
         $input['limit'] = array('4','0');
-        $productview = $this->product_model->get_list($input);
+        $productview = $this->product_model->get_list(product_storefront_input($input));
         $this->data['productview'] = $productview;
 
         $this->data['canonical_url'] = build_product_url($product);
@@ -126,6 +131,7 @@ class Product extends MY_Frontend_Controller {
         $product_reviews = array();
         $user_already_rated = FALSE;
         $user_review = FALSE;
+        $user_review_pending = FALSE;
 
         if ($this->db->table_exists('product_review')) {
             $product_reviews = $this->product_review_model->get_by_product($id, 50);
@@ -149,12 +155,16 @@ class Product extends MY_Frontend_Controller {
             $user_id = ($user_login && isset($user_login->id)) ? (int) $user_login->id : 0;
             $user_review = $this->product_review_model->get_user_review($id, $user_id, $session_token);
             $user_already_rated = ($user_review !== FALSE);
+            if ($user_review && $this->db->field_exists('status', 'product_review')) {
+                $user_review_pending = ((int) $user_review->status === Product_review_model::STATUS_PENDING);
+            }
         }
 
         $this->data['product_reviews'] = $product_reviews;
         $this->data['review_breakdown'] = $review_breakdown;
         $this->data['user_already_rated'] = $user_already_rated;
         $this->data['user_review'] = $user_review;
+        $this->data['user_review_pending'] = $user_review_pending;
 
 		$this->session->flashdata('stock_notice');
 		$this->session->flashdata('message');
@@ -381,6 +391,7 @@ class Product extends MY_Frontend_Controller {
 
     public function hot()
     {
+        product_db_active_only($this->db);
         $this->db->where('buyed >', 0);
 
         $chosen_cats = $this->input->get('category');
@@ -523,8 +534,9 @@ class Product extends MY_Frontend_Controller {
 
     public function views()
     {
-        $input = array();
-        $input['order'] = array('view','DESC');
+        $input = product_storefront_input(array(
+            'order' => array('view', 'DESC'),
+        ));
 
         $total = $this->product_model->get_total($input);
         $this->data['total'] = $total;
@@ -558,13 +570,14 @@ class Product extends MY_Frontend_Controller {
 
         $input['limit'] = array($config['per_page'], $segment);
 
-        $product_list = $this->product_model->get_list($input);
+        $product_list = $this->product_model->get_list(product_storefront_input($input));
         $this->data['product_list'] = $product_list;
         $this->render_frontend_sub('site/product/views');
     }
 
     public function news()
     {
+        product_db_active_only($this->db);
         $chosen_cats = $this->input->get('category');
         $final_catalog_ids = array();
         if (!empty($chosen_cats) && is_array($chosen_cats)) {
@@ -676,6 +689,108 @@ class Product extends MY_Frontend_Controller {
         $this->render_frontend_sub('site/product/new');
     }
 
+    public function discount($offset = 0)
+    {
+        product_db_active_only($this->db);
+        $this->db->where('discount >', 0);
+
+        $chosen_cats = $this->input->get('category');
+        $final_catalog_ids = array();
+        if (!empty($chosen_cats) && is_array($chosen_cats)) {
+            foreach ($chosen_cats as $f_id) {
+                $final_catalog_ids[] = intval($f_id);
+                $sub_1 = $this->catalog_model->get_list(array('where' => array('parent_id' => $f_id)));
+                if (!empty($sub_1)) {
+                    foreach ($sub_1 as $s1) {
+                        $final_catalog_ids[] = $s1->id;
+                        $sub_2 = $this->catalog_model->get_list(array('where' => array('parent_id' => $s1->id)));
+                        if (!empty($sub_2)) {
+                            foreach ($sub_2 as $s2) {
+                                $final_catalog_ids[] = $s2->id;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        $final_catalog_ids = array_unique($final_catalog_ids);
+        if (!empty($final_catalog_ids)) {
+            $this->db->where_in('catalog_id', $final_catalog_ids);
+        }
+
+        $this->_apply_listing_attribute_filters();
+
+        $count_db = clone $this->db;
+        $total = $count_db->count_all_results('product');
+        $this->data['total'] = $total;
+
+        $this->load->library('pagination');
+        $segment = (int) $offset;
+        if ($this->uri->segment(1) === 'product' && $this->uri->segment(2) === 'discount') {
+            $segment = (int) $this->uri->segment(4);
+        }
+
+        $config = array(
+            'base_url'             => base_url('khuyen-mai'),
+            'total_rows'           => $total,
+            'per_page'             => 8,
+            'uri_segment'        => ($this->uri->segment(1) === 'khuyen-mai') ? 2 : 4,
+            'reuse_query_string'   => TRUE,
+            'full_tag_open'        => '<div class="jm-modern-pagination"><ul>',
+            'full_tag_close'       => '</ul></div>',
+            'first_link'           => false,
+            'last_link'            => false,
+            'next_link'            => 'Next',
+            'prev_link'            => 'Prev',
+            'cur_tag_open'         => '<li class="active"><span>',
+            'cur_tag_close'        => '</span></li>',
+            'num_tag_open'         => '<li>',
+            'num_tag_close'        => '</li>',
+            'next_tag_open'        => '<li class="next">',
+            'next_tag_close'       => '</li>',
+            'prev_tag_open'        => '<li class="prev">',
+            'prev_tag_close'       => '</li>',
+        );
+        if ($this->uri->segment(1) !== 'khuyen-mai') {
+            $config['page_query_string'] = true;
+            $config['query_string_segment'] = 'per_page';
+            $segment = (int) $this->input->get('per_page');
+        }
+        $this->pagination->initialize($config);
+
+        product_db_active_only($this->db);
+        $this->db->where('discount >', 0);
+        if (!empty($final_catalog_ids)) {
+            $this->db->where_in('catalog_id', $final_catalog_ids);
+        }
+        $this->_apply_listing_attribute_filters();
+
+        $sort = $this->input->get('sort');
+        if ($sort === 'price_asc') {
+            $this->db->order_by('(price - discount)', 'ASC', false);
+        } elseif ($sort === 'price_desc') {
+            $this->db->order_by('(price - discount)', 'DESC', false);
+        } elseif ($sort === 'new') {
+            $this->db->order_by('id', 'DESC');
+        } else {
+            $this->db->order_by('discount', 'DESC');
+        }
+
+        $this->db->limit($config['per_page'], $segment);
+        $product_list = $this->db->get('product')->result();
+        $this->data['product_list'] = $product_list;
+
+        $this->_load_listing_sidebar();
+
+        $this->data['page_title'] = 'Sản phẩm khuyến mãi - ' . shop_name();
+        $this->data['is_discount_list'] = true;
+        $this->data['main_catalog_title'] = 'Sản phẩm khuyến mãi';
+        $this->data['filter_action'] = base_url('khuyen-mai');
+        $this->data['canonical_url'] = base_url('khuyen-mai');
+
+        $this->render_frontend_sub('site/product/discount');
+    }
+
     public function search_seo($keyword_slug = '', $offset = 0)
     {
         if ($keyword_slug === '' || $keyword_slug === null) {
@@ -700,12 +815,58 @@ class Product extends MY_Frontend_Controller {
             $keyword = $this->input->get('key-search');
         }
         $keyword = trim((string) $keyword);
+        $has_filters = $this->input->get('category') || $this->input->get('size')
+            || $this->input->get('color') || $this->input->get('price_range');
 
-        $total = 0;
-        if (!empty($keyword)) {
-            $this->db->like('name', $keyword);
-            $total = $this->product_model->get_total();
+        if ($keyword === '' && !$has_filters) {
+            $this->data['total'] = 0;
+            $this->data['product_list'] = array();
+            $this->data['keyword'] = '';
+            $this->data['is_search_page'] = true;
+            $this->data['main_catalog_title'] = 'Kết quả tìm kiếm';
+            $this->data['filter_action'] = build_search_url('');
+            $this->data['canonical_url'] = build_search_url('');
+            $this->_load_listing_sidebar();
+            $this->render_frontend_sub('site/product/search');
+            return;
         }
+
+        $this->db->from('product');
+        product_db_active_only($this->db, 'product');
+
+        if ($keyword !== '') {
+            product_apply_search_keyword($keyword, $this->db, TRUE);
+        }
+
+        $chosen_cats = $this->input->get('category');
+        $final_catalog_ids = array();
+        if (!empty($chosen_cats) && is_array($chosen_cats)) {
+            foreach ($chosen_cats as $f_id) {
+                $final_catalog_ids[] = intval($f_id);
+                $sub_1 = $this->catalog_model->get_list(array('where' => array('parent_id' => $f_id)));
+                if (!empty($sub_1)) {
+                    foreach ($sub_1 as $s1) {
+                        $final_catalog_ids[] = $s1->id;
+                        $sub_2 = $this->catalog_model->get_list(array('where' => array('parent_id' => $s1->id)));
+                        if (!empty($sub_2)) {
+                            foreach ($sub_2 as $s2) {
+                                $final_catalog_ids[] = $s2->id;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        $final_catalog_ids = array_unique($final_catalog_ids);
+        if (!empty($final_catalog_ids)) {
+            $this->db->where_in('product.catalog_id', $final_catalog_ids);
+        }
+
+        $this->_apply_listing_attribute_filters('product');
+
+        $count_db = clone $this->db;
+        $total = $count_db->count_all_results();
+        $this->data['total'] = $total;
 
         $this->load->library('pagination');
 
@@ -763,17 +924,35 @@ class Product extends MY_Frontend_Controller {
             $segment = (int) $this->input->get('per_page');
         }
 
-        $product_list = array();
-        if (!empty($keyword)) {
-            $this->db->like('name', $keyword);
-            $this->db->order_by('id', 'DESC');
-            $this->db->limit($config['per_page'], $segment);
-            $product_list = $this->product_model->get_list();
+        $this->db->from('product');
+        product_db_active_only($this->db, 'product');
+        if ($keyword !== '') {
+            product_apply_search_keyword($keyword, $this->db, TRUE);
         }
+        if (!empty($final_catalog_ids)) {
+            $this->db->where_in('product.catalog_id', $final_catalog_ids);
+        }
+        $this->_apply_listing_attribute_filters('product');
+
+        $sort = $this->input->get('sort');
+        if ($sort === 'price_asc') {
+            $this->db->order_by('(product.price - product.discount)', 'ASC', FALSE);
+        } elseif ($sort === 'price_desc') {
+            $this->db->order_by('(product.price - product.discount)', 'DESC', FALSE);
+        } else {
+            $this->db->order_by('product.id', 'DESC');
+        }
+
+        $this->db->limit($config['per_page'], $segment);
+        $product_list = $this->db->get()->result();
 
         $this->data['total'] = $total;
         $this->data['product_list'] = $product_list;
         $this->data['keyword'] = $keyword;
+        $this->data['is_search_page'] = true;
+        $this->data['main_catalog_title'] = 'Kết quả tìm kiếm';
+        $this->data['filter_action'] = build_search_url($keyword);
+        $this->_load_listing_sidebar();
 
         $canon = build_search_url($keyword);
         if ($use_seo_pagination && $segment > 0) {
@@ -788,10 +967,21 @@ class Product extends MY_Frontend_Controller {
     {
         $id = (int) $this->input->post('id');
         $score = (int) round((float) $this->input->post('score'));
+        $comment = trim((string) $this->input->post('comment'));
         $result = array('complete' => FALSE);
 
         if ($id <= 0 || $score < 1 || $score > 5) {
             $result['msg'] = 'Dữ liệu đánh giá không hợp lệ';
+            $this->_json_raty_response($result);
+        }
+
+        if ($comment === '') {
+            $result['msg'] = 'Vui lòng nhập nội dung đánh giá';
+            $this->_json_raty_response($result);
+        }
+
+        if (mb_strlen($comment) > 2000) {
+            $result['msg'] = 'Nội dung đánh giá tối đa 2000 ký tự';
             $this->_json_raty_response($result);
         }
 
@@ -802,7 +992,7 @@ class Product extends MY_Frontend_Controller {
         }
 
         if (!$this->db->table_exists('product_review')) {
-            $result['msg'] = 'Chưa cấu hình bảng lưu đánh giá. Vui lòng chạy file SQL product_review.sql';
+            $result['msg'] = 'Chưa cấu hình bảng lưu đánh giá. Vui lòng chạy run_migrations.php';
             $this->_json_raty_response($result);
         }
 
@@ -810,36 +1000,49 @@ class Product extends MY_Frontend_Controller {
         $user_id = ($user_login && isset($user_login->id)) ? (int) $user_login->id : 0;
         $user_name = ($user_login && !empty($user_login->name)) ? $user_login->name : 'Khách hàng';
         $session_token = $this->_get_rating_session_token();
+        $has_status = $this->db->field_exists('status', 'product_review');
 
         $existing = $this->product_review_model->get_user_review($id, $user_id, $session_token);
+        $review_payload = array(
+            'stars' => $score,
+            'user_name' => $user_name,
+            'created' => time(),
+        );
+        if ($this->db->field_exists('comment', 'product_review')) {
+            $review_payload['comment'] = $comment;
+        }
+        if ($has_status) {
+            $review_payload['status'] = Product_review_model::STATUS_PENDING;
+            $review_payload['reviewed_at'] = 0;
+            $review_payload['reviewed_by'] = 0;
+        }
+
         if ($existing) {
-            if ((int) $existing->stars === $score) {
+            if ((int) $existing->stars === $score
+                && isset($existing->comment)
+                && trim((string) $existing->comment) === $comment
+                && (!$has_status || (int) $existing->status === Product_review_model::STATUS_PENDING)) {
                 $result['complete'] = TRUE;
+                $result['pending'] = TRUE;
                 $result['msg'] = 'Bạn đang đánh giá ' . $score . ' sao';
                 $this->_json_raty_response($result);
             }
 
-            $this->product_review_model->update($existing->id, array(
-                'stars' => $score,
-                'user_name' => $user_name,
-                'created' => time(),
-            ));
+            $this->product_review_model->update($existing->id, $review_payload);
             $this->product_review_model->sync_product_stats($id);
 
             $result['complete'] = TRUE;
             $result['updated'] = TRUE;
+            $result['pending'] = TRUE;
             $result['msg'] = 'Đã cập nhật đánh giá thành ' . $score . ' sao';
             $this->_json_raty_response($result);
         }
 
-        $review_data = array(
+        $review_data = array_merge(array(
             'product_id' => $id,
             'user_id' => $user_id,
-            'user_name' => $user_name,
-            'stars' => $score,
             'session_token' => ($user_id > 0) ? '' : $session_token,
-            'created' => time(),
-        );
+        ), $review_payload);
 
         if (!$this->product_review_model->create($review_data)) {
             $result['msg'] = 'Không lưu được đánh giá, vui lòng thử lại';
@@ -849,6 +1052,7 @@ class Product extends MY_Frontend_Controller {
         $this->product_review_model->sync_product_stats($id);
 
         $result['complete'] = TRUE;
+        $result['pending'] = TRUE;
         $result['msg'] = 'Cảm ơn bạn đã đánh giá ' . $score . ' sao';
         $this->_json_raty_response($result);
     }
@@ -913,6 +1117,8 @@ class Product extends MY_Frontend_Controller {
     // WHERE dùng chung cho đếm và phân trang danh mục
     private function _apply_product_catalog_filters($final_catalog_ids)
     {
+        product_db_active_only($this->db);
+
         if (!empty($final_catalog_ids)) {
             $this->db->where_in('catalog_id', $final_catalog_ids);
         }
@@ -958,5 +1164,78 @@ class Product extends MY_Frontend_Controller {
                 $this->db->where("(price - discount) <= $max_p", NULL, FALSE);
             }
         }
+    }
+
+    private function _apply_listing_attribute_filters($table_prefix = '')
+    {
+        $prefix = ($table_prefix !== '') ? $table_prefix . '.' : '';
+        $size_col = $prefix . 'size';
+        $color_col = $prefix . 'color';
+        $price_col = $prefix . 'price';
+        $discount_col = $prefix . 'discount';
+
+        $chosen_sizes = $this->input->get('size');
+        if (!empty($chosen_sizes)) {
+            if (!is_array($chosen_sizes)) {
+                $chosen_sizes = array($chosen_sizes);
+            }
+            $this->db->group_start();
+            foreach ($chosen_sizes as $sz) {
+                if (trim($sz) !== '') {
+                    $this->db->or_like($size_col, trim($sz));
+                }
+            }
+            $this->db->group_end();
+        }
+
+        $chosen_colors = $this->input->get('color');
+        if (!empty($chosen_colors)) {
+            if (!is_array($chosen_colors)) {
+                $chosen_colors = array($chosen_colors);
+            }
+            $this->db->group_start();
+            foreach ($chosen_colors as $cl) {
+                if (trim($cl) !== '') {
+                    $clean_search = mb_strtolower($cl, 'UTF-8');
+                    $clean_search = str_replace(' ', '', $clean_search);
+                    $safe_color = $this->db->escape_like_str($clean_search);
+                    $this->db->or_where("REPLACE(LOWER({$color_col}), ' ', '') LIKE '%" . $safe_color . "%'", null, false);
+                }
+            }
+            $this->db->group_end();
+        }
+
+        $price_range = $this->input->get('price_range');
+        if (!empty($price_range)) {
+            $arr_p = explode('-', $price_range);
+            if (count($arr_p) == 2) {
+                $min_p = intval($arr_p[0]);
+                $max_p = intval($arr_p[1]);
+                $this->db->where("({$price_col} - {$discount_col}) >= {$min_p}", null, false);
+                $this->db->where("({$price_col} - {$discount_col}) <= {$max_p}", null, false);
+            }
+        }
+    }
+
+    private function _load_listing_sidebar()
+    {
+        if ($this->db->table_exists('master_colors')) {
+            $this->data['master_colors'] = $this->db->where('status', 1)
+                ->order_by('sort_order', 'ASC')
+                ->get('master_colors')
+                ->result();
+        }
+
+        $input_filter_cat = array();
+        $input_filter_cat['where'] = array('parent_id' => 1);
+        $input_filter_cat['order'] = array('id', 'ASC');
+        $catalog_list = $this->catalog_model->get_list($input_filter_cat);
+        foreach ($catalog_list as $parent) {
+            $input_sub = array();
+            $input_sub['where'] = array('parent_id' => $parent->id);
+            $input_sub['order'] = array('id', 'ASC');
+            $parent->subs = $this->catalog_model->get_list($input_sub);
+        }
+        $this->data['catalog_list'] = $catalog_list;
     }
 }

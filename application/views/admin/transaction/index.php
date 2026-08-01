@@ -125,8 +125,7 @@
 								} ?>
 							</td>
 							<td class="text-center text-nowrap">
-								<a class="btn btn-sm btn-outline-primary me-1" href="<?php echo admin_url('transaction/detail/' . $value->id); ?>" title="Chi tiết"><i class="fa-solid fa-eye"></i></a>
-								<?php echo admin_csrf_post_button(admin_url('transaction/del/' . $value->id), '<i class="fa-solid fa-trash"></i>', array('confirm' => 'Bạn chắc chắn muốn xóa vĩnh viễn đơn hàng này?')); ?>
+								<a class="btn btn-sm btn-outline-primary" href="<?php echo admin_url('transaction/detail/' . $value->id); ?>" title="Chi tiết"><i class="fa-solid fa-eye"></i></a>
 							</td>
 						</tr>
 					<?php } ?>

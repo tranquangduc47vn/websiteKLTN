@@ -77,7 +77,7 @@ $js = file_get_contents(FCPATH . 'assets/site/js/ai-chat.js');
 $ok = report('ai-chat.js has parseJsonResponse', strpos($js, 'function parseJsonResponse') !== false) && $ok;
 $ok = report('ai-chat.js has fallback reply', strpos($js, 'chưa nhận được phản hồi') !== false) && $ok;
 $widget = file_get_contents(APPPATH . 'views/site/chat/widget.php');
-$ok = report('widget uses ai-chat v6', strpos($widget, 'ai-chat.js') !== false && strpos($widget, '?v=6') !== false) && $ok;
+$ok = report('widget uses ai-chat v7', strpos($widget, 'ai-chat.js') !== false && strpos($widget, '?v=7') !== false) && $ok;
 $ok = report('widget has login gate', strpos($widget, 'support-chat-login-gate') !== false) && $ok;
 
 if ($liveBase !== '') {

@@ -152,4 +152,37 @@ class Support_chat extends MY_Admin_Controller {
 			'count' => $this->ai_conversation_model->count_waiting(),
 		), JSON_UNESCAPED_UNICODE));
 	}
+
+	public function delete($id = 0)
+	{
+		admin_require_post();
+		require_once APPPATH . 'services/support/SupportChatService.php';
+		$service = new SupportChatService();
+		$result = $service->deleteConversation((int) $id);
+		if (!empty($result['ok'])) {
+			admin_flash_info($result['message']);
+		} else {
+			admin_flash_fail(isset($result['message']) ? $result['message'] : 'Không xóa được hội thoại.');
+		}
+		redirect(admin_url('support-chat'));
+	}
+
+	public function purge()
+	{
+		admin_require_post();
+		if ((int) $this->currentUser->level !== ROLE_ADMIN) {
+			admin_flash_fail('Chỉ Admin mới được xóa toàn bộ lịch sử chat.');
+			redirect(admin_url('support-chat'));
+		}
+
+		require_once APPPATH . 'services/support/SupportChatService.php';
+		$service = new SupportChatService();
+		$result = $service->purgeAllHistory();
+		if (!empty($result['ok'])) {
+			admin_flash_info($result['message']);
+		} else {
+			admin_flash_fail(isset($result['message']) ? $result['message'] : 'Không xóa được lịch sử chat.');
+		}
+		redirect(admin_url('support-chat'));
+	}
 }

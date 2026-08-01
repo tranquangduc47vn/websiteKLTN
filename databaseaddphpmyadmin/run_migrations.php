@@ -120,12 +120,17 @@ CREATE TABLE IF NOT EXISTS `product_review` (
   `user_id` int NOT NULL DEFAULT '0',
   `user_name` varchar(100) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
   `stars` tinyint NOT NULL DEFAULT '5',
+  `comment` text COLLATE utf8mb3_unicode_ci,
+  `status` tinyint NOT NULL DEFAULT '0' COMMENT '0=pending,1=approved,2=rejected',
+  `reviewed_at` int NOT NULL DEFAULT '0',
+  `reviewed_by` int NOT NULL DEFAULT '0',
   `session_token` varchar(64) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
   `created` int NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
   KEY `idx_product_review_product` (`product_id`),
   KEY `idx_product_review_user` (`user_id`),
-  KEY `idx_product_review_session` (`session_token`)
+  KEY `idx_product_review_session` (`session_token`),
+  KEY `idx_product_review_status` (`status`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `suppliers` (
@@ -745,6 +750,37 @@ if (table_exists($m, 'user_phone') && table_engine($m, 'user_phone') === 'INNODB
 	}
 }
 
+if (table_exists($m, 'product_review')) {
+	if (!column_exists($m, 'product_review', 'comment')) {
+		run_sql_or_skip($m,
+			'ALTER TABLE `product_review` ADD COLUMN `comment` text COLLATE utf8mb3_unicode_ci NULL AFTER `stars`',
+			'product_review.comment');
+	}
+	if (!column_exists($m, 'product_review', 'status')) {
+		run_sql_or_skip($m,
+			"ALTER TABLE `product_review` ADD COLUMN `status` tinyint NOT NULL DEFAULT '0' COMMENT '0=pending,1=approved,2=rejected' AFTER `comment`",
+			'product_review.status');
+		run_sql_or_skip($m,
+			"UPDATE `product_review` SET `status` = 1 WHERE `status` = 0",
+			'product_review.status backfill approved');
+	}
+	if (!column_exists($m, 'product_review', 'reviewed_at')) {
+		run_sql_or_skip($m,
+			"ALTER TABLE `product_review` ADD COLUMN `reviewed_at` int NOT NULL DEFAULT '0' AFTER `status`",
+			'product_review.reviewed_at');
+	}
+	if (!column_exists($m, 'product_review', 'reviewed_by')) {
+		run_sql_or_skip($m,
+			"ALTER TABLE `product_review` ADD COLUMN `reviewed_by` int NOT NULL DEFAULT '0' AFTER `reviewed_at`",
+			'product_review.reviewed_by');
+	}
+	if (!index_exists($m, 'product_review', 'idx_product_review_status')) {
+		run_sql_or_skip($m,
+			'ALTER TABLE `product_review` ADD KEY `idx_product_review_status` (`status`)',
+			'product_review idx status');
+	}
+}
+
 if (table_exists($m, 'product_review') && table_engine($m, 'product_review') === 'INNODB') {
 	$orphans = count_query($m, 'SELECT COUNT(*) AS c FROM product_review pr LEFT JOIN product p ON p.id = pr.product_id WHERE p.id IS NULL');
 	if ($orphans > 0) {
@@ -799,6 +835,87 @@ if (table_exists($m, 'ai_message') && table_engine($m, 'ai_message') === 'INNODB
 		run_sql_or_skip($m,
 			'ALTER TABLE `ai_message` ADD CONSTRAINT `fk_ai_message_conversation` FOREIGN KEY (`conversation_id`) REFERENCES `ai_conversation` (`id`) ON DELETE CASCADE ON UPDATE CASCADE',
 			'FK ai_message.conversation_id → ai_conversation.id');
+	}
+}
+
+// --- Thuộc tính sản phẩm động (màu / size) ---
+$masterColorSql = <<<'SQL'
+CREATE TABLE IF NOT EXISTS `master_colors` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(64) COLLATE utf8mb3_unicode_ci NOT NULL,
+  `hex_code` varchar(16) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '#cccccc',
+  `sort_order` int NOT NULL DEFAULT '0',
+  `status` tinyint NOT NULL DEFAULT '1',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_master_colors_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
+SQL;
+if (!$m->query($masterColorSql)) {
+	fwrite(STDERR, 'master_colors: ' . $m->error . PHP_EOL);
+	exit(1);
+}
+echo (table_exists($m, 'master_colors') ? 'OK' : 'FAIL') . ": table `master_colors`" . PHP_EOL;
+
+$masterSizeSql = <<<'SQL'
+CREATE TABLE IF NOT EXISTS `master_sizes` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(32) COLLATE utf8mb3_unicode_ci NOT NULL,
+  `sort_order` int NOT NULL DEFAULT '0',
+  `status` tinyint NOT NULL DEFAULT '1',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_master_sizes_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
+SQL;
+if (!$m->query($masterSizeSql)) {
+	fwrite(STDERR, 'master_sizes: ' . $m->error . PHP_EOL);
+	exit(1);
+}
+echo (table_exists($m, 'master_sizes') ? 'OK' : 'FAIL') . ": table `master_sizes`" . PHP_EOL;
+
+if (table_exists($m, 'master_colors')) {
+	$r = $m->query('SELECT COUNT(*) AS c FROM `master_colors`');
+	$row = $r ? $r->fetch_assoc() : null;
+	if ($row && (int) $row['c'] === 0) {
+		$seedColors = array(
+			array('Đen', '#000000', 1),
+			array('Trắng', '#ffffff', 2),
+			array('Đỏ', '#dd021b', 3),
+			array('Vàng', '#fcd535', 4),
+			array('Xanh dương', '#2196f3', 5),
+			array('Xanh lá', '#4caf50', 6),
+			array('Hồng', '#ffb6c1', 7),
+			array('Xám', '#808080', 8),
+			array('Nâu', '#8b5a2b', 9),
+			array('Kem', '#f5f5dc', 10),
+			array('Cam', '#ff9800', 11),
+			array('Tím', '#9c27b0', 12),
+		);
+		foreach ($seedColors as $c) {
+			$name = $m->real_escape_string($c[0]);
+			$hex = $m->real_escape_string($c[1]);
+			$sort = (int) $c[2];
+			$m->query("INSERT INTO `master_colors` (`name`,`hex_code`,`sort_order`,`status`) VALUES ('{$name}','{$hex}',{$sort},1)");
+		}
+		echo "OK: seeded master_colors\n";
+	} else {
+		echo "SKIP: master_colors already has data\n";
+	}
+}
+
+if (table_exists($m, 'master_sizes')) {
+	$r = $m->query('SELECT COUNT(*) AS c FROM `master_sizes`');
+	$row = $r ? $r->fetch_assoc() : null;
+	if ($row && (int) $row['c'] === 0) {
+		$seedSizes = array('S', 'M', 'L', 'XL', 'XXL');
+		$sort = 0;
+		foreach ($seedSizes as $sz) {
+			$sort++;
+			$name = $m->real_escape_string($sz);
+			$m->query("INSERT INTO `master_sizes` (`name`,`sort_order`,`status`) VALUES ('{$name}',{$sort},1)");
+		}
+		echo "OK: seeded master_sizes\n";
+	} else {
+		echo "SKIP: master_sizes already has data\n";
 	}
 }
 

@@ -70,3 +70,19 @@ if (!function_exists('support_waiting_count')) {
 		return $CI->ai_conversation_model->count_waiting();
 	}
 }
+
+if (!function_exists('support_chat_customer_label')) {
+	function support_chat_customer_label($row, $user = null)
+	{
+		$userId = is_object($row) && isset($row->user_id) ? (int) $row->user_id : 0;
+		if ($userId > 0) {
+			$name = ($user && !empty($user->name)) ? trim((string) $user->name) : '';
+			if ($name !== '') {
+				return 'Khách #' . $userId . ' · ' . $name;
+			}
+			return 'Khách #' . $userId;
+		}
+
+		return 'Khách vãng lai';
+	}
+}

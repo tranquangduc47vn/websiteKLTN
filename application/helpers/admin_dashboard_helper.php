@@ -781,7 +781,7 @@ if (!function_exists('admin_dashboard_notification_groups')) {
 			$review_pending = 0;
 			if (!empty($perm['products']) && $CI->db->table_exists('product_review')) {
 				$CI->load->model('product_review_model');
-				$review_pending = $CI->product_review_model->count_in_range((int) $range['start'], (int) $range['end']);
+				$review_pending = $CI->product_review_model->count_pending();
 			} elseif (!empty($perm['products'])) {
 				$review_pending = (int) $CI->db->where('rate_count >', 0)->count_all_results('product');
 			}
@@ -798,8 +798,8 @@ if (!function_exists('admin_dashboard_notification_groups')) {
 			if (!empty($perm['products'])) {
 				$lines[] = admin_dashboard_notify_summary_line(
 					$review_pending,
-					'Chưa có đánh giá mới trong kỳ.',
-					'Có %s đánh giá mới trong ' . $range['label'] . '.'
+					'Không có đánh giá chờ duyệt.',
+					'Có %s đánh giá chờ duyệt.'
 				);
 			}
 			if (!empty($perm['users'])) {
@@ -814,7 +814,7 @@ if (!function_exists('admin_dashboard_notification_groups')) {
 				'Không có yêu cầu đổi trả mới.',
 				'Có %s yêu cầu đổi trả cần xử lý.'
 			);
-			$action_url = !empty($perm['products']) ? admin_url('home#admDashReviews') : admin_url('users');
+			$action_url = !empty($perm['products']) ? admin_url('product-reviews') : admin_url('users');
 			$groups[] = array(
 				'id' => 'customers',
 				'priority' => 40,
@@ -830,17 +830,22 @@ if (!function_exists('admin_dashboard_notification_groups')) {
 
 		if (!empty($perm['products']) && $CI->db->table_exists('product_review')) {
 			$CI->load->model('product_review_model');
-			$period_review_count = $CI->product_review_model->count_in_range((int) $range['start'], (int) $range['end']);
-			$latest_reviews = $CI->product_review_model->get_recent_with_product(3, (int) $range['start'], (int) $range['end']);
+			$period_review_count = $CI->product_review_model->count_pending();
+			$latest_reviews = $CI->product_review_model->get_pending_with_product(3);
 			$review_notify_lines = array();
 			if (empty($latest_reviews)) {
-				$review_notify_lines[] = 'Chưa có khách hàng đánh giá trong ' . $range['label'] . '.';
+				$review_notify_lines[] = 'Không có đánh giá chờ duyệt.';
 			} else {
 				foreach ($latest_reviews as $review_row) {
 					$product_name = !empty($review_row->product_name) ? $review_row->product_name : ('SP #' . (int) $review_row->product_id);
+					$snippet = isset($review_row->comment) ? trim((string) $review_row->comment) : '';
+					if ($snippet !== '') {
+						$snippet = ' — "' . mb_substr($snippet, 0, 60) . (mb_strlen($snippet) > 60 ? '…' : '') . '"';
+					}
 					$review_notify_lines[] = $review_row->user_name
 						. ' — ' . (int) $review_row->stars . ' sao — '
-						. $product_name;
+						. $product_name
+						. $snippet;
 				}
 			}
 			$groups[] = array(
@@ -851,8 +856,8 @@ if (!function_exists('admin_dashboard_notification_groups')) {
 				'tone' => $period_review_count > 0 ? 'warning' : 'success',
 				'badge' => $period_review_count,
 				'lines' => $review_notify_lines,
-				'action_label' => $period_review_count > 0 ? 'Xem danh sách' : 'Xem chi tiết',
-				'action_url' => admin_url('home#admDashReviews'),
+				'action_label' => $period_review_count > 0 ? 'Duyệt đánh giá' : 'Xem danh sách',
+				'action_url' => admin_url('product-reviews'),
 			);
 		}
 

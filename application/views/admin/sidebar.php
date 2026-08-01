@@ -17,6 +17,7 @@ function admin_menu_active($current, $items, $segment3 = null)
 $admin_menu_main = array(
 	array('slug' => 'home', 'url' => admin_url('home'), 'icon' => 'fa-solid fa-gauge-high', 'label' => 'Trang chủ'),
 	array('slug' => 'products', 'url' => admin_url('products'), 'icon' => 'fa-solid fa-shirt', 'label' => 'Sản phẩm'),
+	array('slug' => 'product-reviews', 'url' => admin_url('product-reviews'), 'icon' => 'fa-solid fa-star', 'label' => 'Đánh giá SP'),
 	array('slug' => 'slider', 'url' => admin_url('slider'), 'icon' => 'fa-solid fa-images', 'label' => 'Slider'),
 	array('slug' => array('orders', 'report'), 'url' => admin_url('orders'), 'icon' => 'fa-solid fa-receipt', 'label' => 'Đơn đặt hàng'),
 	array('slug' => 'users', 'url' => admin_url('users'), 'icon' => 'fa-solid fa-users', 'label' => 'Khách hàng'),
@@ -203,11 +204,6 @@ $info_section_open = in_array($current, $info_slugs, true);
 				href="<?php echo admin_url('ai-assistant/faq'); ?>">
 				<i class="fa-solid fa-circle-question admin-nav-icon" aria-hidden="true"></i>
 				<span>FAQ</span>
-			</a>
-			<a class="nav-link <?php echo ($ai_current && $ai_segment === 'conversations') ? 'active' : ''; ?>"
-				href="<?php echo admin_url('ai-assistant/conversations'); ?>">
-				<i class="fa-solid fa-robot admin-nav-icon" aria-hidden="true"></i>
-				<span>Hội thoại AI</span>
 			</a>
 			<?php } ?>
 		</nav>

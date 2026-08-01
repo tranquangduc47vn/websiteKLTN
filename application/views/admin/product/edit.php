@@ -147,25 +147,27 @@ $this->load->view('admin/partials/form_open');
 					<script src="<?php echo base_url('assets/admin/js/product-price.js?v=3'); ?>"></script>
 
 					<div class="form-group">
+						<label class="col-sm-2 control-label">Trạng thái bán</label>
+						<div class="col-sm-5">
+							<?php
+							$product_status = isset($product->status) ? (int) $product->status : 1;
+							if ($this->input->post('status') !== false && $this->input->post('status') !== null) {
+								$product_status = ((string) $this->input->post('status') === '0') ? 0 : 1;
+							}
+							?>
+							<select name="status" class="form-control">
+								<option value="1" <?php echo $product_status === 1 ? 'selected' : ''; ?>>Đang bán</option>
+								<option value="0" <?php echo $product_status === 0 ? 'selected' : ''; ?>>Ngừng bán (ẩn khỏi cửa hàng)</option>
+							</select>
+						</div>
+					</div>
+
+					<div class="form-group">
 						<label class="col-sm-2 control-label">Màu sắc</label>
 						<div class="col-sm-8">
 							<div class="color-checkbox-wrapper" style="display: flex; flex-wrap: wrap; gap: 15px; padding-top: 7px;">
 								<?php
-								$available_colors = [
-									'Đen' => '#000000',
-									'Trắng' => '#ffffff',
-									'Đỏ' => '#dd021b',
-									'Vàng' => '#fcd535',
-									'Xanh dương' => '#2196f3',
-									'Xanh lá' => '#4caf50',
-									'Hồng' => '#ffb6c1',
-									'Xám' => '#808080',
-									'Nâu' => '#8b5a2b',
-									'Kem' => '#f5f5dc',
-									'Cam' => '#ff9800',
-									'Tím' => '#9c27b0'
-								];
-
+								$available_colors = isset($available_colors) ? $available_colors : product_master_colors();
 								$current_colors = isset($product->color) ? explode(',', $product->color) : [];
 								$current_colors = array_map('trim', $current_colors);
 
@@ -193,7 +195,7 @@ $this->load->view('admin/partials/form_open');
 						<div class="col-sm-8">
 							<div class="size-checkbox-wrapper" style="display: flex; flex-wrap: wrap; gap: 20px; padding-top: 7px;">
 								<?php
-								$available_sizes = ['S', 'M', 'L', 'XL', 'XXL'];
+								$available_sizes = isset($available_sizes) ? $available_sizes : product_master_sizes();
 
 								$current_sizes = isset($product->size) ? explode(',', $product->size) : [];
 								$current_sizes = array_map('trim', $current_sizes);
@@ -228,6 +230,7 @@ $this->load->view('admin/partials/form_open');
 											<th>Size</th>
 											<th>Giá bán</th>
 											<th>Giá nhập</th>
+											<th>Tồn tối thiểu</th>
 											<th>Trạng thái</th>
 										</tr>
 									</thead>
@@ -237,9 +240,24 @@ $this->load->view('admin/partials/form_open');
 											<td><code><?php echo html_escape($v->sku); ?></code></td>
 											<td><?php echo html_escape($v->color !== '' ? $v->color : '—'); ?></td>
 											<td><?php echo html_escape($v->size !== '' ? $v->size : '—'); ?></td>
-											<td><?php echo number_format((float) $v->price); ?> ₫</td>
-											<td><?php echo number_format((float) $v->cost_price); ?> ₫</td>
-											<td><?php echo (int) $v->status === 1 ? 'Đang bán' : 'Ngưng'; ?></td>
+											<td>
+												<input type="text" class="form-control input-sm" name="variant[<?php echo (int) $v->id; ?>][price]"
+													value="<?php echo html_escape(number_format((float) $v->price, 0, '', ',')); ?>">
+											</td>
+											<td>
+												<input type="text" class="form-control input-sm" name="variant[<?php echo (int) $v->id; ?>][cost_price]"
+													value="<?php echo html_escape(number_format((float) $v->cost_price, 0, '', ',')); ?>">
+											</td>
+											<td>
+												<input type="number" class="form-control input-sm" min="0" name="variant[<?php echo (int) $v->id; ?>][min_stock]"
+													value="<?php echo (int) $v->min_stock; ?>">
+											</td>
+											<td>
+												<select class="form-control input-sm" name="variant[<?php echo (int) $v->id; ?>][status]">
+													<option value="1" <?php echo (int) $v->status === 1 ? 'selected' : ''; ?>>Đang bán</option>
+													<option value="0" <?php echo (int) $v->status !== 1 ? 'selected' : ''; ?>>Ngưng</option>
+												</select>
+											</td>
 										</tr>
 									<?php } ?>
 									</tbody>

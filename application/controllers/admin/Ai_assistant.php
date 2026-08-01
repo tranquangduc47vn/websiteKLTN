@@ -1,7 +1,7 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
-// Admin cấu hình trợ lý, FAQ, lịch sử hội thoại (quyền ai.manage)
+// Admin cấu hình trợ lý, FAQ (quyền ai.manage)
 class Ai_assistant extends MY_Admin_Controller {
 
 	protected $currentUser;
@@ -62,10 +62,7 @@ class Ai_assistant extends MY_Admin_Controller {
 
 	public function conversations($action = 'index', $id = 0)
 	{
-		if ($action === 'detail') {
-			return $this->_conversation_detail((int) $id);
-		}
-		return $this->_conversations_index();
+		redirect(admin_url('support-chat'));
 	}
 
 	protected function _faq_index()
@@ -148,35 +145,4 @@ class Ai_assistant extends MY_Admin_Controller {
 		redirect(admin_url('ai-assistant/faq'));
 	}
 
-	protected function _conversations_index()
-	{
-		$this->load->model('ai_conversation_model');
-		$keyword = trim((string) $this->input->get('q'));
-		$this->data['list'] = $this->ai_conversation_model->search($keyword, array('limit' => array(100, 0)));
-		$this->data['keyword'] = $keyword;
-		$this->render_admin('admin/ai_assistant/conversations_index');
-	}
-
-	protected function _conversation_detail($id)
-	{
-		$this->load->model('ai_conversation_model');
-		$this->load->model('ai_message_model');
-
-		$conversation = $this->ai_conversation_model->get_info($id);
-		if (!$conversation) {
-			admin_flash_fail( 'Hội thoại không tồn tại.');
-			redirect(admin_url('ai-assistant/conversations'));
-		}
-
-		$this->data['conversation'] = $conversation;
-		$this->data['messages'] = $this->ai_message_model->for_conversation($id);
-
-		$this->data['customer'] = null;
-		if ((int) $conversation->user_id > 0) {
-			$this->load->model('user_model');
-			$this->data['customer'] = $this->user_model->get_info((int) $conversation->user_id);
-		}
-
-		$this->render_admin('admin/ai_assistant/conversation_detail');
-	}
 }

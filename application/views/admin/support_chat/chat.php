@@ -72,12 +72,22 @@ $conv_id = $conversation ? (int) $conversation->id : 0;
 		<div class="admin-card">
 			<div class="admin-card-body">
 				<h2 class="h6 fw-bold">Thông tin khách</h2>
+				<?php
+				$this->load->helper('ai');
+				$customer_label = support_chat_customer_label($conversation, !empty($customer) ? $customer : null);
+				?>
+				<p class="mb-1"><strong><?php echo htmlspecialchars($customer_label, ENT_QUOTES, 'UTF-8'); ?></strong></p>
 				<?php if (!empty($customer)) { ?>
-					<p class="mb-1"><strong><?php echo htmlspecialchars($customer->name, ENT_QUOTES, 'UTF-8'); ?></strong></p>
 					<p class="small text-muted mb-0"><?php echo htmlspecialchars($customer->email, ENT_QUOTES, 'UTF-8'); ?></p>
-				<?php } else { ?>
-					<p class="small text-muted mb-0">Khách chưa đăng nhập (guest token).</p>
+				<?php } elseif ($conversation && !empty($conversation->guest_token)) { ?>
+					<p class="small text-muted mb-0">Mã phiên: <code><?php echo htmlspecialchars(substr((string) $conversation->guest_token, 0, 8), ENT_QUOTES, 'UTF-8'); ?></code></p>
 				<?php } ?>
+				<hr>
+				<form method="post" action="<?php echo admin_url('support-chat/delete/' . $conv_id); ?>"
+					onsubmit="return confirm('Xóa hội thoại #<?php echo $conv_id; ?> và mọi tin nhắn?');">
+					<?php echo csrf_field(); ?>
+					<button type="submit" class="btn btn-outline-danger btn-sm w-100">Xóa hội thoại này</button>
+				</form>
 				<hr>
 				<p class="small mb-0">Nhân viên phụ trách: <strong><?php echo htmlspecialchars(isset($conversation->staff_name) ? (string) $conversation->staff_name : '—', ENT_QUOTES, 'UTF-8'); ?></strong></p>
 			</div>

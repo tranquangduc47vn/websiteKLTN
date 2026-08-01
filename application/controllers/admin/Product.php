@@ -112,6 +112,9 @@ class Product extends MY_Admin_Controller {
 	public function add()
 	{
 		$this->data['catalog'] = $this->list_catalog();
+		$this->load->helper('product');
+		$this->data['available_colors'] = product_master_colors();
+		$this->data['available_sizes'] = product_master_sizes();
 		$this->form_validation->set_error_delimiters('<div class="alert alert-danger" role="alert" style="padding:5px;border-bottom:0px;">', '</div>');
 
 		if ($this->input->post()) {
@@ -215,6 +218,7 @@ class Product extends MY_Admin_Controller {
 
 	if($this->form_validation->run())
 	{
+		$old_price = (float) $product->price;
 		$price    = $this->_parse_price($this->input->post('price'));
 		if ($price < 0) {
 			admin_flash_fail('Giá sản phẩm không được âm.');
@@ -252,6 +256,10 @@ class Product extends MY_Admin_Controller {
 			'size'       => $size_string,
 		);
 
+		if ($this->db->field_exists('status', 'product')) {
+			$data['status'] = ($this->input->post('status') === '0') ? 0 : 1;
+		}
+
 		$this->load->library('upload_library');
 		$upload_path = './upload/product/';
 
@@ -260,7 +268,8 @@ class Product extends MY_Admin_Controller {
 		if($this->product_model->update($product->id, $data)) {
 			$colors = is_array($color_array) ? $color_array : array();
 			$sizes = is_array($size_array) ? $size_array : array();
-			$this->product_service->sync_variants($product->id, $colors, $sizes, $price);
+			$this->product_service->sync_variants($product->id, $colors, $sizes, $price, 0, $old_price);
+			$this->_save_variant_edits($product->id);
 			admin_flash_success( 'Cập nhật sản phẩm thành công!');
 		} else {
 			admin_flash_fail( 'Có lỗi xảy ra, không thể cập nhật.');
@@ -269,9 +278,15 @@ class Product extends MY_Admin_Controller {
 	}
 
 		$this->load->model('catalog_model');
+		$this->load->helper('product');
 		$this->data['catalog'] = $this->list_catalog();
 		$this->data['product'] = $product;
 		$this->data['variants'] = $this->product_variant_model->get_by_product($product->id);
+
+		$extra_colors = !empty($product->color) ? explode(',', (string) $product->color) : array();
+		$extra_sizes = !empty($product->size) ? explode(',', (string) $product->size) : array();
+		$this->data['available_colors'] = product_master_colors($extra_colors);
+		$this->data['available_sizes'] = product_master_sizes($extra_sizes);
 
 		$this->render_admin('admin/products/edit');
 	}
@@ -404,6 +419,56 @@ class Product extends MY_Admin_Controller {
 		if ($this->db->table_exists('product_variants')) {
 			$this->db->where('product_id', $product_id)->delete('product_variants');
 		}
+	}
+
+	private function _save_variant_edits($product_id)
+	{
+		$raw = $this->input->post('variant');
+		if (!is_array($raw)) {
+			return;
+		}
+
+		$product_id = (int) $product_id;
+		$now = time();
+
+		foreach ($raw as $variant_id => $fields) {
+			$variant_id = (int) $variant_id;
+			if ($variant_id <= 0 || !is_array($fields)) {
+				continue;
+			}
+
+			$variant = $this->product_variant_model->get_info($variant_id);
+			if (!$variant || (int) $variant->product_id !== $product_id) {
+				continue;
+			}
+
+			$update = array('updated' => $now);
+
+			if (isset($fields['price'])) {
+				$price = (int) str_replace(',', '', (string) $fields['price']);
+				if ($price >= 0) {
+					$update['price'] = $price;
+				}
+			}
+			if (isset($fields['cost_price'])) {
+				$cost = (int) str_replace(',', '', (string) $fields['cost_price']);
+				if ($cost >= 0) {
+					$update['cost_price'] = $cost;
+				}
+			}
+			if (isset($fields['min_stock'])) {
+				$update['min_stock'] = max(0, (int) $fields['min_stock']);
+			}
+			if (isset($fields['status'])) {
+				$update['status'] = ((string) $fields['status'] === '1') ? 1 : 0;
+			}
+
+			if (count($update) > 1) {
+				$this->product_variant_model->update($variant_id, $update);
+			}
+		}
+
+		$this->product_service->sync_product_quantity_cache($product_id);
 	}
 
 	private function _parse_price($raw)

@@ -4,21 +4,8 @@ $admin_form_breadcrumb = 'Sản phẩm';
 $admin_form_back_url = admin_url('products');
 $this->load->view('admin/partials/form_open');
 
-$available_colors = array(
-	'Đen' => '#000000',
-	'Trắng' => '#ffffff',
-	'Đỏ' => '#dd021b',
-	'Vàng' => '#fcd535',
-	'Xanh dương' => '#2196f3',
-	'Xanh lá' => '#4caf50',
-	'Hồng' => '#ffb6c1',
-	'Xám' => '#808080',
-	'Nâu' => '#8b5a2b',
-	'Kem' => '#f5f5dc',
-	'Cam' => '#ff9800',
-	'Tím' => '#9c27b0',
-);
-$available_sizes = array('S', 'M', 'L', 'XL', 'XXL');
+$available_colors = isset($available_colors) ? $available_colors : product_master_colors();
+$available_sizes = isset($available_sizes) ? $available_sizes : product_master_sizes();
 $old_colors = (array) $this->input->post('color');
 $old_sizes = (array) $this->input->post('size');
 ?>

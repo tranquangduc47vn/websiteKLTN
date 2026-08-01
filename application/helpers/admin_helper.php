@@ -51,9 +51,6 @@
 			if ($seg3 === 'faq') {
 				return 'Quản lý FAQ trợ lý AI';
 			}
-			if ($seg3 === 'conversations') {
-				return 'Lịch sử hội thoại trợ lý AI';
-			}
 			return 'Cấu hình trợ lý AI';
 		}
 
@@ -75,6 +72,9 @@
 				'default' => 'Quản lý sản phẩm',
 				'add' => 'Thêm sản phẩm',
 				'edit' => 'Chỉnh sửa sản phẩm',
+			),
+			'product-reviews' => array(
+				'default' => 'Duyệt đánh giá sản phẩm',
 			),
 			'inventory' => array(
 				'default' => 'Quản lý tồn kho',

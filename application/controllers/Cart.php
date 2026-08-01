@@ -124,7 +124,7 @@ class Cart extends MY_Frontend_Controller {
             }
 
             $product = $this->product_model->get_info($product_id);
-            if (empty($product)) {
+            if (empty($product) || !product_is_active($product)) {
                 $removed[] = !empty($item['name']) ? (string) $item['name'] : ('#' . $product_id);
                 $changed = TRUE;
                 continue;
@@ -434,6 +434,11 @@ class Cart extends MY_Frontend_Controller {
         $product = $this->product_model->get_info($id);
         if (empty($product)) {
             set_store_flash('fail', 'Sản phẩm không tồn tại trong hệ thống!');
+            redirect(base_url());
+        }
+
+        if (!product_is_active($product)) {
+            set_store_flash('fail', 'Sản phẩm này hiện không còn bán.');
             redirect(base_url());
         }
 

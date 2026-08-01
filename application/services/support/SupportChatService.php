@@ -90,7 +90,7 @@ class SupportChatService {
 	{
 		$conversation = $this->authorizeCustomerConversation($conversationId, $userId, $guestToken);
 		if (!$conversation) {
-			return array('ok' => true, 'messages' => array(), 'status' => self::STATUS_AI_ACTIVE);
+			return array('ok' => true, 'messages' => array());
 		}
 
 		$this->clearUnreadCustomer($conversationId);
@@ -98,6 +98,10 @@ class SupportChatService {
 
 		$CI =& get_instance();
 		$CI->load->model('ai_conversation_model');
+		$conversation = $CI->ai_conversation_model->get_info($conversationId);
+		if (!$conversation) {
+			return array('ok' => true, 'messages' => $messages);
+		}
 
 		return array(
 			'ok' => true,
@@ -343,8 +347,12 @@ class SupportChatService {
 		if (!$conversation) {
 			return null;
 		}
+
 		$userId = (int) $userId;
 		$guestToken = (string) $guestToken;
+		if ($userId > 0 && (int) $conversation->user_id === 0) {
+			$this->attachUserToConversation($conversation, $userId);
+		}
 		if ($userId > 0 && (int) $conversation->user_id === $userId) {
 			return $conversation;
 		}
@@ -446,10 +454,11 @@ class SupportChatService {
 	{
 		$conversation = $this->authorizeCustomerConversation($conversationId, $userId, $guestToken);
 		if (!$conversation) {
-			return array('ok' => true, 'messages' => array(), 'status' => self::STATUS_AI_ACTIVE);
+			return array('ok' => true, 'messages' => array());
 		}
 
 		$CI =& get_instance();
+		$CI->load->model('ai_conversation_model');
 		$CI->load->model('ai_message_model');
 		$rows = $CI->ai_message_model->for_conversation($conversationId);
 		$messages = array();
@@ -475,5 +484,54 @@ class SupportChatService {
 			'staff_name' => (string) $CI->ai_conversation_model->field_value($conversation, 'staff_name', ''),
 			'messages' => $messages,
 		);
+	}
+
+	public function deleteConversation($conversationId)
+	{
+		$CI =& get_instance();
+		$conversationId = (int) $conversationId;
+		if ($conversationId <= 0) {
+			return array('ok' => false, 'message' => 'Hội thoại không hợp lệ.');
+		}
+
+		$CI->load->model('ai_conversation_model');
+		$CI->load->model('ai_message_model');
+		$conversation = $CI->ai_conversation_model->get_info($conversationId);
+		if (!$conversation) {
+			return array('ok' => false, 'message' => 'Hội thoại không tồn tại.');
+		}
+
+		$CI->db->trans_start();
+		$CI->ai_message_model->delete_for_conversation($conversationId);
+		$CI->ai_conversation_model->delete($conversationId);
+		$CI->db->trans_complete();
+
+		if ($CI->db->trans_status() === false) {
+			return array('ok' => false, 'message' => 'Không xóa được hội thoại.');
+		}
+
+		return array('ok' => true, 'message' => 'Đã xóa hội thoại #' . $conversationId . ' và toàn bộ tin nhắn.');
+	}
+
+	public function purgeAllHistory()
+	{
+		$CI =& get_instance();
+		if (!$CI->db->table_exists('ai_conversation') || !$CI->db->table_exists('ai_message')) {
+			return array('ok' => false, 'message' => 'Bảng chat chưa sẵn sàng.');
+		}
+
+		$CI->load->model('ai_conversation_model');
+		$CI->load->model('ai_message_model');
+
+		$CI->db->trans_start();
+		$CI->ai_message_model->delete_all();
+		$CI->ai_conversation_model->delete_all();
+		$CI->db->trans_complete();
+
+		if ($CI->db->trans_status() === false) {
+			return array('ok' => false, 'message' => 'Không xóa được lịch sử chat.');
+		}
+
+		return array('ok' => true, 'message' => 'Đã xóa toàn bộ lịch sử hội thoại và tin nhắn.');
 	}
 }

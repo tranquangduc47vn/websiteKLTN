@@ -7,13 +7,14 @@ class Ai_message_model extends MY_Model {
 
 	public function log($conversation_id, $sender, $content, $meta = array())
 	{
-		return $this->create(array(
+		$this->create(array(
 			'conversation_id' => (int) $conversation_id,
 			'sender' => (string) $sender,
 			'content' => (string) $content,
 			'meta' => json_encode($meta, JSON_UNESCAPED_UNICODE),
 			'created' => time(),
 		));
+		return (int) $this->db->insert_id();
 	}
 
 	public function for_conversation($conversation_id, $limit = 0)
@@ -57,5 +58,24 @@ class Ai_message_model extends MY_Model {
 			return mb_substr($content, 0, 80, 'UTF-8') . '…';
 		}
 		return $content;
+	}
+
+	public function delete_for_conversation($conversation_id)
+	{
+		$conversation_id = (int) $conversation_id;
+		if ($conversation_id <= 0) {
+			return 0;
+		}
+		$this->db->where('conversation_id', $conversation_id);
+		$this->db->delete($this->table);
+		return (int) $this->db->affected_rows();
+	}
+
+	public function delete_all()
+	{
+		if (!$this->db->table_exists($this->table)) {
+			return false;
+		}
+		return $this->db->empty_table($this->table);
 	}
 }

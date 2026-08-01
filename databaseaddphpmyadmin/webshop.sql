@@ -908,12 +908,17 @@ CREATE TABLE `product_review` (
   `user_id` int NOT NULL DEFAULT '0',
   `user_name` varchar(100) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
   `stars` tinyint NOT NULL DEFAULT '5',
+  `comment` text COLLATE utf8mb3_unicode_ci,
+  `status` tinyint NOT NULL DEFAULT '0' COMMENT '0=pending,1=approved,2=rejected',
+  `reviewed_at` int NOT NULL DEFAULT '0',
+  `reviewed_by` int NOT NULL DEFAULT '0',
   `session_token` varchar(64) COLLATE utf8mb3_unicode_ci NOT NULL DEFAULT '',
   `created` int NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
   KEY `idx_product_review_product` (`product_id`),
   KEY `idx_product_review_user` (`user_id`),
-  KEY `idx_product_review_session` (`session_token`)
+  KEY `idx_product_review_session` (`session_token`),
+  KEY `idx_product_review_status` (`status`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
 
 
