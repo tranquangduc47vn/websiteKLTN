@@ -73,10 +73,21 @@ $admin_asset_url = base_url('assets/admin/');
 				<div class="col-md-2">
 					<label class="form-label small mb-1" for="filter-catalog">Danh mục</label>
 					<select id="filter-catalog" class="form-select form-select-sm">
-						<option value="">— Tất cả —</option>
-						<?php foreach ($catalogs as $cat) { ?>
-							<option value="<?php echo (int) $cat->id; ?>"><?php echo html_escape($cat->name); ?></option>
-						<?php } ?>
+						<option value="">— Tất cả danh mục —</option>
+						<?php foreach ($catalogs as $value) {
+							if (!empty($value->sub)) { ?>
+								<option value="<?php echo (int) $value->id; ?>" disabled style="font-weight: bold; color: #000; background-color: #eee;">
+									<?php echo html_escape($value->name); ?>
+								</option>
+								<?php foreach ($value->sub as $sub) { ?>
+									<option value="<?php echo (int) $sub->id; ?>">
+										&nbsp;&nbsp;&nbsp;— <?php echo html_escape($sub->name); ?>
+									</option>
+								<?php }
+							} else { ?>
+								<option value="<?php echo (int) $value->id; ?>"><?php echo html_escape($value->name); ?></option>
+							<?php }
+						} ?>
 					</select>
 				</div>
 				<div class="col-md-3">

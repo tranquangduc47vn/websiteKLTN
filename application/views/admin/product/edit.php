@@ -5,6 +5,65 @@ $admin_form_back_url = admin_url('product');
 $this->load->view('admin/partials/form_open');
 ?>
 				<form class="form-horizontal admin-form" action="<?php echo admin_url('product/edit/'.$product->id); ?>" method="post" enctype="multipart/form-data" data-product-price-form>
+
+					<?php
+					if ($this->input->post('discount') !== false && $this->input->post('discount') !== null) {
+						$discount_display = set_value('discount');
+					} elseif ((int) $product->discount_percent > 0) {
+						$discount_display = (string) (int) $product->discount_percent;
+					} elseif ((int) $product->price > 0 && (int) $product->discount > 0) {
+						$discount_display = (string) (int) round($product->discount / $product->price * 100);
+					} else {
+						$discount_display = '';
+					}
+					$product_status = isset($product->status) ? (int) $product->status : 1;
+					if ($this->input->post('status') !== false && $this->input->post('status') !== null) {
+						$product_status = ((string) $this->input->post('status') === '0') ? 0 : 1;
+					}
+					?>
+					<div class="admin-product-pricing-panel<?php echo $product_status === 0 ? ' admin-product-pricing-panel--inactive' : ''; ?>">
+						<div class="admin-product-pricing-panel__head">
+							<span class="admin-product-pricing-panel__icon" aria-hidden="true"><i class="fa-solid fa-tags"></i></span>
+							<div>
+								<h3 class="admin-product-pricing-panel__title">Giá &amp; trạng thái bán</h3>
+								<p class="admin-product-pricing-panel__subtitle">Khu vực chỉnh nhanh — thay đổi hiển thị ngay trên cửa hàng sau khi lưu</p>
+							</div>
+						</div>
+						<div class="row g-3 admin-product-pricing-panel__fields">
+							<div class="col-md-4">
+								<label for="price" class="admin-product-pricing-panel__label">Giá tiền (VNĐ)</label>
+								<input type="text" name="price" class="form-control form-control-lg admin-product-pricing-panel__input" id="price" inputmode="numeric"
+									placeholder="Ví dụ: 1,455,000" value="<?php echo set_value('price', number_format($product->price)); ?>">
+								<div class="text-danger small mt-1"><?php echo form_error('price'); ?></div>
+							</div>
+							<div class="col-md-4">
+								<label for="discount" class="admin-product-pricing-panel__label">Giảm giá (%)</label>
+								<div class="input-group input-group-lg admin-product-pricing-panel__input-group">
+									<input type="text" name="discount" class="form-control admin-product-pricing-panel__input" id="discount" inputmode="numeric"
+										placeholder="Ví dụ: 15" maxlength="3"
+										value="<?php echo html_escape($discount_display); ?>">
+									<span class="input-group-text">%</span>
+								</div>
+								<input type="hidden" name="discount_type" value="percent">
+								<p class="admin-product-pricing-panel__hint" data-discount-preview></p>
+							</div>
+							<div class="col-md-4">
+								<label for="product_status" class="admin-product-pricing-panel__label">Trạng thái bán</label>
+								<select name="status" id="product_status" class="form-control form-control-lg admin-product-pricing-panel__input admin-product-pricing-panel__select">
+									<option value="1" <?php echo $product_status === 1 ? 'selected' : ''; ?>>Đang bán</option>
+									<option value="0" <?php echo $product_status === 0 ? 'selected' : ''; ?>>Ngừng bán (ẩn khỏi cửa hàng)</option>
+								</select>
+							</div>
+						</div>
+					</div>
+					<script src="<?php echo base_url('assets/admin/js/product-price.js?v=3'); ?>"></script>
+					<script>
+					(function ($) {
+						$('#product_status').on('change', function () {
+							$('.admin-product-pricing-panel').toggleClass('admin-product-pricing-panel--inactive', $(this).val() === '0');
+						});
+					})(jQuery);
+					</script>
 					
 					<div class="form-group">
 						<label for="name" class="col-sm-2 control-label">Tên sản phẩm</label>
@@ -105,60 +164,6 @@ $this->load->view('admin/partials/form_open');
 						</div>
 						<div class="col-sm-4 text-danger">
 							<?php echo form_error('catalog_id'); ?>
-						</div>
-					</div>
-
-					<div class="form-group">
-						<label for="price" class="col-sm-2 control-label">Giá tiền (VNĐ)</label>
-						<div class="col-sm-5">
-							<input type="text" name="price" class="form-control" id="price" inputmode="numeric"
-								placeholder="Ví dụ: 1,455,000" value="<?php echo set_value('price', number_format($product->price)); ?>">
-						</div>
-						<div class="col-sm-4 text-danger">
-							<?php echo form_error('price'); ?>
-						</div>
-					</div>
-
-					<?php
-					if ($this->input->post('discount') !== false && $this->input->post('discount') !== null) {
-						$discount_display = set_value('discount');
-					} elseif ((int) $product->discount_percent > 0) {
-						$discount_display = (string) (int) $product->discount_percent;
-					} elseif ((int) $product->price > 0 && (int) $product->discount > 0) {
-						$discount_display = (string) (int) round($product->discount / $product->price * 100);
-					} else {
-						$discount_display = '';
-					}
-					?>
-					<div class="form-group">
-						<label for="discount" class="col-sm-2 control-label">Giảm giá (%)</label>
-						<div class="col-sm-5">
-							<div class="input-group">
-								<input type="text" name="discount" class="form-control" id="discount" inputmode="numeric"
-									placeholder="Ví dụ: 15" maxlength="3"
-									value="<?php echo html_escape($discount_display); ?>">
-								<span class="input-group-text">%</span>
-							</div>
-							<input type="hidden" name="discount_type" value="percent">
-							<p class="help-block text-muted" data-discount-preview style="font-size:11px;margin-top:6px;margin-bottom:0;"></p>
-						</div>
-					</div>
-
-					<script src="<?php echo base_url('assets/admin/js/product-price.js?v=3'); ?>"></script>
-
-					<div class="form-group">
-						<label class="col-sm-2 control-label">Trạng thái bán</label>
-						<div class="col-sm-5">
-							<?php
-							$product_status = isset($product->status) ? (int) $product->status : 1;
-							if ($this->input->post('status') !== false && $this->input->post('status') !== null) {
-								$product_status = ((string) $this->input->post('status') === '0') ? 0 : 1;
-							}
-							?>
-							<select name="status" class="form-control">
-								<option value="1" <?php echo $product_status === 1 ? 'selected' : ''; ?>>Đang bán</option>
-								<option value="0" <?php echo $product_status === 0 ? 'selected' : ''; ?>>Ngừng bán (ẩn khỏi cửa hàng)</option>
-							</select>
 						</div>
 					</div>
 

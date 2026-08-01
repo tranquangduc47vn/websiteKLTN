@@ -24,7 +24,7 @@ class Product_review_model extends MY_Model {
 	protected function approved_where()
 	{
 		if ($this->db->field_exists('status', $this->table)) {
-			$this->db->where('status', self::STATUS_APPROVED);
+			$this->db->where($this->table . '.status', self::STATUS_APPROVED);
 		}
 	}
 

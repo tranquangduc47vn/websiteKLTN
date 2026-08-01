@@ -34,13 +34,25 @@ class Product extends MY_Admin_Controller {
 	{
 		$search_name = $this->input->get('name');
 		$search_catalog = $this->input->get('catalog_id');
+		$search_status = $this->input->get('status');
+		if (!in_array((string) $search_status, array('0', '1'), true)) {
+			$search_status = '';
+		}
+		$has_status_col = $this->db->field_exists('status', 'product');
 		
 		$input_total = array();
+		$where_total = array();
 		if (!empty($search_name)) {
 			$input_total['like'] = array('name', $search_name);
 		}
 		if (!empty($search_catalog)) {
-			$input_total['where'] = array('catalog_id' => $search_catalog);
+			$where_total['catalog_id'] = $search_catalog;
+		}
+		if ($has_status_col && $search_status !== '') {
+			$where_total['status'] = (int) $search_status;
+		}
+		if (!empty($where_total)) {
+			$input_total['where'] = $where_total;
 		}
 		$total = $this->product_model->get_total($input_total);
 		$this->data['total'] = $total;
@@ -62,6 +74,9 @@ class Product extends MY_Admin_Controller {
 		if (!empty($search_catalog)) {
 			$admin_query['catalog_id'] = (int) $search_catalog;
 		}
+		if ($search_status !== '') {
+			$admin_query['status'] = (int) $search_status;
+		}
 		if (!empty($admin_query)) {
 			$config['suffix'] = '?' . http_build_query($admin_query);
 		}
@@ -73,14 +88,22 @@ class Product extends MY_Admin_Controller {
 		
 		$input = array();
 		$input['limit'] = array($config['per_page'], $segment);
+		$where_list = array();
 		
 		if (!empty($search_name)) {
 			$input['like'] = array('product.name', $search_name);
 		}
 		if (!empty($search_catalog)) {
-			$input['where'] = array('product.catalog_id' => $search_catalog);
+			$where_list['product.catalog_id'] = $search_catalog;
+		}
+		if ($has_status_col && $search_status !== '') {
+			$where_list['product.status'] = (int) $search_status;
+		}
+		if (!empty($where_list)) {
+			$input['where'] = $where_list;
 		}
 
+		$select_status = $has_status_col ? ', product.status as status' : '';
 		$this->db->select('
 			product.id as id,
 			product.name as name,
@@ -94,7 +117,7 @@ class Product extends MY_Admin_Controller {
 			color,
 			size,
 			quantity,
-			catalog.name as namecatalog
+			catalog.name as namecatalog' . $select_status . '
 		');
 		$this->db->join('catalog', 'catalog.id = product.catalog_id');
 		
@@ -105,6 +128,8 @@ class Product extends MY_Admin_Controller {
 		
 		$this->data['search_name'] = $search_name;
 		$this->data['search_catalog'] = $search_catalog;
+		$this->data['search_status'] = $search_status;
+		$this->data['has_product_status'] = $has_status_col;
 		
 		$this->render_admin('admin/products/index');
 	}

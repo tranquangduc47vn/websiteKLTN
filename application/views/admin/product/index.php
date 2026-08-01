@@ -16,11 +16,11 @@ $can_bulk_delete = admin_can('product.bulk_delete', $login);
 <div class="admin-card mb-3">
 	<div class="admin-card-body">
 		<form class="row g-2 align-items-end" action="<?php echo admin_url('product/index'); ?>" method="get" data-admin-auto-filter>
-			<div class="col-md-5">
+			<div class="col-md-4">
 				<label for="search_name" class="form-label">Tên sản phẩm</label>
 				<input type="search" name="name" class="form-control form-control-sm" id="search_name" placeholder="Nhập tên cần tìm..." value="<?php echo isset($search_name) ? $search_name : ''; ?>">
 			</div>
-			<div class="col-md-5">
+			<div class="col-md-4">
 				<label for="search_catalog" class="form-label">Danh mục</label>
 				<select name="catalog_id" class="form-select form-select-sm" id="search_catalog">
 							<option value="">-- Tất cả danh mục --</option>
@@ -50,6 +50,16 @@ $can_bulk_delete = admin_can('product.bulk_delete', $login);
 							?>
 					</select>
 			</div>
+			<?php if (!empty($has_product_status)) { ?>
+			<div class="col-md-2">
+				<label for="search_status" class="form-label">Trạng thái bán</label>
+				<select name="status" class="form-select form-select-sm" id="search_status">
+					<option value="" <?php echo ($search_status === '' || $search_status === null) ? 'selected' : ''; ?>>Tất cả</option>
+					<option value="1" <?php echo (string) $search_status === '1' ? 'selected' : ''; ?>>Còn kinh doanh</option>
+					<option value="0" <?php echo (string) $search_status === '0' ? 'selected' : ''; ?>>Ngừng kinh doanh</option>
+				</select>
+			</div>
+			<?php } ?>
 			<div class="col-md-2">
 				<a href="<?php echo admin_url('product'); ?>" class="btn btn-outline-secondary btn-sm w-100">Xóa bộ lọc</a>
 				<noscript><button type="submit" class="btn btn-primary btn-sm w-100 mt-1">Tìm kiếm</button></noscript>
@@ -90,8 +100,10 @@ $can_bulk_delete = admin_can('product.bulk_delete', $login);
 						</thead>
 						<tbody>
 						<?php if(!empty($product)): ?>
-							<?php foreach ($product as $value) { ?>
-							<tr>
+							<?php foreach ($product as $value) {
+								$row_inactive = !empty($has_product_status) && isset($value->status) && (int) $value->status === 0;
+							?>
+							<tr class="<?php echo $row_inactive ? 'admin-product-row--inactive' : ''; ?>">
 								<?php if ($can_bulk_delete): ?>
 									<td style="vertical-align: middle; text-align: center;">
 										<input type="checkbox" name="checkbox[]" class="case" value="<?php echo $value->id; ?>" />

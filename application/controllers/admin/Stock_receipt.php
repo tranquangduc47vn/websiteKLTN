@@ -364,9 +364,7 @@ class Stock_receipt extends MY_Admin_Controller {
 		));
 
 		$this->load->model('catalog_model');
-		$this->data['catalogs'] = $this->catalog_model->get_list(array(
-			'order' => array('name', 'ASC'),
-		));
+		$this->data['catalogs'] = $this->_catalog_tree();
 
 		$variant_ids = array();
 		foreach ((array) $items as $item) {
@@ -414,5 +412,20 @@ class Stock_receipt extends MY_Admin_Controller {
 		}
 
 		return $lines;
+	}
+
+	private function _catalog_tree()
+	{
+		$input = array(
+			'where' => array('parent_id' => '1'),
+			'order' => array('sort_order', 'ASC'),
+		);
+		$catalog = $this->catalog_model->get_list($input);
+		foreach ($catalog as $value) {
+			$input['where'] = array('parent_id' => $value->id);
+			$value->sub = $this->catalog_model->get_list($input);
+		}
+
+		return $catalog;
 	}
 }
