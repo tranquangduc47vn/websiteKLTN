@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller trang chủ storefront: hiển thị sản phẩm nổi bật, mới, bán chạy và slider banner.
+ */
 class Home extends MY_Frontend_Controller {
 
 	public function index()

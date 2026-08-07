@@ -1,6 +1,10 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Model bảng `user_address` — sổ địa chỉ giao hàng của khách (tối đa MAX_PER_USER địa chỉ/người).
+ * Địa chỉ mặc định được ưu tiên sắp xếp lên đầu và tự động đồng bộ vào cột address của bảng user.
+ */
 class User_address_model extends MY_Model {
 	var $table = 'user_address';
 	var $order = array('is_default', 'DESC');

@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Model bảng `stores` — thông tin hệ thống cửa hàng vật lý (địa chỉ, số điện thoại, giờ mở cửa).
+ */
 class Store_model extends MY_Model {
     
     public function __construct() {

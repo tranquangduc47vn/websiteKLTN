@@ -1,6 +1,10 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Model bảng `stock_receipts` — phiếu nhập kho từ nhà cung cấp.
+ * Mỗi phiếu có nhiều dòng chi tiết (stock_receipt_items); khi xác nhận sẽ cộng tồn kho vào product_variants.
+ */
 class Stock_receipt_model extends MY_Model {
 	var $table = 'stock_receipts';
 	var $order = array('id', 'DESC');

@@ -1,6 +1,10 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Model bảng `stock_receipt_items` — dòng chi tiết của phiếu nhập kho.
+ * Mỗi dòng chứa biến thể (variant_id), số lượng nhập và giá vốn tại thời điểm nhập.
+ */
 class Stock_receipt_item_model extends MY_Model {
 	var $table = 'stock_receipt_items';
 	var $order = array('id', 'ASC');

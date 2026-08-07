@@ -2,8 +2,9 @@
 
 defined('BASEPATH') OR exit('No direct script access allowed');
 
-
-
+/**
+ * Controller quản lý tuyển dụng phía admin: đăng tin vị trí, sửa, xóa (CMS).
+ */
 class Tuyendung extends MY_Admin_Controller {
 
 

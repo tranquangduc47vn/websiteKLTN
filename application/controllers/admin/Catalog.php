@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller quản lý danh mục sản phẩm phía admin (thêm, sửa, xóa, sắp xếp 3 cấp).
+ */
 class Catalog extends MY_Admin_Controller {
 
 	protected $currentUser;

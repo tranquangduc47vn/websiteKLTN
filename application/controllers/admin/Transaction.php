@@ -1,6 +1,11 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller quản lý đơn hàng phía admin.
+ * Luồng trạng thái: 0 (chờ) → 1 (xác nhận) → 2 (đang giao) → 3 (hoàn thành) | 4 (đã hủy).
+ * Khi complete: cộng buyed + tích điểm loyalty. Khi cancel: hoàn kho + thu hồi điểm (nếu đã hoàn thành).
+ */
 class Transaction extends MY_Admin_Controller {
 
 	function __construct()
@@ -24,6 +29,7 @@ class Transaction extends MY_Admin_Controller {
 		}
 	}
 
+	// Danh sách đơn hàng với bộ lọc: từ khóa, trạng thái, phương thức thanh toán, khoảng ngày.
 	public function index()
 	{
 		$filter_q = trim((string) $this->input->get('q'));
@@ -103,6 +109,7 @@ class Transaction extends MY_Admin_Controller {
 		}
 	}
 
+	// Chặn xóa đơn hàng; thay vào đó phải dùng cancel để giữ lịch sử.
 	public function del()
 	{
 		admin_require_post();
@@ -165,6 +172,7 @@ class Transaction extends MY_Admin_Controller {
 		redirect(admin_url('transaction/detail/' . $transaction_id));
 	}
 
+	// Xác nhận đơn: chuyển status 0 → 1 (chờ xử lý → đã xác nhận).
 	public function accept()
 	{
 		$id = $this->uri->segment(4);
@@ -182,6 +190,7 @@ class Transaction extends MY_Admin_Controller {
 		redirect(admin_url('transaction/detail/' . $id));
 	}
 
+	// Giao hàng: chuyển status 1 → 2 (đã xác nhận → đang giao hàng).
 	public function ship()
 	{
 		$id = $this->uri->segment(4);
@@ -198,6 +207,7 @@ class Transaction extends MY_Admin_Controller {
 		admin_flash_success('Cập nhật trạng thái đơn hàng: Đang giao hàng');
 		redirect(admin_url('transaction/detail/' . $id));
 	}
+	// Hoàn thành đơn: status → 3; cộng buyed cho sản phẩm và tích điểm loyalty cho khách.
 	public function complete()
 	{
 		$id = $this->uri->segment(4);
@@ -234,6 +244,7 @@ class Transaction extends MY_Admin_Controller {
 		redirect(admin_url('transaction/detail/' . $id));
 	}
 
+	// Hủy đơn (admin): chỉ được hủy status 0 hoặc 1; hoàn kho, thu hồi điểm nếu đã hoàn thành.
 	public function cancel()
 	{
 		admin_require_post();
@@ -247,6 +258,11 @@ class Transaction extends MY_Admin_Controller {
 
 		if ((string) $transaction->status === '4') {
 			admin_flash_fail('Đơn hàng đã được hủy trước đó.');
+			redirect(admin_url('transaction/detail/' . $id));
+		}
+
+		if (in_array((string) $transaction->status, array('2', '3'), true)) {
+			admin_flash_fail('Không thể hủy đơn hàng đã bàn giao cho shipper hoặc đã hoàn thành.');
 			redirect(admin_url('transaction/detail/' . $id));
 		}
 
@@ -278,6 +294,7 @@ class Transaction extends MY_Admin_Controller {
 		redirect(admin_url('support-chat'));
 	}
 
+	// AJAX lấy số đơn hàng đang chờ (status 0,1,2) cho badge sidebar admin.
 	public function pending_count()
 	{
 		$this->load->helper('admin');

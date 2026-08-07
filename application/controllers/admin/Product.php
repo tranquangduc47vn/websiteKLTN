@@ -1,6 +1,10 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller quản lý sản phẩm phía admin: thêm/sửa/xóa, upload ảnh, quản lý biến thể (size/màu/tồn kho).
+ * Khi lưu biến thể, tự động đồng bộ tồn kho tổng hợp về cột quantity của bảng product.
+ */
 class Product extends MY_Admin_Controller {
 
 	protected $currentUser;

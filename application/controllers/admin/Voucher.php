@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller quản lý mã voucher giảm giá phía admin (tạo, sửa, kích hoạt/tắt, xóa).
+ */
 class Voucher extends MY_Admin_Controller {
 
 	protected $currentUser;

@@ -2,6 +2,9 @@
 
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller quản lý trang tĩnh CMS phía admin (trang giới thiệu, vận chuyển, hợp tác, tuyển dụng).
+ */
 class Pages extends MY_Admin_Controller {
 
 	public function __construct()

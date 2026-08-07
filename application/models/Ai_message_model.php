@@ -1,6 +1,10 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Model bảng `ai_message` — tin nhắn trong phiên hội thoại AI chat.
+ * Lưu cả tin của khách (sender='user') và phản hồi AI (sender='ai'); sắp xếp theo thứ tự tăng dần.
+ */
 class Ai_message_model extends MY_Model {
 	var $table = 'ai_message';
 	var $order = array('id', 'ASC');

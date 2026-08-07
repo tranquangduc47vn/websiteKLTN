@@ -151,7 +151,7 @@
 				<?php echo admin_prompt_post_button(admin_url('transaction/cancel/' . $transaction->id), '<i class="fa-solid fa-ban me-1"></i> Hủy bỏ đơn', 'Nhập lý do hủy đơn hàng này:'); ?>
 			<?php } elseif ($transaction->status == '2') { ?>
 				<a href="<?php echo admin_url('transaction/complete/'.$transaction->id); ?>" class="btn btn-success"><i class="fa-solid fa-circle-check me-1"></i> Xác nhận: Khách đã nhận hàng thành công</a>
-				<?php echo admin_prompt_post_button(admin_url('transaction/cancel/' . $transaction->id), '<i class="fa-solid fa-rotate-left me-1"></i> Khách bùng hàng (Hoàn đơn)', 'Nhập lý do khách trả hàng / bùng hàng:', array('class' => 'btn btn-warning')); ?>
+				<span class="ms-2 text-muted small"><i class="fa-solid fa-lock me-1"></i>Đơn đã bàn giao shipper, không thể hủy</span>
 			<?php } elseif ($transaction->status == '3') { ?>
 				<div class="alert alert-success mb-0"><i class="fa-solid fa-circle-check me-1"></i> <strong>Đơn hàng hoàn tất:</strong> Đơn hàng đã được giao thành công và hệ thống đã ghi nhận doanh thu cùng số lượng sản phẩm bán ra.</div>
 			<?php } elseif ($transaction->status == '4') { ?>

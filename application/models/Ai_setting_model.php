@@ -1,6 +1,10 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Model bảng `ai_setting` — cấu hình AI assistant (key-value store).
+ * Kết quả được cache trong static $cache để tránh query lặp trong cùng một request.
+ */
 class Ai_setting_model extends MY_Model {
 	var $table = 'ai_setting';
 

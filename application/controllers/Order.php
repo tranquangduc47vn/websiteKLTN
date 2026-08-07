@@ -1,6 +1,11 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller xử lý đặt hàng và thanh toán phía storefront.
+ * Quản lý: trang checkout, áp voucher (AJAX), trang QR chuyển khoản, hủy đơn từ phía khách.
+ * Giỏ hàng đọc từ session custom_cart; tồn kho được kiểm tra lại ngay trước khi tạo đơn.
+ */
 class Order extends MY_Frontend_Controller {
     public function __construct()
     {
@@ -13,6 +18,7 @@ class Order extends MY_Frontend_Controller {
         $this->load->library('inventory_service');
     }
 
+    // Trang checkout: hiển thị form đặt hàng; xử lý POST tạo đơn (kiểm tra tồn kho, trừ kho, ghi nhận voucher).
     public function index()
     {
         $carts = $this->session->userdata('custom_cart');
@@ -280,7 +286,7 @@ class Order extends MY_Frontend_Controller {
         $this->render_frontend_sub('site/order/index');
     }
 
-    // AJAX áp dụng voucher (session + JSON)
+    // AJAX áp dụng / bỏ voucher; cập nhật session checkout_voucher và trả về JSON với số tiền giảm.
     public function apply_voucher()
     {
         $this->output->set_content_type('application/json', 'utf-8');
@@ -354,6 +360,7 @@ class Order extends MY_Frontend_Controller {
         ), csrf_json_meta()));
     }
 
+    // Trang QR chuyển khoản: hiển thị mã VietQR sau khi đặt hàng thành công bằng phương thức chuyển khoản.
     public function checkout_qr()
     {
         $id = $this->uri->segment(3);
@@ -396,6 +403,7 @@ class Order extends MY_Frontend_Controller {
         
         $this->render_frontend_sub('site/order/checkout_qr');
     }
+    // Khách hủy đơn (POST): chỉ cho phép hủy status 0 hoặc 1; hoàn kho và điểm tích lũy nếu cần.
     public function cancel()
     {
         if ($this->input->method() !== 'post') {
@@ -542,6 +550,7 @@ class Order extends MY_Frontend_Controller {
         return number_format((int) $amount, 0, ',', '.') . ' ₫';
     }
 
+    // Kiểm tra toàn bộ giỏ hàng: xóa sản phẩm không còn bán/hết tồn, cập nhật giá và subtotal theo DB hiện tại.
     private function _sanitize_cart(array $carts)
     {
         $clean = array();

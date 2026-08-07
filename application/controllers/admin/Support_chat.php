@@ -1,7 +1,10 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
-// Admin chat khách hàng (quyền order.chat)
+/**
+ * Controller hỗ trợ chat khách hàng phía admin (yêu cầu quyền order.chat).
+ * Xem danh sách hội thoại AI, đọc tin nhắn, gửi phản hồi từ admin vào phiên của khách.
+ */
 class Support_chat extends MY_Admin_Controller {
 
 	protected $currentUser;

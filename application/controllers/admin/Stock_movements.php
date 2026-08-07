@@ -1,6 +1,10 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller xem lịch sử xuất/nhập kho phía admin (chỉ đọc).
+ * Lọc theo biến thể, loại biến động và khoảng ngày.
+ */
 class Stock_movements extends MY_Admin_Controller {
 
 	protected $currentUser;

@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller trang tin tức / blog storefront: danh sách bài viết và xem chi tiết.
+ */
 class Tintuc extends MY_Controller {
 
     public function __construct() {

@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller trang tin tức chi tiết storefront (alias/redirect cho Tintuc).
+ */
 class News extends MY_Controller {
 
     public function __construct() {

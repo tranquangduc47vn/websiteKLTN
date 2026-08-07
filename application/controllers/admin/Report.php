@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller báo cáo kinh doanh phía admin: doanh thu theo ngày/tháng, sản phẩm bán chạy, tổng quan.
+ */
 class Report extends MY_Admin_Controller {
 
     public function __construct()

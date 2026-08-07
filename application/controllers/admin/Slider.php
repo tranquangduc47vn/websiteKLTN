@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller quản lý slider banner trang chủ phía admin (thêm, sửa, xóa, upload ảnh).
+ */
 class Slider extends MY_Admin_Controller {
 
 	function __construct()

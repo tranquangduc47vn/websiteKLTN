@@ -1,7 +1,10 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
-// Admin cấu hình trợ lý, FAQ (quyền ai.manage)
+/**
+ * Controller quản lý cấu hình AI assistant phía admin (yêu cầu quyền ai.manage).
+ * Cấu hình Gemini API key, model, prompt hệ thống và danh sách FAQ ngữ cảnh.
+ */
 class Ai_assistant extends MY_Admin_Controller {
 
 	protected $currentUser;

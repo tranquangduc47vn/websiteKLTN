@@ -1,9 +1,15 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Model quản lý voucher giảm giá.
+ * Kiểm tra điều kiện áp dụng: hiệu lực thời gian, hạng thành viên, đơn tối thiểu, lượt dùng tối đa.
+ * Ghi nhận lịch sử sử dụng vào bảng `voucher_use` và cập nhật used_count.
+ */
 class Voucher_model extends MY_Model {
 	var $table = 'voucher';
 
+	// Kiểm tra toàn diện voucher tại checkout: hạn, hạng thành viên, giới hạn lượt, đơn tối thiểu.
 	public function validate_for_checkout($code, $user_id, $cart_total)
 	{
 		$this->load->helper('loyalty');
@@ -86,6 +92,7 @@ class Voucher_model extends MY_Model {
 		);
 	}
 
+	// Ghi nhận một lượt dùng voucher; tăng used_count và lưu log vào voucher_use.
 	public function record_use($voucher_id, $user_id, $transaction_id, $discount_amount)
 	{
 		$voucher_id = (int) $voucher_id;
@@ -102,6 +109,7 @@ class Voucher_model extends MY_Model {
 		$this->db->update($this->table);
 	}
 
+	// Hoàn lượt dùng khi đơn bị hủy: giảm used_count và xóa log voucher_use của đơn đó.
 	public function release_for_transaction($transaction_id)
 	{
 		$transaction_id = (int) $transaction_id;

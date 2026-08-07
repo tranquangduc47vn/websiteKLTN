@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller trang tuyển dụng storefront: danh sách vị trí và xem chi tiết.
+ */
 class Tuyendung extends MY_Controller {
 
     public function __construct() {

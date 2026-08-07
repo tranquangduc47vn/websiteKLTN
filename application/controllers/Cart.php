@@ -1,6 +1,11 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller giỏ hàng phía storefront (session custom_cart).
+ * Xử lý: xem giỏ, thêm/sửa/xóa sản phẩm, cập nhật số lượng và biến thể (size/màu).
+ * Trả về JSON cho AJAX hoặc redirect flash nếu là form thường.
+ */
 class Cart extends MY_Frontend_Controller {
     
     public function __construct()
@@ -84,6 +89,7 @@ class Cart extends MY_Frontend_Controller {
         );
     }
 
+    // Mỗi tổ hợp (product_id + size + color) có một rowid riêng để tách dòng trong giỏ hàng.
     private function _build_rowid($id, $size, $color)
     {
         return $id . '_' . md5($size . '_' . $color);
@@ -102,6 +108,7 @@ class Cart extends MY_Frontend_Controller {
         return $items;
     }
 
+    // Đồng bộ giá và tồn kho cho toàn bộ giỏ: cập nhật price/subtotal theo DB, xóa dòng hết hàng.
     private function _recalculate_cart_prices($carts)
     {
         if (!is_array($carts) || empty($carts)) {
@@ -503,6 +510,7 @@ class Cart extends MY_Frontend_Controller {
         redirect(build_cart_url());
     }
 
+    // Cập nhật size/màu sắc của một dòng trong giỏ; nếu rowid mới đã tồn tại thì gộp số lượng.
     public function update_options()
     {
         if (!$this->_require_login_for_cart()) {
@@ -600,6 +608,7 @@ class Cart extends MY_Frontend_Controller {
         )));
     }
 
+    // Tăng (action=sum) hoặc giảm (action=sub) số lượng một dòng; kiểm tra tồn kho khi tăng.
     public function update()
     {
         if ($this->input->method() !== 'post') {

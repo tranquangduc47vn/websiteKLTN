@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller trang tổng quan (dashboard) phía admin: thống kê nhanh đơn hàng, doanh thu, tồn kho.
+ */
 class Home extends MY_Admin_Controller {
 
     function __construct()

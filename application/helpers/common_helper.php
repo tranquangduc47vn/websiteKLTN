@@ -49,11 +49,6 @@
 		$CI->data['temp'] = $view;
 		$CI->load->view($layout, $CI->data);
 	}
-	function pre($str=''){
-		echo '<pre>';
-		print_r($str);
-		die;
-	}
 	function pagination($base_url='',$total='',$per='',$uri='')
 	{
 		$config = array();

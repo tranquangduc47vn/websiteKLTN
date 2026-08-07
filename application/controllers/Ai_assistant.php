@@ -1,7 +1,10 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
-// AJAX widget hỗ trợ khách
+/**
+ * Controller AJAX cho widget AI chat hỗ trợ khách hàng phía storefront.
+ * Nhận tin nhắn từ khách, gọi Gemini API, lưu lịch sử vào ai_conversation/ai_message và trả về JSON.
+ */
 class Ai_assistant extends MY_Frontend_Controller {
 
 	public function send()

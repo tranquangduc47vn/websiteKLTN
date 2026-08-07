@@ -221,9 +221,9 @@ $account_asset = site_asset_url('');
 										<td class="jm-account-orders__actions">
 											<div class="jm-account-orders__action-stack">
 												<button type="button" class="jm-account-btn jm-account-btn--ghost" onclick="moModalChiTietDon(<?php echo (int) $value->id; ?>)">Chi tiết</button>
-												<?php if ($value->status == '0') { ?>
-													<button type="button" class="jm-account-btn jm-account-btn--danger" onclick="moModalHuyDon(<?php echo (int) $value->id; ?>)">Hủy đơn</button>
-												<?php } ?>
+											<?php if ($value->status == '0' || $value->status == '1') { ?>
+												<button type="button" class="jm-account-btn jm-account-btn--danger" onclick="moModalHuyDon(<?php echo (int) $value->id; ?>)">Hủy đơn</button>
+											<?php } ?>
 											</div>
 										</td>
 									</tr>

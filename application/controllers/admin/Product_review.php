@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller quản lý đánh giá sản phẩm phía admin (duyệt, ẩn, xóa nhận xét của khách).
+ */
 class Product_review extends MY_Admin_Controller {
 
 	protected $currentUser;

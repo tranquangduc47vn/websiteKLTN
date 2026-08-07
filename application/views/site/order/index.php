@@ -105,7 +105,7 @@ $voucher_init_code = $has_applied ? $cv['code'] : set_value('voucher_code');
 					</div>
 				</div>
 
-				<button type="submit" class="jm-checkout-submit">Xác nhận đặt hàng</button>
+				<button type="submit" class="jm-checkout-submit">Tiến hành thanh toán</button>
 			</form>
 		</section>
 	</div>

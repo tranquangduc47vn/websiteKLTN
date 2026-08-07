@@ -1,6 +1,10 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Model bảng `product_variants` — biến thể sản phẩm (size + màu sắc).
+ * Mỗi biến thể lưu tồn kho riêng (stock), mức tồn kho tối thiểu (min_stock) và giá vốn (cost_price).
+ */
 class Product_variant_model extends MY_Model {
 
 	var $table = 'product_variants';

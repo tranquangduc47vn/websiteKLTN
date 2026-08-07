@@ -1,6 +1,11 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Model bảng `ai_conversation` — phiên hội thoại AI chat.
+ * Một phiên thuộc về user đã đăng nhập (user_id > 0) hoặc khách vãng lai (guest_token).
+ * find_or_create đảm bảo mỗi người chỉ tiếp tục phiên của chính mình, không bị truy cập chéo.
+ */
 class Ai_conversation_model extends MY_Model {
 	var $table = 'ai_conversation';
 	var $order = array('id', 'DESC');

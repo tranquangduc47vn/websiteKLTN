@@ -149,7 +149,7 @@ $cart_asset = site_asset_url('');
 							<strong class="jm-cart-summary__amount"><?php echo number_format($total_price, 0, ',', '.'); ?> ₫</strong>
 						</div>
 					</div>
-					<a href="<?php echo build_checkout_url(); ?>" class="jm-cart-checkout">Tiến hành thanh toán</a>
+					<a href="<?php echo build_checkout_url(); ?>" class="jm-cart-checkout">Tiến hành đặt hàng</a>
 				</footer>
 			</section>
 		<?php } else { ?>

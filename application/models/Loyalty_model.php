@@ -1,8 +1,14 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Model xử lý nghiệp vụ tích điểm và hạng thành viên (loyalty).
+ * Hạng tính theo số đơn hoàn thành + tổng chi tiêu (loyalty_compute_tier).
+ * Điểm được cộng khi đơn hoàn thành (status 3) và hoàn lại khi đơn bị hủy.
+ */
 class Loyalty_model extends CI_Model {
 
+	// Trả về profile tích điểm của user; tự cập nhật hạng nếu hạng tính lại khác hạng đang lưu.
 	public function get_profile($user_id)
 	{
 		$user_id = (int) $user_id;
@@ -31,6 +37,7 @@ class Loyalty_model extends CI_Model {
 		);
 	}
 
+	// Cộng điểm và cập nhật hạng khi đơn chuyển sang hoàn thành; bỏ qua nếu đã ghi log earn.
 	public function credit_order_completed($transaction)
 	{
 		if (empty($transaction) || (int) $transaction->user_id <= 0) {
@@ -76,6 +83,7 @@ class Loyalty_model extends CI_Model {
 		}
 	}
 
+	// Hoàn lại điểm và giảm chỉ số khi hủy đơn đã hoàn thành; bỏ qua nếu chưa có log earn hoặc đã reverse.
 	public function reverse_order_completed($transaction)
 	{
 		if (empty($transaction) || (int) $transaction->user_id <= 0) {

@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller trang hệ thống cửa hàng vật lý: hiển thị danh sách địa điểm trên bản đồ.
+ */
 class Hethongcuahang extends MY_Frontend_Controller {
 
     public function index()

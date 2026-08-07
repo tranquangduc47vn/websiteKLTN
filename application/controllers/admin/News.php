@@ -2,8 +2,9 @@
 
 defined('BASEPATH') OR exit('No direct script access allowed');
 
-
-
+/**
+ * Controller quản lý tin tức / bài viết blog phía admin (CMS).
+ */
 class News extends MY_Admin_Controller {
 
 

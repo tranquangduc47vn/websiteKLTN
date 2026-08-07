@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller trang chính sách vận chuyển storefront.
+ */
 class Vanchuyen extends MY_Controller {
 
     public function __construct() {

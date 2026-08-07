@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller quản lý tài khoản khách hàng phía admin (xem, tìm kiếm, khóa/mở tài khoản).
+ */
 class User extends MY_Admin_Controller {
 
 	function __construct()

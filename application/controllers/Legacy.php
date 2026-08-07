@@ -1,7 +1,10 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
-// Redirect URL storefront cũ sang SEO URL
+/**
+ * Controller chuyển hướng (301) từ URL cũ (posts/, product/view/) sang SEO URL mới.
+ * Xem chi tiết mapping tại docs/URL-MIGRATION.md.
+ */
 class Legacy extends CI_Controller
 {
 	public function posts($path = '')

@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller trang chính sách tích điểm và hạng thành viên phía storefront.
+ */
 class Loyalty extends MY_Frontend_Controller {
 
 	public function index()

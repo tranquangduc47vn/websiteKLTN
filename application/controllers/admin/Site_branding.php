@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller cấu hình thương hiệu website phía admin: tên shop, logo, favicon.
+ */
 class Site_branding extends MY_Admin_Controller {
 
 	public function __construct()

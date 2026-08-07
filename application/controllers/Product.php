@@ -1,6 +1,11 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller sản phẩm phía storefront.
+ * Xử lý: trang chi tiết sản phẩm, catalog theo danh mục, tìm kiếm, sản phẩm mới / giảm giá / nổi bật.
+ * SEO: tự redirect về URL chuẩn (slug-pID) nếu truy cập qua route cũ hoặc slug không khớp.
+ */
 class Product extends MY_Frontend_Controller {
     public function __construct()
     {

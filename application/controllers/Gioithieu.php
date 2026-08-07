@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller trang giới thiệu thương hiệu storefront.
+ */
 class Gioithieu extends MY_Controller {
 
 	public function index()

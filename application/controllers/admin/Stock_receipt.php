@@ -1,6 +1,11 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller quản lý phiếu nhập kho phía admin.
+ * Luồng: tạo nháp → thêm dòng chi tiết (variant + số lượng + giá vốn) → xác nhận → cộng tồn kho.
+ * Khi xác nhận, tồn kho từng biến thể được cập nhật qua InventoryService và ghi log stock_movements.
+ */
 class Stock_receipt extends MY_Admin_Controller {
 
 	protected $currentUser;

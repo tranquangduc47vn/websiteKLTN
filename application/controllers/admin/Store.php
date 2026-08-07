@@ -2,8 +2,9 @@
 
 defined('BASEPATH') OR exit('No direct script access allowed');
 
-
-
+/**
+ * Controller quản lý hệ thống cửa hàng vật lý phía admin (địa chỉ, giờ mở cửa, bản đồ).
+ */
 class Store extends MY_Admin_Controller {
 
 

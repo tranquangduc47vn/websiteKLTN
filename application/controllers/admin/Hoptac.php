@@ -2,8 +2,9 @@
 
 defined('BASEPATH') OR exit('No direct script access allowed');
 
-
-
+/**
+ * Controller quản lý trang hợp tác kinh doanh / đại lý phía admin (CMS).
+ */
 class Hoptac extends MY_Admin_Controller {
 
 

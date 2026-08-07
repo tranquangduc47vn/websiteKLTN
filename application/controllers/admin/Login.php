@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller đăng nhập / đăng xuất phía admin.
+ */
 class Login extends MY_Controller {
 
 	public function __construct()

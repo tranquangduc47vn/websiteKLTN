@@ -1,6 +1,10 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Model bảng `password_resets` — token đặt lại mật khẩu qua email.
+ * Token hết hạn sau EXPIRE_SECONDS (15 phút); sau khi dùng được đánh dấu used_at để vô hiệu hóa.
+ */
 class Password_reset_model extends MY_Model {
 	var $table = 'password_resets';
 

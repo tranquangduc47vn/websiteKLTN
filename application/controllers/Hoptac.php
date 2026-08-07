@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller trang hợp tác kinh doanh / đại lý storefront.
+ */
 class Hoptac extends MY_Controller {
 
     public function __construct() {

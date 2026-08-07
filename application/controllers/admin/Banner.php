@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller quản lý banner quảng cáo phía admin.
+ */
 class Banner extends MY_Admin_Controller {
 
     protected $currentUser;

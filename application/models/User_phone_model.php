@@ -1,6 +1,10 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Model bảng `user_phone` — sổ số điện thoại của khách (tối đa MAX_PER_USER số/người).
+ * Số mặc định được ưu tiên sắp xếp lên đầu và tự động đồng bộ vào cột phone của bảng user.
+ */
 class User_phone_model extends MY_Model {
 	var $table = 'user_phone';
 	var $order = array('is_default', 'DESC');

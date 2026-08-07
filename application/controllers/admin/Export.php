@@ -3,6 +3,10 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 require_once APPPATH . 'services/export/ExportService.php';
 
+/**
+ * Controller xuất dữ liệu phía admin (PDF / Excel).
+ * Sử dụng ExportService để tạo file; hỗ trợ nhiều module: orders, products, inventory,...
+ */
 class Export extends MY_Admin_Controller {
 
 	public function __construct()

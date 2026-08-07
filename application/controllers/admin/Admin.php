@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller quản lý tài khoản admin (tạo, sửa, đổi mật khẩu, phân quyền, xóa).
+ */
 class Admin extends MY_Admin_Controller {
 
 	protected $currentUser;

@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller quản lý nhà cung cấp phía admin (thêm, sửa, xóa).
+ */
 class Suppliers extends MY_Admin_Controller {
 
 	protected $currentUser;

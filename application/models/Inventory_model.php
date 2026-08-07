@@ -1,8 +1,14 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Model quản lý tồn kho phía admin.
+ * Đọc dữ liệu từ bảng `product_variants`; hỗ trợ lọc theo danh mục, sku, trạng thái tồn kho.
+ * Không ghi trực tiếp — việc nhập/xuất kho thực hiện qua InventoryService và StockReceipt.
+ */
 class Inventory_model extends CI_Model {
 
+	// Phân loại tồn kho thành out (hết), low (sắp hết ≤ min_stock), ok (còn hàng).
 	public function stock_label($stock, $min_stock)
 	{
 		$stock = (int) $stock;
@@ -48,6 +54,7 @@ class Inventory_model extends CI_Model {
 		return $this->db->get()->result();
 	}
 
+	// Thống kê nhanh: tổng biến thể, số hết hàng, số sắp hết, giá trị tồn kho (stock × cost_price).
 	public function get_stats()
 	{
 		$row = $this->db->query('
@@ -168,6 +175,7 @@ class Inventory_model extends CI_Model {
 		return $map;
 	}
 
+	// Các biến thể admin đã nhập gần nhất (dùng cho gợi ý nhanh khi tạo phiếu nhập kho mới).
 	public function get_recent_receipt_variants($admin_id, $limit = 10)
 	{
 		$admin_id = (int) $admin_id;

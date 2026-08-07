@@ -1,6 +1,10 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller quản lý tồn kho phía admin: xem danh sách biến thể, lọc theo trạng thái tồn kho.
+ * Tìm kiếm variant cho phiếu nhập kho (AJAX); xem lịch sử xuất/nhập theo variant.
+ */
 class Inventory extends MY_Admin_Controller {
 
 	protected $currentUser;

@@ -1,6 +1,11 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Controller tài khoản khách hàng phía storefront.
+ * Xử lý: đăng nhập, đăng ký, quên/đặt lại mật khẩu, quản lý địa chỉ và số điện thoại, xem đơn hàng.
+ * Sau đăng nhập, giỏ hàng đã lưu (DB) được tự động khôi phục vào session custom_cart.
+ */
 class User extends MY_Frontend_Controller {
 	public function __construct()
 	{
@@ -12,7 +17,8 @@ class User extends MY_Frontend_Controller {
 		$this->load->helper('form');
 	}
 
-public function index()
+	// Trang tài khoản: hiển thị thông tin, địa chỉ, số điện thoại, danh sách đơn hàng, voucher và điểm loyalty.
+	public function index()
 	{
 		$user_login = $this->_require_login();
 		$user_id = (int) $user_login->id;
@@ -511,6 +517,7 @@ public function index()
 		return $user_login;
 	}
 
+	// Làm mới dữ liệu user trong session sau khi cập nhật profile (tên, địa chỉ, điện thoại).
 	protected function _refresh_session_user($user_id)
 	{
 		$user_row = $this->user_model->get_info((int) $user_id);
@@ -710,6 +717,7 @@ public function index()
 		$this->render_frontend_standalone('site/user/login');
 	}
 
+	// Xác thực đăng nhập: hỗ trợ mật khẩu bcrypt mới và MD5 legacy (tự động nâng cấp hash khi đăng nhập).
 	public function get_info_user()
 	{
 		$email = trim((string) $this->input->post('email'));
@@ -820,6 +828,7 @@ public function index()
 		$this->render_frontend_standalone('site/user/reset_password');
 	}
 
+	// Đăng xuất: đồng bộ giỏ hàng vào DB trước khi xóa session, rồi xóa custom_cart và checkout_voucher.
 	public function logout()
 	{
 		$user = $this->session->userdata('user');
