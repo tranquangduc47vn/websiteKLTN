@@ -528,7 +528,7 @@
 
 	.jm-catalog-lux .jm-product-name {
 		font-size: 15px !important;
-		min-height: 0 !important;
+		min-height: calc(1.48em * 2) !important;
 	}
 
 	.jm-catalog-lux .jm-price-new {

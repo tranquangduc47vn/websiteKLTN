@@ -9,6 +9,7 @@ application/config/mail.local.php
 application/config/branding.local.php
 .env
 .env.*
+!.env.example
 
 # CodeIgniter cache / logs
 application/cache/*
@@ -45,6 +46,12 @@ user_guide_src/cilexer/build/*
 user_guide_src/cilexer/dist/*
 user_guide_src/cilexer/pycilexer.egg-info/*
 /vendor/
+/node_modules/
+.composer-home/
+
+# Dump và script export local — có thể chứa dữ liệu hoặc credential.
+# File đã từng được track cần gỡ khỏi index, không xóa bản trên đĩa.
+/databaseaddphpmyadmin/
 
 # IDE / editor
 /nbproject/

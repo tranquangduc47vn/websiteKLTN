@@ -51,7 +51,7 @@
     $sort_options['price_asc'] = 'Giá tăng dần';
     $sort_options['price_desc'] = 'Giá giảm dần';
 ?>
-<link rel="stylesheet" href="<?php echo $site_asset_url; ?>css/catalog-luxury.css?v=28">
+<link rel="stylesheet" href="<?php echo $site_asset_url; ?>css/catalog-luxury.css?v=29">
 <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12 jm-catalog-wrapper jm-catalog-lux jm-catalog-lux--sidebar-pinned">
 
     <div class="jm-toolbar jm-catalog-header">

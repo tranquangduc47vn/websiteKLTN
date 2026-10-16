@@ -2,15 +2,18 @@
 defined('BASEPATH') OR exit('No direct script access allowed');
 
 /**
- * Sao chép file này thành ai.php rồi điền API key:
+ * Sao chép file này thành ai.php.
  *   copy application\config\ai.php.example application\config\ai.php
+ *
+ * Không dán API key vào file PHP. Đặt GEMINI_API_KEY trong môi trường
+ * hoặc trong laravel/.env (file đó không được commit).
  *
  * Cờ bật/tắt AI / nhân viên nội bộ nằm ở bảng `ai_setting`.
  */
 
 $config['ai_provider'] = 'gemini';
 
-$config['ai_gemini_api_key'] = ''; // dán Gemini API key tại đây
+$config['ai_gemini_api_key'] = getenv('GEMINI_API_KEY') ?: '';
 $config['ai_gemini_model'] = 'gemini-3.1-flash-lite';
 $config['ai_gemini_endpoint'] = 'https://generativelanguage.googleapis.com/v1beta/models';
 $config['ai_gemini_timeout'] = 10;

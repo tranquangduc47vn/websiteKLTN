@@ -19,7 +19,7 @@ $site_asset_url = site_asset_url('');
 	<link rel="stylesheet" type="text/css" href="<?php echo $site_asset_url; ?>bootstrap/css/bootstrap.css">
 	<link rel="stylesheet" type="text/css" href="<?php echo $site_asset_url; ?>css/style.css?v=20260724c">
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
-	<link rel="stylesheet" type="text/css" href="<?php echo $site_asset_url; ?>css/layout-chrome-2026.css?v=20">
+	<link rel="stylesheet" type="text/css" href="<?php echo $site_asset_url; ?>css/layout-chrome-2026.css?v=21">
 	<?php if (!empty($canonical_url)) { ?>
 	<link rel="canonical" href="<?php echo htmlspecialchars($canonical_url, ENT_QUOTES, 'UTF-8'); ?>">
 	<?php } ?>

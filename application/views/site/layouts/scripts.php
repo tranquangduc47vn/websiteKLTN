@@ -1,7 +1,7 @@
 <?php
 $site_asset_url = site_asset_url('');
 ?>
-<link rel="stylesheet" type="text/css" href="<?php echo $site_asset_url; ?>css/responsive-2026.css?v=15">
+<link rel="stylesheet" type="text/css" href="<?php echo $site_asset_url; ?>css/responsive-2026.css?v=16">
 <?php echo csrf_form_inject_script(); ?>
 <script src="<?php echo $site_asset_url; ?>bootstrap/js/bootstrap.min.js"></script>
 <script src="<?php echo $site_asset_url; ?>js/header-icons.js"></script>
