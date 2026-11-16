@@ -4,7 +4,7 @@
 @php
     $siteAssetUrl = \App\Support\Storefront\Shop::assetUrl("");
 @endphp
-<link rel="stylesheet" href="{{ $siteAssetUrl }}css/home-bestsellers.css?v=9">
+<link rel="stylesheet" href="{{ $siteAssetUrl }}css/home-bestsellers.css?v=10">
 
 <div class="row home-collection-banners" style="margin-top: 20px; margin-bottom: 40px;">
     @if (!empty($list_banner) && count($list_banner) > 0)
@@ -53,7 +53,6 @@
                 $img = \App\Support\Storefront\Product::imageUrl($value->image_link);
                 $in_stock = \App\Support\Storefront\Product::isInStock($value);
                 $price_new = (int) $value->price - (int) $value->discount;
-                $add_url = url("gio-hang/them/" . (int) $value->id);
             @endphp
             <li class="jm-bs-card{{ $in_stock ? "" : " jm-bs-card--out-of-stock" }}">
                 <div class="jm-bs-card__media">
@@ -67,9 +66,7 @@
                         <img src="{{ $img }}" alt="{{ $name }}" loading="lazy">
                     </a>
                     @if ($in_stock)
-                    <a href="{{ $add_url }}" class="jm-bs-card__cart-btn">
-                        Thêm giỏ hàng
-                    </a>
+                    @include("site.partials.add-to-cart-form", ["productId" => (int) $value->id, "buttonClass" => "jm-bs-card__cart-btn", "label" => "Thêm giỏ hàng"])
                     @else
                     <span class="jm-bs-card__cart-btn jm-bs-card__cart-btn--disabled">Hết hàng</span>
                     @endif

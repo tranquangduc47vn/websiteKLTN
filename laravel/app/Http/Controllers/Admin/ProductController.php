@@ -98,7 +98,7 @@ class ProductController extends Controller
 
         return view('admin.products.form', [
             'product' => $product,
-            'variants' => $product->variants()->orderBy('color')->orderBy('size')->get(),
+            'variants' => $product->variants()->orderBy('color_name')->orderBy('size_name')->get(),
             'catalog' => $this->products->catalogTree(),
             'colors' => $this->products->colors($extraColors),
             'sizes' => $this->products->sizes($extraSizes),

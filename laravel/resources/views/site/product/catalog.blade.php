@@ -17,7 +17,7 @@
     $sortOptions = $sort_options ?? ["new" => "Mới nhất", "price_asc" => "Giá tăng dần", "price_desc" => "Giá giảm dần"];
     $isHotList = ! empty($is_hot_list);
 @endphp
-<link rel="stylesheet" href="{{ $siteAssetUrl }}css/catalog-luxury.css?v=29">
+<link rel="stylesheet" href="{{ $siteAssetUrl }}css/catalog-luxury.css?v=30">
 <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12 jm-catalog-wrapper jm-catalog-lux jm-catalog-lux--sidebar-pinned">
 
     <div class="jm-toolbar jm-catalog-header">
@@ -176,10 +176,10 @@
                         <div class="jm-color-scroll-container">
                             <div class="jm-color-options">
                                 @php
-                                    $availableColors = \App\Support\Storefront\ColorPalette::defaults();
+                                    $availableColors = \App\Support\Storefront\ColorPalette::fromMaster();
                                     foreach ($chosenColorsArr as $chosenColorName) {
                                         if ($chosenColorName !== "" && ! isset($availableColors[$chosenColorName])) {
-                                            $availableColors[$chosenColorName] = "#e0e0e0";
+                                            $availableColors[$chosenColorName] = \App\Support\Storefront\ColorPalette::hexFor($chosenColorName);
                                         }
                                     }
                                 @endphp

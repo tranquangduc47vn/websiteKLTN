@@ -3,25 +3,28 @@
 namespace App\Http\Controllers\Storefront;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Models\Slider;
+use App\Models\Store;
+use Illuminate\View\View;
 
-/**
- * TODO B5+: implement logic tu CI3 $n.
- */
 class HethongcuahangController extends Controller
 {
-    public function index(Request $request)
+    public function index(): View
     {
-        abort(501, 'Chua implement — xem TODO trong routes/web.php.');
+        return view('site.stores.index', [
+            'page_title' => 'Hệ thống cửa hàng - ' . config('shop.name', 'qD Design'),
+            'list_stores' => Store::query()->orderBy('id')->get(),
+            'slider' => Slider::query()->ordered()->get(),
+        ]);
     }
 
-    public function handlePath(Request $request, string $path = '')
+    public function handlePath(): never
     {
-        abort(501, 'Chua implement — xem TODO trong routes/web.php.');
+        abort(404);
     }
 
-    public function __call(string $method, array $args)
+    public function __call(string $method, array $parameters): never
     {
-        abort(501, 'Action $method chua implement — xem TODO trong routes/web.php.');
+        abort(404);
     }
 }

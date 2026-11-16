@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\LegacyTimestamps;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -26,13 +25,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class ProductReview extends BaseModel
 {
-    use LegacyTimestamps;
 
-    protected $table = 'product_review';
+    protected $table = 'product_reviews';
 
-    public const STATUS_PENDING = 0;
-    public const STATUS_APPROVED = 1;
-    public const STATUS_REJECTED = 2;
+    public const UPDATED_AT = null;
+
+    public $timestamps = true;
+
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_APPROVED = 'approved';
+
+    public const STATUS_REJECTED = 'rejected';
 
     protected function casts(): array
     {
@@ -41,10 +45,8 @@ class ProductReview extends BaseModel
             'product_id' => 'int',
             'user_id' => 'int',
             'stars' => 'int',
-            'status' => 'int',
-            'reviewed_at' => 'int',
+            'reviewed_at' => 'datetime',
             'reviewed_by' => 'int',
-            'created' => 'int',
         ];
     }
 
@@ -85,11 +87,13 @@ class ProductReview extends BaseModel
 
     public function isApproved(): bool
     {
-        return (int) $this->status === self::STATUS_APPROVED;
+        return $this->status === self::STATUS_APPROVED;
     }
 
-    public function createdAt(): ?\Illuminate\Support\Carbon
+    public function getCreatedAttribute(): int
     {
-        return $this->legacyTimestamp('created');
+        $value = $this->created_at;
+
+        return $value ? $value->getTimestamp() : 0;
     }
 }

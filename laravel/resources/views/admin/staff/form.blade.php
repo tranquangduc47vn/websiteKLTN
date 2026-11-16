@@ -2,14 +2,18 @@
 
 @section('content')
 @php $editing = $staff !== null; @endphp
-<nav aria-label="breadcrumb" class="mb-3">
+<nav aria-label="breadcrumb" class="admin-breadcrumb">
 	<ol class="breadcrumb mb-0">
 		<li class="breadcrumb-item"><a href="{{ url('admin/admin') }}">Nhân viên</a></li>
 		<li class="breadcrumb-item active">{{ $editing ? 'Sửa thông tin thành viên' : 'Thêm quản trị viên' }}</li>
 	</ol>
 </nav>
-<form method="post" action="{{ url($editing ? 'admin/admin/edit/' . $staff->id : 'admin/admin/add') }}">
+<div class="admin-page-header">
+	<h1 class="admin-page-title">{{ $editing ? 'Sửa thông tin thành viên' : 'Thêm quản trị viên' }}</h1>
+</div>
+<form method="post" action="{{ url($editing ? 'admin/admin/edit/' . $staff->id : 'admin/admin/add') }}" class="adm-form">
 	@csrf
+	<div class="admin-card"><div class="admin-card-body">
 	<div class="mb-3">
 		<label class="form-label" for="name">Họ tên</label>
 		<input class="form-control" id="name" name="name" maxlength="100" value="{{ old('name', $staff->name ?? '') }}">
@@ -40,7 +44,10 @@
 			<option value="2" @selected((string) old('level', $staff->level ?? '') === '2')>User</option>
 		</select>
 	</div>
-	<button class="btn btn-primary" type="submit">{{ $editing ? 'Lưu thay đổi' : 'Thêm mới' }}</button>
-	<a class="btn btn-outline-secondary" href="{{ url('admin/admin') }}">Hủy bỏ</a>
+	</div></div>
+	<div class="d-flex flex-wrap gap-2 mb-4">
+		<button class="btn btn-primary" type="submit">{{ $editing ? 'Lưu thay đổi' : 'Thêm mới' }}</button>
+		<a class="btn btn-outline-secondary" href="{{ url('admin/admin') }}">Hủy bỏ</a>
+	</div>
 </form>
 @endsection

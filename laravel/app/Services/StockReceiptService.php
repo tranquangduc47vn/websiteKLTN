@@ -65,7 +65,6 @@ class StockReceiptService
             $receipt->note = trim($note);
             $receipt->total_qty = $totals['qty'];
             $receipt->total_amount = $totals['amount'];
-            $receipt->updated = $now;
             $receipt->save();
 
             StockReceiptItem::query()->where('receipt_id', $receipt->id)->delete();
@@ -111,10 +110,9 @@ class StockReceiptService
 
                 $applied = $this->applyLines((int) $receipt->id, (string) $receipt->receipt_code, $lines, $adminId, $now);
                 $receipt->status = StockReceipt::STATUS_CONFIRMED;
-                $receipt->confirmed_by = $adminId;
-                $receipt->confirmed_at = $now;
+                $receipt->confirmed_by = $adminId > 0 ? $adminId : null;
+                $receipt->confirmed_at = now();
                 $receipt->total_amount = $applied;
-                $receipt->updated = $now;
                 $receipt->save();
 
                 return ['ok' => true, 'message' => 'Đã xác nhận phiếu ' . $receipt->receipt_code . ' và cộng tồn kho.'];
@@ -137,10 +135,8 @@ class StockReceiptService
             return ['ok' => false, 'message' => 'Chỉ hủy được phiếu nháp.'];
         }
 
-        $now = time();
         $receipt->status = StockReceipt::STATUS_CANCELLED;
-        $receipt->cancelled_at = $now;
-        $receipt->updated = $now;
+        $receipt->cancelled_at = now();
         $receipt->save();
 
         return ['ok' => true, 'message' => 'Đã hủy phiếu ' . $receipt->receipt_code . '.'];
@@ -186,12 +182,10 @@ class StockReceiptService
                     'total_qty' => $totals['qty'],
                     'total_amount' => $totals['amount'],
                     'receipt_date' => date('Y-m-d'),
-                    'created_by' => $adminId,
-                    'confirmed_by' => $confirm ? $adminId : 0,
-                    'confirmed_at' => $confirm ? $now : 0,
-                    'cancelled_at' => 0,
-                    'created' => $now,
-                    'updated' => $now,
+                    'created_by' => $adminId > 0 ? $adminId : null,
+                    'confirmed_by' => $confirm && $adminId > 0 ? $adminId : null,
+                    'confirmed_at' => $confirm ? now() : null,
+                    'cancelled_at' => null,
                 ]);
 
                 $this->insertLines((int) $receipt->id, $validation['lines']);
@@ -200,7 +194,6 @@ class StockReceiptService
                     $amount = $this->applyLines((int) $receipt->id, $code, $validation['lines'], $adminId, $now);
                     if ($amount > 0) {
                         $receipt->total_amount = $amount;
-                        $receipt->updated = $now;
                         $receipt->save();
                     }
                 }
@@ -257,7 +250,7 @@ class StockReceiptService
             }
 
             $variant = ProductVariant::query()->find($variantId);
-            if (! $variant || (int) $variant->status !== 1) {
+            if (! $variant || (string) $variant->status !== ProductVariant::STATUS_ACTIVE) {
                 $errors[] = 'Dòng ' . ($idx + 1) . ': biến thể không tồn tại hoặc đã ngưng.';
 
                 continue;
@@ -353,12 +346,12 @@ class StockReceiptService
             StockReceiptItem::query()->create([
                 'receipt_id' => $receiptId,
                 'variant_id' => $line['variant_id'],
-                'product_id' => $line['product_id'],
-                'size' => $line['size'],
-                'color' => $line['color'],
+                'sku' => (string) (ProductVariant::query()->where('id', $line['variant_id'])->value('sku') ?? ''),
+                'color_name' => (string) ($line['color'] ?? ''),
+                'size_name' => (string) ($line['size'] ?? ''),
                 'qty' => $line['qty'],
                 'unit_cost' => $line['unit_cost'],
-                'subtotal' => $line['subtotal'],
+                'line_total' => $line['subtotal'],
                 'note' => '',
             ]);
         }
@@ -389,7 +382,7 @@ class StockReceiptService
             return ['ok' => false, 'message' => 'Vui lòng chọn nhà cung cấp trước khi nhập kho.'];
         }
         $supplier = Supplier::query()->find($supplierId);
-        if (! $supplier || (int) $supplier->status !== 1) {
+        if (! $supplier || (string) $supplier->status !== 'active') {
             return ['ok' => false, 'message' => 'Nhà cung cấp không hợp lệ hoặc đã ngưng hoạt động.'];
         }
 

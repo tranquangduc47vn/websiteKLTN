@@ -47,8 +47,10 @@ class InventoryController extends Controller
             ->limit(self::PER_PAGE)
             ->get([
                 'product_variants.*',
-                'product.name as product_name',
-                'catalog.name as catalog_name',
+                'product_variants.color_name as color',
+                'product_variants.size_name as size',
+                'products.name as product_name',
+                'categories.name as catalog_name',
             ]);
 
         $admin = Auth::guard('admin')->user();
@@ -127,7 +129,7 @@ class InventoryController extends Controller
             return redirect()->to(url('admin/inventory'))->with('message_fail', 'Biến thể không tồn tại.');
         }
 
-        $name = (string) DB::table('product')->where('id', $variant->product_id)->value('name');
+        $name = (string) DB::table('products')->where('id', $variant->product_id)->value('name');
 
         return view('admin.inventory.adjust', [
             'variant' => $variant,
@@ -152,14 +154,14 @@ class InventoryController extends Controller
     private function filtered(array $filters)
     {
         $query = DB::table('product_variants')
-            ->join('product', 'product.id', '=', 'product_variants.product_id')
-            ->leftJoin('catalog', 'catalog.id', '=', 'product.catalog_id');
+            ->join('products', 'products.id', '=', 'product_variants.product_id')
+            ->leftJoin('categories', 'categories.id', '=', 'products.category_id');
 
         if ($filters['name'] !== '') {
-            $query->where('product.name', 'like', '%' . addcslashes($filters['name'], '%_\\') . '%');
+            $query->where('products.name', 'like', '%' . addcslashes($filters['name'], '%_\\') . '%');
         }
         if ($filters['catalog_id'] > 0) {
-            $query->where('product.catalog_id', $filters['catalog_id']);
+            $query->where('products.category_id', $filters['catalog_id']);
         }
         if ($filters['sku'] !== '') {
             $query->where('product_variants.sku', 'like', '%' . addcslashes($filters['sku'], '%_\\') . '%');
@@ -192,23 +194,25 @@ class InventoryController extends Controller
 
         return $query->get([
             'product_variants.*',
-            'product.name as product_name',
-            'catalog.name as catalog_name',
+            'product_variants.color_name as color',
+            'product_variants.size_name as size',
+            'products.name as product_name',
+            'categories.name as catalog_name',
         ]);
     }
 
     /** @return array{total: int, out_of_stock: int, low_stock: int, stock_value: float} */
     private function stats(): array
     {
-        $row = DB::selectOne('
+        $row = DB::selectOne("
             SELECT
                 COUNT(*) AS total,
                 SUM(CASE WHEN stock <= 0 THEN 1 ELSE 0 END) AS out_of_stock,
                 SUM(CASE WHEN stock > 0 AND stock <= min_stock THEN 1 ELSE 0 END) AS low_stock,
                 SUM(stock * cost_price) AS stock_value
             FROM product_variants
-            WHERE status = 1
-        ');
+            WHERE status = 'active'
+        ");
 
         return [
             'total' => (int) ($row->total ?? 0),
@@ -221,9 +225,9 @@ class InventoryController extends Controller
     /** @return list<object> */
     private function catalogs(): array
     {
-        $parents = DB::table('catalog')->where('parent_id', 1)->orderBy('sort_order')->get();
+        $parents = DB::table('categories')->where('parent_id', 1)->orderBy('sort_order')->get();
         foreach ($parents as $parent) {
-            $parent->sub = DB::table('catalog')->where('parent_id', $parent->id)->orderBy('sort_order')->get();
+            $parent->sub = DB::table('categories')->where('parent_id', $parent->id)->orderBy('sort_order')->get();
         }
 
         return $parents->all();

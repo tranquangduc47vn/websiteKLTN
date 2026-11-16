@@ -28,8 +28,8 @@ class VariantStockService
      */
     public function attributes(Product $product): array
     {
-        $colors = self::normalizeList(explode(',', (string) $product->color));
-        $sizes = self::normalizeList(explode(',', (string) $product->size));
+        $colors = $product->colorList();
+        $sizes = $product->sizeList();
 
         return [
             'colors' => $colors !== [] ? $colors : [''],
@@ -64,11 +64,11 @@ class VariantStockService
         // So khớp chính xác trên bộ nạp sẵn; nếu trượt thì để MySQL so theo collation như CI3.
         $row ??= ProductVariant::query()
             ->where('product_id', (int) $product->id)
-            ->where('color', $color)
-            ->where('size', $size)
+            ->where('color_name', $color)
+            ->where('size_name', $size)
             ->first();
 
-        if (! $row || (int) $row->status !== 1) {
+        if (! $row || (string) $row->status !== ProductVariant::STATUS_ACTIVE) {
             return null;
         }
 

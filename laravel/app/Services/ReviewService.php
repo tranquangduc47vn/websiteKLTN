@@ -32,14 +32,14 @@ class ReviewService
             'reviews' => ProductReview::query()
                 ->where('product_id', $productId)
                 ->where('status', ProductReview::STATUS_APPROVED)
-                ->orderByDesc('created')
+                ->orderByDesc('created_at')
                 ->limit(50)
                 ->get(),
             'breakdown' => $breakdown,
             'rate_count' => $count,
             'rate_total' => $total,
             'user_review' => $own,
-            'pending' => $own !== null && (int) $own->status === ProductReview::STATUS_PENDING,
+            'pending' => $own !== null && (string) $own->status === ProductReview::STATUS_PENDING,
         ];
     }
 
@@ -69,17 +69,16 @@ class ReviewService
             'stars' => $score,
             'user_name' => ($user instanceof User && $user->name !== '') ? (string) $user->name : 'Khách hàng',
             'comment' => $comment,
-            'created' => time(),
             'status' => ProductReview::STATUS_PENDING,
-            'reviewed_at' => 0,
-            'reviewed_by' => 0,
+            'reviewed_at' => null,
+            'reviewed_by' => null,
         ];
 
         $existing = $this->ownReview($productId, $guestToken);
         if ($existing) {
             if ((int) $existing->stars === $score
                 && trim((string) $existing->comment) === $comment
-                && (int) $existing->status === ProductReview::STATUS_PENDING) {
+                && (string) $existing->status === ProductReview::STATUS_PENDING) {
                 return [
                     'complete' => true,
                     'pending' => true,
@@ -99,7 +98,7 @@ class ReviewService
 
         ProductReview::query()->create(array_merge($payload, [
             'product_id' => $productId,
-            'user_id' => $userId,
+            'user_id' => $userId > 0 ? $userId : null,
             'session_token' => $userId > 0 ? '' : $guestToken,
         ]));
         $this->syncProductStats($productId);
@@ -144,7 +143,7 @@ class ReviewService
             return null;
         }
 
-        return $query->where('user_id', 0)->where('session_token', $guestToken)->first();
+        return $query->whereNull('user_id')->where('session_token', $guestToken)->first();
     }
 
     /**
@@ -153,7 +152,7 @@ class ReviewService
     public function breakdown(int $productId): array
     {
         $breakdown = [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0];
-        $rows = DB::table('product_review')
+        $rows = DB::table('product_reviews')
             ->selectRaw('stars, COUNT(*) AS total')
             ->where('product_id', $productId)
             ->where('status', ProductReview::STATUS_APPROVED)
@@ -171,15 +170,15 @@ class ReviewService
 
     public function syncProductStats(int $productId): void
     {
-        $row = DB::table('product_review')
+        $row = DB::table('product_reviews')
             ->where('product_id', $productId)
             ->where('status', ProductReview::STATUS_APPROVED)
             ->selectRaw('COUNT(*) AS rate_count, COALESCE(SUM(stars), 0) AS rate_total')
             ->first();
 
         Product::query()->where('id', $productId)->update([
-            'rate_count' => (int) ($row->rate_count ?? 0),
-            'rate_total' => (int) ($row->rate_total ?? 0),
+            'rating_count' => (int) ($row->rate_count ?? 0),
+            'rating_total' => (int) ($row->rate_total ?? 0),
         ]);
     }
 
@@ -188,30 +187,30 @@ class ReviewService
      */
     public function adminList(string $status, string $keyword): array
     {
-        $query = DB::table('product_review')
-            ->leftJoin('product', 'product.id', '=', 'product_review.product_id')
-            ->select(['product_review.*', 'product.name as product_name']);
+        $query = DB::table('product_reviews')
+            ->leftJoin('products', 'products.id', '=', 'product_reviews.product_id')
+            ->select(['product_reviews.*', 'products.name as product_name']);
 
         if ($status === 'pending') {
-            $query->where('product_review.status', ProductReview::STATUS_PENDING);
+            $query->where('product_reviews.status', ProductReview::STATUS_PENDING);
         } elseif ($status === 'approved') {
-            $query->where('product_review.status', ProductReview::STATUS_APPROVED);
+            $query->where('product_reviews.status', ProductReview::STATUS_APPROVED);
         } elseif ($status === 'rejected') {
-            $query->where('product_review.status', ProductReview::STATUS_REJECTED);
+            $query->where('product_reviews.status', ProductReview::STATUS_REJECTED);
         }
 
         if ($keyword !== '') {
             $like = '%' . addcslashes($keyword, '%_\\') . '%';
             $query->where(function ($inner) use ($like, $keyword) {
-                $inner->where('product.name', 'like', $like)
-                    ->orWhere('product_review.user_name', 'like', $like)
-                    ->orWhere('product_review.comment', 'like', $like)
-                    ->orWhere('product_review.product_id', (int) $keyword);
+                $inner->where('products.name', 'like', $like)
+                    ->orWhere('product_reviews.user_name', 'like', $like)
+                    ->orWhere('product_reviews.comment', 'like', $like)
+                    ->orWhere('product_reviews.product_id', (int) $keyword);
             });
         }
 
         return [
-            'list' => $query->orderByDesc('product_review.created')->limit(100)->get(),
+            'list' => $query->orderByDesc('product_reviews.created_at')->limit(100)->get(),
             'counts' => [
                 'pending' => (int) ProductReview::query()->where('status', ProductReview::STATUS_PENDING)->count(),
                 'approved' => (int) ProductReview::query()->where('status', ProductReview::STATUS_APPROVED)->count(),
@@ -220,7 +219,7 @@ class ReviewService
         ];
     }
 
-    public function setStatus(int $id, int $status, int $adminId): bool
+    public function setStatus(int $id, string $status, int $adminId): bool
     {
         $review = ProductReview::query()->find($id);
         if (! $review) {
@@ -228,8 +227,8 @@ class ReviewService
         }
         $review->fill([
             'status' => $status,
-            'reviewed_at' => time(),
-            'reviewed_by' => $adminId,
+            'reviewed_at' => now(),
+            'reviewed_by' => $adminId > 0 ? $adminId : null,
         ])->save();
         $this->syncProductStats((int) $review->product_id);
 

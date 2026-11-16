@@ -24,10 +24,10 @@ class AdminComposer
             $badge = 0;
             $waiting = 0;
             if ($admin && AdminPermission::can($admin, 'order.manage')) {
-                $badge = (int) DB::table('transaction')->whereIn('status', [0, 1, 2])->count();
+                $badge = (int) DB::table('orders')->whereIn('status', ['pending', 'confirmed', 'packed'])->count();
             }
-            if ($admin && AdminPermission::can($admin, 'order.chat') && Schema::hasTable('ai_conversation')) {
-                $waiting = (int) DB::table('ai_conversation')->whereIn('status', ['waiting_staff', 'handed_off'])->count();
+            if ($admin && AdminPermission::can($admin, 'order.chat') && Schema::hasTable('ai_conversations')) {
+                $waiting = (int) DB::table('ai_conversations')->whereIn('status', ['waiting_staff', 'handed_off'])->count();
             }
             $request->attributes->set('admin.shared', [
                 'login' => $admin,

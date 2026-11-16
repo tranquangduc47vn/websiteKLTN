@@ -66,7 +66,10 @@ class CartTest extends CartTestCase
 
         $this->addToCart($product, ['size' => 'S', 'color' => 'Đen', 'qty' => 1])
             ->assertRedirect(Urls::login())
-            ->assertSessionHas('redirect_back', url('gio-hang/them/' . $product->id));
+            ->assertSessionHas('redirect_back', url('gio-hang'))
+            ->assertSessionHas('pending_cart_add.id', $product->id)
+            ->assertSessionHas('pending_cart_add.size', 'S')
+            ->assertSessionHas('pending_cart_add.color', 'Đen');
 
         $this->assertSame([], $this->sessionCart());
     }
@@ -108,10 +111,12 @@ class CartTest extends CartTestCase
     {
         $this->get('/gio-hang/update')->assertNotFound();
         $this->get('/gio-hang/del')->assertNotFound();
+        $this->get('/gio-hang/cap-nhat-thuoc-tinh')->assertNotFound();
 
         $this->actingAs($this->makeUser(), 'web');
         $this->get('/gio-hang/update')->assertNotFound();
         $this->get('/gio-hang/del/abc')->assertNotFound();
+        $this->get('/gio-hang/cap-nhat-thuoc-tinh')->assertNotFound();
     }
 
     /* ---------------------------------------------------------------
@@ -171,13 +176,21 @@ class CartTest extends CartTestCase
         $this->assertSame([$rowid => $expectedItem], $this->sessionCart());
     }
 
-    public function test_related_product_get_link_adds_default_variant(): void
+    public function test_get_add_does_not_mutate_cart_and_post_adds_default_variant(): void
     {
         $this->actingAs($this->makeUser(), 'web');
         $product = $this->standardProduct();
 
-        $this->get('/gio-hang/them/' . $product->id)->assertRedirect(Urls::cart());
+        $this->get('/gio-hang/them/' . $product->id)->assertNotFound();
+        $this->get('/gio-hang/add/' . $product->id)->assertNotFound();
+        $this->assertSame([], $this->sessionCart());
 
+        $card = view('site.partials.product-card', ['value' => $product])->render();
+        $this->assertStringContainsString('method="post"', $card);
+        $this->assertStringContainsString(url('gio-hang/them/' . $product->id), $card);
+        $this->assertStringNotContainsString('<a href="' . url('gio-hang/them/' . $product->id), $card);
+
+        $this->post('/gio-hang/them/' . $product->id)->assertRedirect(Urls::cart());
         $rowid = $this->rowId($product, 'S', 'Đen');
         $this->assertSame(1, $this->sessionCart()[$rowid]['qty']);
     }
@@ -266,7 +279,7 @@ class CartTest extends CartTestCase
     {
         $this->actingAs($this->makeUser(), 'web');
         $inactive = $this->standardProduct(['status' => 0]);
-        $missingId = (int) DB::table('product')->max('id') + 1000;
+        $missingId = (int) DB::table('products')->max('id') + 1000;
 
         $this->post('/gio-hang/them/' . $missingId)
             ->assertRedirect(url('/'))
@@ -299,7 +312,7 @@ class CartTest extends CartTestCase
 
         $this->addToCart($product, ['size' => 'S', 'color' => 'Đen']);
 
-        $this->assertSame(1000.0, $this->sessionCart()[$this->rowId($product, 'S', 'Đen')]['price']);
+        $this->assertSame(0.0, $this->sessionCart()[$this->rowId($product, 'S', 'Đen')]['price']);
     }
 
     public function test_product_without_declared_options_respects_stock_on_repeat_add(): void
@@ -524,8 +537,8 @@ class CartTest extends CartTestCase
         $this->addToCart($stopped, ['size' => 'S', 'color' => 'Đen', 'qty' => 1]);
         $this->addToCart($deleted, ['size' => 'S', 'color' => 'Đen', 'qty' => 1]);
 
-        Product::query()->whereKey($keep->id)->update(['price' => 400000, 'discount' => 100000]);
-        Product::query()->whereKey($stopped->id)->update(['status' => 0]);
+        Product::query()->whereKey($keep->id)->update(['list_price' => 400000, 'discount_amount' => 100000]);
+        Product::query()->whereKey($stopped->id)->update(['status' => 'inactive']);
         Product::query()->whereKey($deleted->id)->delete();
 
         // CI3 set_store_flash('fail') 2 lần cùng key: thông báo sau (tính lại giá) ghi đè thông báo trước.
@@ -592,10 +605,10 @@ class CartTest extends CartTestCase
             'qty' => 2, 'price' => 250000, 'name' => $product->name, 'subtotal' => 500000,
             'options' => ['image_link' => 'b5-test.jpg', 'size' => 'S', 'color' => 'Đen'],
         ]];
-        DB::table('user_saved_cart')->insert([
+        DB::table('user_saved_carts')->insert([
             'user_id' => $user->id,
             'cart_json' => json_encode($saved, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            'updated' => time(),
+            'updated_at' => now(),
         ]);
 
         // Guest không giữ được giỏ (CI3 MY_Controller xóa custom_cart của guest).
@@ -619,10 +632,14 @@ class CartTest extends CartTestCase
         $user = $this->makeUser();
         $product = $this->standardProduct();
 
-        $this->post('/gio-hang/them/' . $product->id, ['size' => 'S', 'color' => 'Đen'])->assertRedirect(Urls::login());
+        $this->post('/gio-hang/them/' . $product->id, ['size' => 'S', 'color' => 'Đen', 'qty' => 2])->assertRedirect(Urls::login());
 
         $this->post('/dang-nhap', ['email' => $user->email, 'password' => self::PASSWORD])
-            ->assertRedirect(url('gio-hang/them/' . $product->id));
+            ->assertRedirect(Urls::cart());
+
+        $rowid = $this->rowId($product, 'S', 'Đen');
+        $this->assertSame(2, $this->sessionCart()[$rowid]['qty']);
+        $this->assertNull(session('pending_cart_add'));
     }
 
     public function test_logged_in_user_with_empty_session_gets_saved_cart_on_any_page(): void
@@ -630,10 +647,10 @@ class CartTest extends CartTestCase
         $user = $this->makeUser();
         $product = $this->standardProduct();
         $rowid = $this->rowId($product, 'S', 'Đen');
-        DB::table('user_saved_cart')->insert([
+        DB::table('user_saved_carts')->insert([
             'user_id' => $user->id,
             'cart_json' => json_encode([$rowid => ['rowid' => $rowid, 'id' => $product->id, 'qty' => 1, 'subtotal' => 250000, 'options' => []]]),
-            'updated' => time(),
+            'updated_at' => now(),
         ]);
 
         $this->actingAs($user, 'web')->get('/')
@@ -651,16 +668,17 @@ class CartTest extends CartTestCase
     {
         $other = $this->makeUser();
         $otherJson = json_encode(['keep' => ['id' => 1, 'qty' => 9]]);
-        DB::table('user_saved_cart')->insert(['user_id' => $other->id, 'cart_json' => $otherJson, 'updated' => 1]);
+        DB::table('user_saved_carts')->insert(['user_id' => $other->id, 'cart_json' => $otherJson, 'updated_at' => now()]);
+        $before = DB::table('user_saved_carts')->where('user_id', $other->id)->value('updated_at');
 
         $this->actingAs($this->makeUser(), 'web');
         $product = $this->standardProduct();
         $this->addToCart($product, ['size' => 'S', 'color' => 'Đen', 'user_id' => $other->id]);
         $this->withHeaders(self::AJAX)->post('/gio-hang/del', ['rowid' => 'keep', 'user_id' => $other->id]);
 
-        $row = DB::table('user_saved_cart')->where('user_id', $other->id)->first();
+        $row = DB::table('user_saved_carts')->where('user_id', $other->id)->first();
         $this->assertSame($otherJson, $row->cart_json);
-        $this->assertSame(1, (int) $row->updated);
+        $this->assertEquals($before, $row->updated_at);
     }
 
     /* ---------------------------------------------------------------

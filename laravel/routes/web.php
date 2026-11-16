@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Payment\SepayWebhookController;
 use App\Http\Controllers\Storefront\AiAssistantController;
 use App\Http\Controllers\Storefront\CartController;
 use App\Http\Controllers\Storefront\GioithieuController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\Storefront\LoyaltyController;
 use App\Http\Controllers\Storefront\NewsController;
 use App\Http\Controllers\Storefront\OrderController;
 use App\Http\Controllers\Storefront\ProductController;
+use App\Http\Controllers\Storefront\SeoController;
 use App\Http\Controllers\Storefront\TintucController;
 use App\Http\Controllers\Storefront\TuyendungController;
 use App\Http\Controllers\Storefront\UserController;
@@ -81,8 +83,14 @@ Route::match(['get', 'post'], 'vanchuyen/{path}', [VanchuyenController::class, '
 
 Route::get('ThongTinTuyenDung', [TuyendungController::class, 'index'])->name('storefront.tuyendung.index');
 Route::get('ThongTinTuyenDung/{slug}', [TuyendungController::class, 'view'])->name('storefront.tuyendung.detail');
+Route::get('tuyendung/view/{slug}', [TuyendungController::class, 'view'])->name('storefront.tuyendung.view');
 
 Route::get('LienHeHopTacKinhDoanh', [HoptacController::class, 'index'])->name('storefront.hoptac.index');
+Route::get('hoptac/view/{slug}', [HoptacController::class, 'show'])->name('storefront.hoptac.view');
+Route::get('vanchuyen/view/{slug}', [VanchuyenController::class, 'show'])->name('storefront.vanchuyen.view');
+
+Route::get('robots.txt', [SeoController::class, 'robots'])->name('storefront.robots');
+Route::get('sitemap.xml', [SeoController::class, 'sitemap'])->name('storefront.sitemap');
 
 Route::get('tich-diem', [LoyaltyController::class, 'index'])->name('storefront.loyalty');
 Route::get('TichDiem', [LoyaltyController::class, 'index'])->name('storefront.loyalty.legacy');
@@ -140,6 +148,11 @@ Route::match(['get', 'post'], 'thanh-toan/apply_voucher', [OrderController::clas
 Route::match(['get', 'post'], 'thanh-toan/checkout_qr/{id}', [OrderController::class, 'checkoutQr'])
     ->whereNumber('id')
     ->name('storefront.order.checkout_qr');
+Route::get('thanh-toan/payment-status/{id}', [OrderController::class, 'paymentStatus'])
+    ->whereNumber('id')
+    ->name('storefront.order.payment_status');
+Route::post('payment/webhook/sepay', SepayWebhookController::class)
+    ->name('payment.webhook.sepay');
 Route::match(['get', 'post'], 'thanh-toan/cancel/{id}', [OrderController::class, 'cancel'])
     ->whereNumber('id')
     ->name('storefront.order.cancel');
@@ -198,19 +211,20 @@ Route::post('product/raty-undo', [ProductController::class, 'ratyUndo'])->name('
 |--------------------------------------------------------------------------
 | Auth SEO: /dang-nhap /dang-ky /quen-mat-khau /dat-lai-mat-khau — public.
 | Account /user* : middleware customer.auth (CI3 `_require_login()` → /dang-nhap).
-| /user/logout và handlePath (user/login, user/register...) đứng ngoài middleware.
+| POST /user/logout và handlePath (user/login, user/register...) đứng ngoài middleware.
+| GET /user/logout không đăng xuất.
 */
 Route::get('dang-nhap', [UserController::class, 'login'])->name('storefront.user.login');
 Route::post('dang-nhap', [UserController::class, 'login'])->name('storefront.user.login.post');
 Route::get('dang-ky', [UserController::class, 'register'])->name('storefront.user.register');
-Route::post('dang-ky', [UserController::class, 'register'])->name('storefront.user.register.post');
+Route::post('dang-ky', [UserController::class, 'register'])->middleware('throttle:auth-public')->name('storefront.user.register.post');
 Route::get('quen-mat-khau', [UserController::class, 'forgotPassword'])->name('storefront.user.forgot_password');
-Route::post('quen-mat-khau', [UserController::class, 'forgotPassword'])->name('storefront.user.forgot_password.post');
+Route::post('quen-mat-khau', [UserController::class, 'forgotPassword'])->middleware('throttle:auth-public')->name('storefront.user.forgot_password.post');
 Route::get('dat-lai-mat-khau', [UserController::class, 'resetPassword'])->name('storefront.user.reset_password');
 Route::get('dat-lai-mat-khau/{token}', [UserController::class, 'resetPassword'])->name('storefront.user.reset_password.token');
-Route::post('dat-lai-mat-khau', [UserController::class, 'resetPassword'])->name('storefront.user.reset_password.post');
+Route::post('dat-lai-mat-khau', [UserController::class, 'resetPassword'])->middleware('throttle:auth-public')->name('storefront.user.reset_password.post');
 
-Route::match(['get', 'post'], 'user/logout', [UserController::class, 'logout'])->name('storefront.user.logout');
+Route::post('user/logout', [UserController::class, 'logout'])->name('storefront.user.logout');
 
 Route::middleware('customer.auth')->group(function () {
     Route::get('user', [UserController::class, 'index'])->name('storefront.user.index');
@@ -245,7 +259,7 @@ Route::match(['get', 'post'], 'tintuc', [TintucController::class, 'index'])->nam
 |--------------------------------------------------------------------------
 | URL phải giữ nguyên: /ai-assistant/send|history|poll
 */
-Route::match(['get', 'post'], 'ai-assistant/send', [AiAssistantController::class, 'send'])->name('storefront.ai.send');
+Route::match(['get', 'post'], 'ai-assistant/send', [AiAssistantController::class, 'send'])->middleware('throttle:ai-send')->name('storefront.ai.send');
 Route::get('ai-assistant/history', [AiAssistantController::class, 'history'])->name('storefront.ai.history');
 Route::get('ai-assistant/poll', [AiAssistantController::class, 'poll'])->name('storefront.ai.poll');
 
@@ -342,6 +356,32 @@ Route::get('{slug}/tren-1tr/{offset}', [ProductController::class, 'catalogSeo'])
     ->defaults('price_slug', 'tren-1tr')
     ->name('storefront.catalog.seo.tren1tr.page');
 
+foreach (['duoi-200k', '200k-500k', '500k-1tr', 'tren-1tr'] as $priceSlug) {
+    Route::get('danh-muc/{slug}/' . $priceSlug, [ProductController::class, 'catalogSeo'])
+        ->where('slug', '[a-z0-9-]+')
+        ->defaults('price_slug', $priceSlug);
+    Route::get('danh-muc/{slug}/' . $priceSlug . '/{offset}', [ProductController::class, 'catalogSeo'])
+        ->where('slug', '[a-z0-9-]+')
+        ->whereNumber('offset')
+        ->defaults('price_slug', $priceSlug);
+}
+
+Route::get('danh-muc/{slug}/{offset}', [ProductController::class, 'catalogSeo'])
+    ->where('slug', '[a-z0-9-]+')
+    ->whereNumber('offset')
+    ->defaults('price_slug', '')
+    ->name('storefront.catalog.namespaced.page');
+Route::get('danh-muc/{slug}', [ProductController::class, 'catalogSeo'])
+    ->where('slug', '[a-z0-9-]+')
+    ->defaults('price_slug', '')
+    ->name('storefront.catalog.namespaced');
+
+Route::get('{slug}/{offset}', [ProductController::class, 'catalogSeo'])
+    ->where('slug', '(?!admin$)[a-z0-9-]+')
+    ->whereNumber('offset')
+    ->defaults('price_slug', '')
+    ->name('storefront.catalog.seo.page');
+
 Route::get('{slug}/_/{offset}', [ProductController::class, 'catalogSeo'])
     ->where('slug', '[a-z0-9-]+')->whereNumber('offset')->defaults('price_slug', '')
     ->name('storefront.catalog.seo.offset');
@@ -354,8 +394,7 @@ Route::get('{slug}', [ProductController::class, 'catalogSeo'])
 |--------------------------------------------------------------------------
 | ADMIN
 |--------------------------------------------------------------------------
-| CI3: admin_url() sinh URL /admin/*; MY_Admin_Controller chặn bằng session('login').
-| Laravel: middleware `admin.auth` dịch từ MY_Admin_Controller::__construct().
+| Laravel: middleware `admin.auth` dùng Auth::guard('admin').
 |
 | Route group admin.* KHÔNG áp middleware cho `admin/login` (trang đăng nhập).
 | Phân quyền chi tiết (Admin=0 / Mod=1 / User=2) sẽ làm ở B3 bằng Gate/Policy —
@@ -366,11 +405,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // Đăng nhập panel
     Route::get('login', [\App\Http\Controllers\Admin\LoginController::class, 'index'])->name('login');
     Route::post('login', [\App\Http\Controllers\Admin\LoginController::class, 'checkLogin'])->name('login.post');
-    Route::match(['get', 'post'], 'logout', [\App\Http\Controllers\Admin\AdminController::class, 'logout'])->name('logout');
+    Route::get('logout', [\App\Http\Controllers\Admin\AdminController::class, 'logout']);
+    Route::post('logout', [\App\Http\Controllers\Admin\AdminController::class, 'logout'])->name('logout');
 
-    // dmin.auth = xác thực guard dmin (nguồn xác thực duy nhất).
-    // dmin.session = đồng bộ session key `login` của CI3 (mirror 2 chiều, chống login giả).
-    Route::middleware(['admin.session', 'admin.auth'])->group(function () {
+    // admin.auth = Auth::guard('admin'). Session key `login` không cấp quyền.
+    Route::middleware(['admin.auth'])->group(function () {
 
         // Dashboard — CI3: /admin và /admin/home đều vào Home::index
         Route::get('/', [\App\Http\Controllers\Admin\HomeController::class, 'index'])->name('home');
@@ -380,7 +419,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Alias plural -> controller cũ (giữ nguyên như CI3)
         Route::middleware('admin.permission:content.manage')->group(function () {
-            Route::get('branding', [\App\Http\Controllers\Admin\SiteBrandingController::class, 'index'])->name('branding.index');
+            Route::match(['get', 'post'], 'branding', [\App\Http\Controllers\Admin\SiteBrandingController::class, 'index'])->name('branding.index');
             Route::match(['get', 'post'], 'branding/{path}', [\App\Http\Controllers\Admin\SiteBrandingController::class, 'handlePath'])
                 ->where('path', '.*')->name('branding.path');
         });
@@ -469,24 +508,26 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Trang nội dung tĩnh — hỗ trợ cả /admin/page và /admin/pages
         Route::get('page', [\App\Http\Controllers\Admin\PagesController::class, 'index'])->name('page.index');
-        Route::get('page/edit/{id}', [\App\Http\Controllers\Admin\PagesController::class, 'edit'])
+        Route::match(['get', 'post'], 'page/add', [\App\Http\Controllers\Admin\PagesController::class, 'add'])->name('page.add');
+        Route::match(['get', 'post'], 'page/edit/{id}', [\App\Http\Controllers\Admin\PagesController::class, 'edit'])
             ->whereNumber('id')->name('page.edit');
         Route::get('pages', [\App\Http\Controllers\Admin\PagesController::class, 'index'])->name('pages.index');
-        Route::get('pages/edit/{id}', [\App\Http\Controllers\Admin\PagesController::class, 'edit'])
+        Route::match(['get', 'post'], 'pages/add', [\App\Http\Controllers\Admin\PagesController::class, 'add'])->name('pages.add');
+        Route::match(['get', 'post'], 'pages/edit/{id}', [\App\Http\Controllers\Admin\PagesController::class, 'edit'])
             ->whereNumber('id')->name('pages.edit');
 
         // Cửa hàng
         Route::get('store', [\App\Http\Controllers\Admin\StoreController::class, 'index'])->name('store.index');
-        Route::get('store/add', [\App\Http\Controllers\Admin\StoreController::class, 'add'])->name('store.add');
-        Route::get('store/edit/{id}', [\App\Http\Controllers\Admin\StoreController::class, 'edit'])
+        Route::match(['get', 'post'], 'store/add', [\App\Http\Controllers\Admin\StoreController::class, 'add'])->name('store.add');
+        Route::match(['get', 'post'], 'store/edit/{id}', [\App\Http\Controllers\Admin\StoreController::class, 'edit'])
             ->whereNumber('id')->name('store.edit');
         Route::match(['get', 'post'], 'store/delete/{id}', [\App\Http\Controllers\Admin\StoreController::class, 'delete'])
             ->whereNumber('id')->name('store.delete');
 
         // Tuyển dụng
         Route::get('tuyendung', [\App\Http\Controllers\Admin\TuyendungController::class, 'index'])->name('tuyendung.index');
-        Route::get('tuyendung/add', [\App\Http\Controllers\Admin\TuyendungController::class, 'add'])->name('tuyendung.add');
-        Route::get('tuyendung/edit/{id}', [\App\Http\Controllers\Admin\TuyendungController::class, 'edit'])
+        Route::match(['get', 'post'], 'tuyendung/add', [\App\Http\Controllers\Admin\TuyendungController::class, 'add'])->name('tuyendung.add');
+        Route::match(['get', 'post'], 'tuyendung/edit/{id}', [\App\Http\Controllers\Admin\TuyendungController::class, 'edit'])
             ->whereNumber('id')->name('tuyendung.edit');
         Route::match(['get', 'post'], 'tuyendung/delete/{id}', [\App\Http\Controllers\Admin\TuyendungController::class, 'delete'])
             ->whereNumber('id')->name('tuyendung.delete');
@@ -614,8 +655,9 @@ Route::fallback(function () {
 |    user/validate_*, thanh-toan/apply_voucher, admin/support-chat/*.
 |    Cần giữ window.CI_CSRF trong giai đoạn chuyển tiếp.
 |
-| 6. SESSION KEY — GIỮ NGUYÊN
-|    `custom_cart` (giỏ hàng), `login` (admin), `user` (khách) — theo AGENTS.md.
+| 6. SESSION KEY
+|    `custom_cart` là giỏ hàng Laravel và được giữ.
+|    `login` / `user` không còn dùng để xác thực.
 |
 | 7. ENV — KHÔNG đổi ở B2.
 |==========================================================================

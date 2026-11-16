@@ -34,19 +34,15 @@ class AdminController extends Controller
     ];
 
     /**
-     * GET|POST /admin/logout
-     *
-     * CI3 (application/controllers/admin/Admin.php::logout):
-     *   - nếu session `login` tồn tại thì unset
-     *   - admin_flash_success('Bạn đã đăng xuất.', 'dashboard')
-     *   - admin_no_cache_headers()
-     *   - redirect admin_url('login')
-     *
-     * Bản Laravel: logout guard `admin`, vô hiệu hoá session (chống session fixation),
-     * rotate CSRF token, giữ nguyên các key giỏ hàng, phát flash message tương đương.
+     * POST /admin/logout thực hiện đăng xuất, có CSRF của nhóm web.
+     * GET /admin/logout chỉ chuyển về trang đăng nhập, không đụng session.
      */
     public function logout(Request $request): RedirectResponse
     {
+        if (! $request->isMethod('post') || ! Auth::guard('admin')->check()) {
+            return redirect()->route('admin.login');
+        }
+
         // 1. Chụp key giỏ hàng trước khi session bị xóa.
         $preserved = [];
 
@@ -122,9 +118,8 @@ class AdminController extends Controller
         Admin::query()->create([
             'name' => $data['name'],
             'email' => $data['email'],
-            'password' => LegacyPassword::hash($data['password']),
+            'password_hash' => LegacyPassword::hash($data['password']),
             'level' => $data['level'],
-            'created' => time(),
         ]);
 
         return redirect('/admin/admin')->with('message_success', 'Thêm thành viên thành công');
@@ -159,7 +154,7 @@ class AdminController extends Controller
         $staff->email = $data['email'];
         $staff->level = $data['level'];
         if ($data['password'] !== '') {
-            $staff->password = LegacyPassword::hash($data['password']);
+            $staff->password_hash = LegacyPassword::hash($data['password']);
         }
         $staff->save();
 

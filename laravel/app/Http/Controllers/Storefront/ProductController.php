@@ -42,6 +42,10 @@ class ProductController extends Controller
      */
     public function catalogSeo(Request $request, ?string $slug = null, $offset = 0): View|RedirectResponse
     {
+        if (in_array('_', $request->segments(), true)) {
+            return $this->redirectWithoutUnderscore($request);
+        }
+
         // price_slug khong nam trong URI -> lay tu route defaults cua Laravel.
         $priceSlug = (string) ($request->route()->defaults["price_slug"] ?? "");
         $slug = (string) ($slug ?? "");
@@ -64,6 +68,17 @@ class ProductController extends Controller
             }
         }
 
+        $namespaced = $request->segment(1) === "danh-muc";
+        $reserved = Urls::isReservedCatalogSlug($slug);
+        if ($namespaced !== $reserved) {
+            $catalogModel = Catalog::query()->find($id);
+            if (! $catalogModel) {
+                abort(404);
+            }
+
+            return $this->redirectCatalog($catalogModel, $range, $offset, $request);
+        }
+
         return $this->catalog($request, $id, $offset, $priceSlug, $range);
     }
 
@@ -80,6 +95,12 @@ class ProductController extends Controller
         }
 
         $priceRange = $rangeOverride !== null ? $rangeOverride : $request->query("price_range");
+
+        if ($request->query->has("page")) {
+            $pageNum = max(1, (int) $request->query("page"));
+
+            return $this->redirectCatalog($catalogModel, $priceRange ?: null, ($pageNum - 1) * self::PER_PAGE, $request);
+        }
 
         // CI3: truy cap /product/catalog/... ma co price_range -> 301 sang URL SEO.
         if ($request->segment(1) === "product" && $request->segment(2) === "catalog" && ! empty($priceRange)) {
@@ -107,11 +128,12 @@ class ProductController extends Controller
         } else {
             $segment = (int) $request->segment(($seo_price_slug !== null && $seo_price_slug !== "") ? 3 : 2);
         }
-        $page = (int) floor(max(0, $segment) / self::PER_PAGE) + 1;
+        $page = (int) floor($segment / self::PER_PAGE) + 1;
 
         $productList = $this->applySort($builder, $request)
             ->with("catalog")
-            ->forPage($page, self::PER_PAGE)
+            ->skip($segment)
+            ->take(self::PER_PAGE)
             ->get();
 
         $canonical = Urls::category($catalogModel, $priceRange ?: null);
@@ -141,11 +163,15 @@ class ProductController extends Controller
     }
 
     /** CI3 product/hot - phan trang query string (?per_page=). */
-    public function hot(Request $request): View
+    public function hot(Request $request): View|RedirectResponse
     {
+        if ($redirect = $this->redirectQueryPage($request, "ban-chay")) {
+            return $redirect;
+        }
+
         $priceRange = $request->query("price_range");
         $builder = $this->applyFilters(
-            Product::query()->active()->where("buyed", ">", 0),
+            Product::query()->active()->where("sold_count", ">", 0),
             $this->resolveFinalCatalogIds($request, 0),
             $priceRange
         );
@@ -154,9 +180,10 @@ class ProductController extends Controller
         $segment = max(0, (int) $request->query("per_page"));
         $page = (int) floor($segment / self::PER_PAGE) + 1;
 
-        $productList = $this->applySort($builder, $request, "buyed", "DESC")
+        $productList = $this->applySort($builder, $request, "sold_count", "DESC")
             ->with("catalog")
-            ->forPage($page, self::PER_PAGE)
+            ->skip($segment)
+            ->take(self::PER_PAGE)
             ->get();
 
         return $this->renderSub("site/product/hot", [
@@ -165,7 +192,7 @@ class ProductController extends Controller
             "total" => $total,
             "main_catalog_title" => "San pham ban chay",
             "filter_action" => url("ban-chay"),
-            "canonical_url" => url("ban-chay"),
+            "canonical_url" => $segment > 0 ? url("ban-chay") . "?per_page=" . $segment : url("ban-chay"),
             "catalog_list" => CatalogTree::childrenOf(1),
             "master_colors" => $this->masterColors(),
             "is_hot" => true,
@@ -193,7 +220,7 @@ class ProductController extends Controller
         $total = (clone $builder)->count();
         $page = (int) floor(max(0, $offset) / self::PER_PAGE) + 1;
 
-        $productList = $builder->with("catalog")->orderByDesc("view")
+        $productList = $builder->with("catalog")->orderByDesc("view_count")
             ->forPage($page, self::PER_PAGE)->get();
 
         return $this->renderSub("site/product/views", [
@@ -217,8 +244,12 @@ class ProductController extends Controller
     }
 
     /** CI3 product/news - san pham moi, phan trang query string. */
-    public function news(Request $request): View
+    public function news(Request $request): View|RedirectResponse
     {
+        if ($redirect = $this->redirectQueryPage($request, "moi")) {
+            return $redirect;
+        }
+
         $priceRange = $request->query("price_range");
         $builder = $this->applyFilters(
             Product::query()->active(),
@@ -232,7 +263,8 @@ class ProductController extends Controller
 
         $productList = $this->applySort($builder, $request, "id", "DESC")
             ->with("catalog")
-            ->forPage($page, self::PER_PAGE)
+            ->skip($segment)
+            ->take(self::PER_PAGE)
             ->get();
 
         return $this->renderSub("site/product/new", [
@@ -241,7 +273,7 @@ class ProductController extends Controller
             "total" => $total,
             "main_catalog_title" => "San pham moi",
             "filter_action" => url("moi"),
-            "canonical_url" => url("moi"),
+            "canonical_url" => $segment > 0 ? url("moi") . "?per_page=" . $segment : url("moi"),
             "catalog_list" => CatalogTree::childrenOf(1),
             "master_colors" => $this->masterColors(),
             "pagination" => $this->queryPaginator($total, url("moi"), $request, $segment),
@@ -259,11 +291,17 @@ class ProductController extends Controller
      * CI3 product/discount - hai che do phan trang: /khuyen-mai/{offset} (segment 2)
      * va /product/discount (uri_segment 4 hoac query string).
      */
-    public function discount(Request $request, $offset = 0): View
+    public function discount(Request $request, $offset = 0): View|RedirectResponse
     {
+        if ($request->query->has("page")) {
+            $wanted = (max(1, (int) $request->query("page")) - 1) * self::PER_PAGE;
+
+            return $this->redirectPathOffset($request, "khuyen-mai", $wanted);
+        }
+
         $priceRange = $request->query("price_range");
         $builder = $this->applyFilters(
-            Product::query()->active()->where("discount", ">", 0),
+            Product::query()->active()->where('discount_amount', '>', 0),
             $this->resolveFinalCatalogIds($request, 0),
             $priceRange
         );
@@ -277,7 +315,8 @@ class ProductController extends Controller
 
         $productList = $this->applySort($builder, $request, "discount", "DESC")
             ->with("catalog")
-            ->forPage($page, self::PER_PAGE)
+            ->skip($segment)
+            ->take(self::PER_PAGE)
             ->get();
 
         return $this->renderSub("site/product/discount", [
@@ -286,7 +325,7 @@ class ProductController extends Controller
             "total" => $total,
             "main_catalog_title" => "San pham khuyen mai",
             "filter_action" => url("khuyen-mai"),
-            "canonical_url" => url("khuyen-mai"),
+            "canonical_url" => $segment > 0 ? url("khuyen-mai/" . $segment) : url("khuyen-mai"),
             "catalog_list" => CatalogTree::childrenOf(1),
             "master_colors" => $this->masterColors(),
             "is_discount_list" => true,
@@ -316,7 +355,7 @@ class ProductController extends Controller
     }
 
     /** CI3 product/search. */
-    public function search(Request $request, $keyword = null, $seo_offset = null): View
+    public function search(Request $request, $keyword = null, $seo_offset = null): View|RedirectResponse
     {
         $keyword = trim((string) ($keyword ?? $request->query("key-search", "")));
         $hasFilters = $request->filled("category") || $request->filled("size")
@@ -332,7 +371,7 @@ class ProductController extends Controller
                 "product_list" => collect(),
                 "keyword" => "",
                 "is_search_page" => true,
-                "main_catalog_title" => "Ket qua tim kiem",
+                "main_catalog_title" => "Kết quả tìm kiếm",
                 "filter_action" => Urls::search(""),
                 "canonical_url" => Urls::search(""),
                 "catalog_list" => CatalogTree::childrenOf(1),
@@ -358,11 +397,17 @@ class ProductController extends Controller
             ? ($seo_offset !== null ? (int) $seo_offset : (int) $request->segment(3))
             : (int) $request->query("per_page");
         $segment = max(0, $segment);
+        if ($useSeoPagination && $request->query->has("page")) {
+            $wanted = (max(1, (int) $request->query("page")) - 1) * self::PER_PAGE;
+
+            return $this->redirectPathOffset($request, trim(parse_url(Urls::search($keyword), PHP_URL_PATH) ?: "tim-kiem", "/"), $wanted);
+        }
         $page = (int) floor($segment / self::PER_PAGE) + 1;
 
         $productList = $this->applySort($builder, $request, "id", "DESC")
             ->with("catalog")
-            ->forPage($page, self::PER_PAGE)
+            ->skip($useSeoPagination ? $segment : ($page - 1) * self::PER_PAGE)
+            ->take(self::PER_PAGE)
             ->get();
 
         $canonical = Urls::search($keyword);
@@ -376,7 +421,7 @@ class ProductController extends Controller
             "product_list" => $productList,
             "keyword" => $keyword,
             "is_search_page" => true,
-            "main_catalog_title" => "Ket qua tim kiem",
+            "main_catalog_title" => "Kết quả tìm kiếm",
             "filter_action" => Urls::search($keyword),
             "canonical_url" => $canonical,
             "catalog_list" => CatalogTree::childrenOf(1),
@@ -408,7 +453,7 @@ class ProductController extends Controller
             return redirect(url("/"));
         }
 
-        if ((int) $product->status !== 1) {
+        if ((string) $product->status !== Product::STATUS_ACTIVE) {
             Flash::store("fail", "San pham nay hien khong con ban");
 
             return redirect(url("/"));
@@ -433,23 +478,23 @@ class ProductController extends Controller
         if (! isset($seen[$id])) {
             $seen[$id] = true;
             $request->session()->put("session_view", $seen);
-            Product::query()->where("id", $id)->increment("view");
-            $product->view = (int) $product->view + 1;
+            Product::query()->where("id", $id)->increment("view_count");
+            $product->view_count = (int) $product->view_count + 1;
         }
 
         $variantStockMap = $this->variantStockMap($id);
 
         $productSub = Product::query()->active()
-            ->where("catalog_id", $product->catalog_id)
+            ->where("category_id", $product->category_id)
             ->where("id", "!=", $id)
             ->limit(4)->get();
 
-        $productView = Product::query()->active()->orderByDesc("buyed")->limit(4)->get();
+        $productView = Product::query()->active()->orderByDesc("sold_count")->limit(4)->get();
 
         $reviewData = app(ReviewService::class)->forProduct($id, $this->ratingSessionToken($request));
         if ($reviewData["rate_count"] > 0) {
-            $product->rate_count = $reviewData["rate_count"];
-            $product->rate_total = $reviewData["rate_total"];
+            $product->rating_count = $reviewData["rate_count"];
+            $product->rating_total = $reviewData["rate_total"];
         }
 
         $defaultColor = "";
@@ -585,34 +630,42 @@ class ProductController extends Controller
     protected function applyFilters(Builder $builder, array $catalogIds, $priceRange): Builder
     {
         if ($catalogIds !== []) {
-            $builder->whereIn("catalog_id", $catalogIds);
+            $builder->whereIn("category_id", $catalogIds);
         }
 
         $sizes = array_values(array_filter(array_map("trim", $this->arrayParam(request()->query("size"))), fn ($s) => $s !== ""));
         if ($sizes !== []) {
             $builder->where(function (Builder $q) use ($sizes) {
-                foreach ($sizes as $sz) {
-                    $q->orWhere("size", "LIKE", "%" . $this->escapeLike($sz) . "%");
-                }
+                $q->whereHas("activeVariants", function (Builder $variant) use ($sizes) {
+                    $variant->where(function (Builder $inner) use ($sizes) {
+                        foreach ($sizes as $sz) {
+                            $inner->orWhere("size_name", "LIKE", "%" . $this->escapeLike($sz) . "%");
+                        }
+                    });
+                });
             });
         }
 
         $colors = array_values(array_filter(array_map("trim", $this->arrayParam(request()->query("color"))), fn ($c) => $c !== ""));
         if ($colors !== []) {
             $builder->where(function (Builder $q) use ($colors) {
-                foreach ($colors as $cl) {
-                    $clean = str_replace(" ", "", mb_strtolower($cl, "UTF-8"));
-                    $safe = $this->escapeLike($clean);
-                    $q->orWhereRaw("REPLACE(LOWER(color), ' ', '') LIKE ?", ["%" . $safe . "%"]);
-                }
+                $q->whereHas("activeVariants", function (Builder $variant) use ($colors) {
+                    $variant->where(function (Builder $inner) use ($colors) {
+                        foreach ($colors as $cl) {
+                            $clean = str_replace(" ", "", mb_strtolower($cl, "UTF-8"));
+                            $safe = $this->escapeLike($clean);
+                            $inner->orWhereRaw("REPLACE(LOWER(color_name), ' ', '') LIKE ?", ["%" . $safe . "%"]);
+                        }
+                    });
+                });
             });
         }
 
         [$min, $max] = $this->parseRange($priceRange);
         if ($min !== null) {
-            $builder->where("price", ">=", $min);
+            $builder->whereRaw("(list_price - discount_amount) >= ?", [$min]);
             if ($max !== null) {
-                $builder->where("price", "<=", $max);
+                $builder->whereRaw("(list_price - discount_amount) <= ?", [$max]);
             }
         }
 
@@ -628,55 +681,143 @@ class ProductController extends Controller
         $sort = (string) $request->query("sort", "");
 
         if ($sort === "price_asc" || $sort === "price_desc") {
-            return $builder->orderByRaw("(price - discount) " . ($sort === "price_asc" ? "ASC" : "DESC"));
+            return $builder->orderByRaw("(list_price - discount_amount) " . ($sort === "price_asc" ? "ASC" : "DESC"));
         }
 
         if ($sort === "new") {
             return $builder->orderByDesc("id");
         }
 
+        $defaultColumn = match ($defaultColumn) {
+            "buyed" => "sold_count",
+            "view" => "view_count",
+            "price" => "list_price",
+            "discount" => "discount_amount",
+            default => $defaultColumn,
+        };
+
         return $builder->orderBy($defaultColumn, $defaultDir);
     }
 
-    /** Phân trang theo URI segment (CI3 uri_segment). GIỮ y hệt HTML wrapper. */
+    /** Phân trang theo offset trên path, giữ query lọc và sắp xếp. */
     protected function segmentPaginator(int $total, ?Catalog $catalog, $priceRange, Request $request, int $segment, int $page, ?string $baseUrl = null): string
     {
-        if ($total <= self::PER_PAGE) {
-            return "";
-        }
+        $base = $baseUrl ?? Urls::category($catalog, $priceRange ?: null);
 
-        $base = $baseUrl
-            ?? rtrim(Urls::category($catalog, $priceRange ?: null), "/") . "/";
+        return $this->offsetPagination($total, $segment, function (int $offset) use ($base, $request): string {
+            $path = rtrim($base, "/");
+            if ($offset > 0) {
+                $path .= "/" . $offset;
+            }
 
-        $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
-            $this->sliceForPage($request, $page),
-            $total,
-            self::PER_PAGE,
-            $page,
-            ["path" => $base, "pageName" => "page"]
-        );
-
-        return $paginator->withQueryString()->links("pagination::default")->render();
+            return $this->withQuery($path, $request);
+        });
     }
 
-    /** Phân trang dạng query string (?per_page=) - dùng chung LengthAwarePaginator. */
+    /** Phân trang ?per_page=offset của /ban-chay và /moi. */
     protected function queryPaginator(int $total, string $baseUrl, Request $request, int $segment): string
+    {
+        return $this->offsetPagination($total, $segment, function (int $offset) use ($baseUrl, $request): string {
+            $query = $request->query();
+            unset($query["page"], $query["per_page"]);
+            if ($offset > 0) {
+                $query["per_page"] = $offset;
+            }
+
+            return $this->withQuery(rtrim($baseUrl, "/"), $request, $query);
+        });
+    }
+
+    protected function redirectCatalog(Catalog $catalog, mixed $priceRange, int $offset, Request $request): RedirectResponse
+    {
+        $target = rtrim(Urls::category($catalog, $priceRange ?: null), "/");
+        if ($offset > 0) {
+            $target .= "/" . $offset;
+        }
+
+        $query = $request->query();
+        unset($query["page"], $query["price_range"]);
+
+        return redirect()->to($this->withQuery($target, $request, $query), 301);
+    }
+
+    protected function redirectWithoutUnderscore(Request $request): RedirectResponse
+    {
+        $segments = array_values(array_filter(
+            $request->segments(),
+            static fn (string $segment): bool => $segment !== "_"
+        ));
+
+        return redirect()->to($this->withQuery(url(implode("/", $segments)), $request, null, false), 301);
+    }
+
+    protected function redirectQueryPage(Request $request, string $path): ?RedirectResponse
+    {
+        if (! $request->query->has("page")) {
+            return null;
+        }
+
+        $offset = (max(1, (int) $request->query("page")) - 1) * self::PER_PAGE;
+        $query = $request->query();
+        unset($query["page"], $query["per_page"]);
+        if ($offset > 0) {
+            $query["per_page"] = $offset;
+        }
+
+        return redirect()->to($this->withQuery(url($path), $request, $query), 301);
+    }
+
+    protected function redirectPathOffset(Request $request, string $path, int $offset): RedirectResponse
+    {
+        $target = url(trim($path, "/"));
+        if ($offset > 0) {
+            $target .= "/" . $offset;
+        }
+
+        return redirect()->to($this->withQuery($target, $request), 301);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $query
+     */
+    protected function withQuery(string $url, Request $request, ?array $query = null, bool $dropPage = true): string
+    {
+        $query ??= $request->query();
+        if ($dropPage) {
+            unset($query["page"]);
+        }
+        if ($query === []) {
+            return $url;
+        }
+
+        return $url . "?" . http_build_query($query);
+    }
+
+    protected function offsetPagination(int $total, int $segment, callable $urlForOffset): string
     {
         if ($total <= self::PER_PAGE) {
             return "";
         }
 
-        $page = (int) floor($segment / self::PER_PAGE) + 1;
+        $pages = (int) ceil($total / self::PER_PAGE);
+        $current = (int) floor($segment / self::PER_PAGE) + 1;
+        $current = min(max(1, $current), $pages);
+        $html = '<div class="jm-modern-pagination"><ul>';
+        if ($current > 1) {
+            $html .= '<li class="prev"><a href="' . e($urlForOffset(($current - 2) * self::PER_PAGE)) . '">Prev</a></li>';
+        }
+        for ($i = 1; $i <= $pages; $i++) {
+            if ($i === $current) {
+                $html .= '<li class="active"><span>' . $i . '</span></li>';
+                continue;
+            }
+            $html .= '<li><a href="' . e($urlForOffset(($i - 1) * self::PER_PAGE)) . '">' . $i . '</a></li>';
+        }
+        if ($current < $pages) {
+            $html .= '<li class="next"><a href="' . e($urlForOffset($current * self::PER_PAGE)) . '">Next</a></li>';
+        }
 
-        $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
-            $this->emptySlice(),
-            $total,
-            self::PER_PAGE,
-            $page,
-            ["path" => $baseUrl, "pageName" => "page"]
-        );
-
-        return $paginator->links("pagination::default")->render();
+        return $html . "</ul></div>";
     }
 
     /**
@@ -699,7 +840,7 @@ class ProductController extends Controller
     protected function masterColors()
     {
         return \App\Models\MasterColor::query()
-            ->where("status", 1)
+            ->where("status", \App\Models\MasterColor::STATUS_ACTIVE)
             ->orderBy("sort_order")
             ->orderBy("name")
             ->get();
@@ -712,9 +853,9 @@ class ProductController extends Controller
     {
         $rows = \App\Models\ProductVariant::query()
             ->where("product_id", $productId)
-            ->where("status", 1)
-            ->orderBy("color")
-            ->orderBy("size")
+            ->where("status", \App\Models\ProductVariant::STATUS_ACTIVE)
+            ->orderBy("color_name")
+            ->orderBy("size_name")
             ->get();
 
         $map = [];

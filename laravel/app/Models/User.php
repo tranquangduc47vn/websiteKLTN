@@ -2,49 +2,65 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\LegacyTimestamps;
 use Illuminate\Auth\Authenticatable as AuthenticatableTrait;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
- * Model cho bảng `user` (khách hàng storefront — KHÁC bảng `admin`).
- *
- * Password có thể là bcrypt ($2y$...) hoặc MD5 32 ký tự (dữ liệu cũ).
- * Cột loyalty_* phục vụ module tích điểm.
- * Cột `created` là INT Unix (một số bản ghi cũ lưu năm dạng 2026).
+ * Khách hàng. Bảng V2: users. Phone và address nằm ở bảng con.
  *
  * @property int $id
  * @property string $name
  * @property string $email
- * @property string $password
- * @property string $phone
- * @property string $address
+ * @property string $password_hash
  * @property int $loyalty_points
- * @property int $loyalty_lifetime_spend
+ * @property string $loyalty_lifetime_spend
  * @property int $loyalty_completed_orders
- * @property string $loyalty_tier   // member|silver|gold|diamond
- * @property int $created
+ * @property string $loyalty_tier
+ * @property string $status
  */
 class User extends BaseModel implements Authenticatable
 {
     use AuthenticatableTrait;
 
-    use LegacyTimestamps;
+    protected $table = 'users';
 
-    protected $table = 'user';
+    public $timestamps = true;
 
     /**
-     * Các hạng thành viên theo loyalty_helper.php.
+     * Parent để $guarded rỗng. Model này chỉ nhận cột dịch vụ thực sự ghi.
+     *
+     * @var list<string>
      */
+    protected $fillable = [
+        'name',
+        'email',
+        'password_hash',
+        'loyalty_points',
+        'loyalty_lifetime_spend',
+        'loyalty_completed_orders',
+        'loyalty_tier',
+        'status',
+    ];
+
+    /** @var list<string> */
+    protected $guarded = ['*'];
+
     public const TIER_MEMBER = 'member';
+
     public const TIER_SILVER = 'silver';
+
     public const TIER_GOLD = 'gold';
+
     public const TIER_DIAMOND = 'diamond';
 
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_DISABLED = 'disabled';
+
     protected $hidden = [
-        'password',
+        'password_hash',
     ];
 
     protected function casts(): array
@@ -52,9 +68,8 @@ class User extends BaseModel implements Authenticatable
         return [
             'id' => 'int',
             'loyalty_points' => 'int',
-            'loyalty_lifetime_spend' => 'int',
+            'loyalty_lifetime_spend' => 'decimal:2',
             'loyalty_completed_orders' => 'int',
-            'created' => 'int',
         ];
     }
 
@@ -78,9 +93,6 @@ class User extends BaseModel implements Authenticatable
         return $this->hasOne(UserPhone::class, 'user_id')->where('is_default', 1);
     }
 
-    /**
-     * Giỏ hàng đã lưu (1-1 theo user_id, PK của bảng là user_id).
-     */
     public function savedCart(): HasOne
     {
         return $this->hasOne(UserSavedCart::class, 'user_id', 'id');
@@ -91,9 +103,6 @@ class User extends BaseModel implements Authenticatable
         return $this->hasMany(UserPointLog::class, 'user_id');
     }
 
-    /**
-     * Đơn hàng của khách — join theo `user_id` hoặc `user_email` (dữ liệu cũ có thể thiếu user_id).
-     */
     public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class, 'user_id');
@@ -109,22 +118,40 @@ class User extends BaseModel implements Authenticatable
         return $this->hasMany(PasswordReset::class, 'user_id');
     }
 
-    public function createdAt(): ?\Illuminate\Support\Carbon
+    public function getAuthPasswordName(): string
     {
-        return $this->legacyTimestamp('created');
+        return 'password_hash';
     }
 
-    public function setCreatedAtAttribute(mixed $value): void
+    public function getPasswordAttribute(): string
     {
-        $this->setLegacyTimestamp('created', $value);
+        return (string) ($this->attributes['password_hash'] ?? '');
     }
 
-    /**
-     * Kiểm tra hash cũ dạng MD5 (32 hex) để rehash khi login (dùng ở B3).
-     */
+    public function setPasswordAttribute(string $value): void
+    {
+        $this->attributes['password_hash'] = $value;
+    }
+
     public function hasLegacyMd5Password(): bool
     {
-        return (bool) preg_match('/^[a-f0-9]{32}$/i', (string) $this->password);
+        return (bool) preg_match('/^[a-f0-9]{32}$/i', (string) $this->password_hash);
+    }
+
+    public function getPhoneAttribute(): string
+    {
+        return (string) ($this->defaultPhone?->phone_number ?? $this->phones()->value('phone_number') ?? '');
+    }
+
+    public function getAddressAttribute(): string
+    {
+        return (string) ($this->defaultAddress?->address_line ?? $this->addresses()->value('address_line') ?? '');
+    }
+
+    public function getCreatedAttribute(): int
+    {
+        $value = $this->created_at;
+
+        return $value ? $value->getTimestamp() : 0;
     }
 }
-

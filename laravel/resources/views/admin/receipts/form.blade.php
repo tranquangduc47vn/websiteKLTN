@@ -2,10 +2,19 @@
 
 @section('content')
 @php $isEdit = $receipt !== null; @endphp
-<h1 class="h4 mb-3">{{ $isEdit ? 'Sửa phiếu nháp' : 'Nhập kho' }}</h1>
-<form method="post" action="{{ $isEdit ? url('admin/stock-receipts/edit/'.$receipt->id) : url('admin/stock-receipts/add') }}" class="admin-card">
+<nav aria-label="breadcrumb" class="admin-breadcrumb">
+	<ol class="breadcrumb mb-0">
+		<li class="breadcrumb-item"><a href="{{ url('admin/stock-receipts') }}">Phiếu nhập kho</a></li>
+		<li class="breadcrumb-item active">{{ $isEdit ? 'Sửa phiếu nháp' : 'Nhập kho' }}</li>
+	</ol>
+</nav>
+<div class="admin-page-header">
+	<h1 class="admin-page-title">{{ $isEdit ? 'Sửa phiếu nháp' : 'Nhập kho' }}</h1>
+</div>
+<form method="post" action="{{ $isEdit ? url('admin/stock-receipts/edit/'.$receipt->id) : url('admin/stock-receipts/add') }}" class="adm-form">
 	@csrf
 	<input type="hidden" name="submit" value="1">
+	<div class="admin-card"><div class="admin-card-body">
 	<div class="mb-3">
 		<label class="form-label" for="rc-supplier">Nhà cung cấp</label>
 		<select name="supplier_id" id="rc-supplier" class="form-select" required>
@@ -24,7 +33,8 @@
 		<input type="search" id="variant-q" class="form-control" placeholder="SKU hoặc tên">
 		<div id="variant-results" class="small mt-2"></div>
 	</div>
-	<table class="table admin-table" id="receipt-lines">
+	<div class="table-responsive adm-table-wrap">
+	<table class="table admin-table mb-0" id="receipt-lines">
 		<thead><tr><th>Variant ID</th><th>Số lượng</th><th>Giá nhập</th></tr></thead>
 		<tbody>
 			@forelse ($items as $item)
@@ -42,8 +52,12 @@
 			@endforelse
 		</tbody>
 	</table>
-	<button class="btn btn-primary" type="submit">{{ $isEdit ? 'Lưu phiếu nháp' : 'Nhập kho' }}</button>
-	<a href="{{ url('admin/stock-receipts') }}">Quay lại</a>
+	</div>
+	</div></div>
+	<div class="d-flex flex-wrap gap-2 mb-4">
+		<button class="btn btn-primary" type="submit">{{ $isEdit ? 'Lưu phiếu nháp' : 'Nhập kho' }}</button>
+		<a class="btn btn-outline-secondary" href="{{ url('admin/stock-receipts') }}">Quay lại</a>
+	</div>
 </form>
 <script>
 document.getElementById('variant-q')?.addEventListener('change', function () {

@@ -33,13 +33,17 @@ class UserController extends Controller
             $query->where(function ($inner) use ($like) {
                 $inner->where('name', 'like', $like)
                     ->orWhere('email', 'like', $like)
-                    ->orWhere('phone', 'like', $like)
-                    ->orWhere('address', 'like', $like);
+                    ->orWhereIn('id', function ($sub) use ($like) {
+                        $sub->select('user_id')->from('user_phones')->where('phone_number', 'like', $like);
+                    })
+                    ->orWhereIn('id', function ($sub) use ($like) {
+                        $sub->select('user_id')->from('user_addresses')->where('address_line', 'like', $like);
+                    });
             });
         }
 
         return view('admin.users.index', [
-            'users' => $query->get(['id', 'name', 'email', 'phone', 'address']),
+            'users' => $query->get(),
             'search' => $q,
             'admin_header_title' => 'Khách hàng',
         ]);
@@ -69,8 +73,10 @@ class UserController extends Controller
         if (! $user) {
             return redirect()->to(url('admin/users'))->with('message_fail', 'Khách hàng không tồn tại');
         }
-        $addresses = DB::table('user_address')->where('user_id', $id)->orderByDesc('is_default')->orderBy('id')->get();
-        $phones = DB::table('user_phone')->where('user_id', $id)->orderByDesc('is_default')->orderBy('id')->get();
+        $addresses = DB::table('user_addresses')->where('user_id', $id)->orderByDesc('is_default')->orderBy('id')
+            ->get([DB::raw('user_addresses.*'), DB::raw('user_addresses.note as address_note')]);
+        $phones = DB::table('user_phones')->where('user_id', $id)->orderByDesc('is_default')->orderBy('id')
+            ->get([DB::raw('user_phones.*'), DB::raw('user_phones.label as phone_label')]);
 
         return view('admin.users.view', [
             'customer' => $user,
@@ -137,11 +143,11 @@ class UserController extends Controller
         if (! $request->isMethod('post')) {
             abort(404);
         }
-        $line = DB::table('order')->where('id', $id)->first();
+        $line = DB::table('order_items')->where('id', $id)->first();
         if (! $line) {
             return redirect()->to(url('admin/orders'))->with('message_fail', 'Danh mục không tồn tại');
         }
-        DB::table('order')->where('id', $id)->delete();
+        DB::table('order_items')->where('id', $id)->delete();
 
         return redirect()->to(url('admin/users'))->with('message_success', 'Xóa thành công');
     }

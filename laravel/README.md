@@ -13,4 +13,4 @@ php artisan key:generate
 
 Điền `DB_PASSWORD` và `GEMINI_API_KEY` trong `.env`. Không commit `.env`.
 
-Database `webshop` đã có schema. Không chạy `php artisan migrate` hoặc `migrate:fresh` trên database này.
+Database `webshop` đã có schema V2. `php artisan migrate` bị `MigrationSafetyGuard` chặn trên database này. Xem trạng thái bằng `php artisan webshop:migration-status`. Không chạy `migrate:fresh`. Database trống mới dùng baseline trong `database/schema/v2-baseline.sql`.

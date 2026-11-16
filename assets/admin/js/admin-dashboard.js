@@ -61,58 +61,29 @@
 		return;
 	}
 
-	var commonOpts = {
-		responsive: true,
-		maintainAspectRatio: false,
-		plugins: {
-			legend: { display: false },
-			tooltip: {
-				backgroundColor: 'rgba(15, 23, 42, 0.92)',
-				padding: 10,
-				cornerRadius: 8,
-			},
-		},
-		scales: {
-			x: {
-				grid: { display: false },
-				ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
-			},
-			y: {
-				beginAtZero: true,
-				grid: { color: 'rgba(148, 163, 184, 0.15)' },
-			},
-		},
-	};
-
 	var revCtx = document.getElementById('admChartRevenue');
-	if (revCtx) {
-		new Chart(revCtx, {
-			type: 'line',
-			data: {
-				labels: cfg.labels,
-				datasets: [{
-					label: 'Doanh thu',
-					data: cfg.revenue,
-					borderColor: '#2563eb',
-					backgroundColor: 'rgba(37, 99, 235, 0.12)',
-					fill: true,
-					tension: 0.35,
-					borderWidth: 2,
-					pointRadius: 2,
-				}],
-			},
-			options: Object.assign({}, commonOpts, {
-				plugins: Object.assign({}, commonOpts.plugins, {
-					tooltip: {
-						callbacks: {
-							label: function (ctx) {
-								var v = ctx.parsed.y || 0;
-								return ' ' + v.toLocaleString('vi-VN') + ' ₫';
-							},
-						},
-					},
-				}),
-			}),
+	if (revCtx && revCtx.getContext) {
+		new Chart(revCtx.getContext('2d')).Line({
+			labels: cfg.labels || [],
+			datasets: [{
+				label: 'Doanh thu',
+				fillColor: 'rgba(37, 99, 235, 0.12)',
+				strokeColor: '#2563eb',
+				pointColor: '#2563eb',
+				pointStrokeColor: '#ffffff',
+				pointHighlightFill: '#ffffff',
+				pointHighlightStroke: '#2563eb',
+				data: cfg.revenue || [],
+			}],
+		}, {
+			responsive: true,
+			maintainAspectRatio: false,
+			animation: false,
+			scaleBeginAtZero: true,
+			bezierCurve: true,
+			datasetFill: true,
+			scaleShowGridLines: true,
+			tooltipTemplate: '<%if (label){%><%=label%>: <%}%><%= value %> ₫',
 		});
 	}
 })();

@@ -42,6 +42,37 @@ class OrderTest extends OrderTestCase
         $this->get('/gio-hang')->assertRedirect(url('dang-nhap'));
     }
 
+    public function test_guest_with_cart_cannot_checkout_and_login_keeps_cart(): void
+    {
+        $user = $this->makeUser();
+        $product = $this->standardProduct();
+        $variantId = $this->variantId($product, 'Đen', 'S');
+        $stock = $this->variantStock($variantId);
+        $orders = DB::table('orders')->count();
+        $payments = DB::table('payments')->count();
+        $items = DB::table('order_items')->count();
+
+        $this->withSession(['custom_cart' => $this->cartRow($product, 'S', 'Đen', 2)])
+            ->post('/thanh-toan', $this->checkoutPayload($user) + [
+                'payment' => 'Chuyển khoản',
+                'price' => 1,
+                'total' => 1,
+            ])
+            ->assertRedirect(url('dang-nhap'));
+
+        $this->assertSame($orders, DB::table('orders')->count());
+        $this->assertSame($payments, DB::table('payments')->count());
+        $this->assertSame($items, DB::table('order_items')->count());
+        $this->assertSame($stock, $this->variantStock($variantId));
+
+        $this->post('/dang-nhap', [
+            'email' => $user->email,
+            'password' => self::PASSWORD,
+        ])->assertRedirect(url('thanh-toan'));
+
+        $this->assertSame(2, (int) ($this->sessionCart()[$this->rowId($product, 'S', 'Đen')]['qty'] ?? 0));
+    }
+
     public function test_empty_cart_checkout_is_rejected(): void
     {
         $user = $this->makeUser();
@@ -50,7 +81,7 @@ class OrderTest extends OrderTestCase
         $this->post('/thanh-toan', $this->checkoutPayload($user))
             ->assertRedirect(url('gio-hang'));
 
-        $this->assertSame(0, DB::table('transaction')->where('user_id', $user->id)->count());
+        $this->assertSame(0, DB::table('orders')->where('user_id', $user->id)->count());
     }
 
     public function test_cod_checkout_creates_order_and_clears_cart(): void
@@ -72,27 +103,26 @@ class OrderTest extends OrderTestCase
         ])->assertRedirect(url('gio-hang'));
 
         $txId = $this->lastTransactionId($user);
-        $tx = DB::table('transaction')->where('id', $txId)->first();
+        $tx = DB::table('orders')->where('id', $txId)->first();
         $this->assertNotNull($tx);
-        $this->assertSame('COD', $tx->payment);
-        $this->assertSame(0, (int) $tx->status);
+        $this->assertSame('cod', DB::table('payments')->where('order_id', $txId)->value('method'));
+        $this->assertSame('pending', $tx->status);
         $this->assertSame($user->id, (int) $tx->user_id);
-        $this->assertEquals(500000, (float) $tx->amount);
-        $this->assertSame('', $tx->voucher_code);
+        $this->assertEquals(500000, (float) $tx->total);
+        $this->assertTrue($tx->voucher_code === null || $tx->voucher_code === '');
         $this->assertSame(0, (int) $tx->discount_amount);
-        $this->assertSame('Ghi chú B6', $tx->message);
+        $this->assertSame('Ghi chú B6', $tx->note);
 
-        $line = DB::table('order')->where('transaction_id', $txId)->first();
+        $line = DB::table('order_items')->where('order_id', $txId)->first();
         $this->assertSame($product->id, (int) $line->product_id);
         $this->assertSame($variantId, (int) $line->variant_id);
         $this->assertSame(2, (int) $line->qty);
-        $this->assertSame('S', $line->size);
-        $this->assertSame('Đen', $line->color);
-        $this->assertEquals(500000, (float) $line->amount);
+        $this->assertSame('S', $line->size_name);
+        $this->assertSame('Đen', $line->color_name);
+        $this->assertEquals(500000, (float) $line->line_subtotal);
 
         $this->assertSame($stockBefore - 2, $this->variantStock($variantId));
-        // Cache quantity = tổng stock biến thể status=1 (Đen/S còn 3 + Đen/M 1 + Trắng/S 0).
-        $this->assertSame(4, (int) DB::table('product')->where('id', $product->id)->value('quantity'));
+        $this->assertSame(4, (int) DB::table('product_variants')->where('product_id', $product->id)->where('status', 'active')->sum('stock'));
         $this->assertSame([], $this->sessionCart());
         $this->assertSame([], $this->savedCart($user));
         $this->assertSame(1, DB::table('stock_movements')->where('reference_id', $txId)->where('movement_type', 'out')->count());
@@ -111,8 +141,8 @@ class OrderTest extends OrderTestCase
             ->assertRedirect();
 
         $txId = $this->lastTransactionId($user);
-        $this->assertSame('Chuyển khoản', DB::table('transaction')->where('id', $txId)->value('payment'));
-        $this->assertSame(2, DB::table('order')->where('transaction_id', $txId)->count());
+        $this->assertSame('bank_transfer', DB::table('payments')->where('order_id', $txId)->value('method'));
+        $this->assertSame(2, DB::table('order_items')->where('order_id', $txId)->count());
         $this->assertSame([], $this->sessionCart());
 
         $this->get('/thanh-toan/checkout_qr/' . $txId)
@@ -131,9 +161,9 @@ class OrderTest extends OrderTestCase
         $this->addToCart($product, ['size' => 'M', 'color' => 'Đen']);
         DB::table('product_variants')->where('id', $variantId)->update(['stock' => 0]);
 
-        $beforeTx = DB::table('transaction')->count();
+        $beforeTx = DB::table('orders')->count();
         $this->post('/thanh-toan', $this->checkoutPayload($user))->assertRedirect();
-        $this->assertSame($beforeTx, DB::table('transaction')->count());
+        $this->assertSame($beforeTx, DB::table('orders')->count());
         $this->assertSame(0, $this->variantStock($variantId));
     }
 
@@ -165,12 +195,12 @@ class OrderTest extends OrderTestCase
         $this->post('/thanh-toan', $this->checkoutPayload($user, ['voucher_code' => $ok->code]))
             ->assertRedirect(url('gio-hang'));
 
-        $tx = DB::table('transaction')->where('user_id', $user->id)->orderByDesc('id')->first();
+        $tx = DB::table('orders')->where('user_id', $user->id)->orderByDesc('id')->first();
         $this->assertSame($ok->code, $tx->voucher_code);
         $this->assertSame(25000, (int) $tx->discount_amount);
-        $this->assertEquals(225000, (float) $tx->amount);
-        $this->assertSame(1, (int) DB::table('voucher')->where('id', $ok->id)->value('used_count'));
-        $this->assertSame(1, DB::table('voucher_use')->where('transaction_id', $tx->id)->count());
+        $this->assertEquals(225000, (float) $tx->total);
+        $this->assertSame(1, (int) DB::table('vouchers')->where('id', $ok->id)->value('used_count'));
+        $this->assertSame(1, DB::table('voucher_uses')->where('order_id', $tx->id)->count());
     }
 
     public function test_voucher_usage_limit_and_client_discount_are_ignored(): void
@@ -186,8 +216,8 @@ class OrderTest extends OrderTestCase
             'discount_amount' => 1,
         ]))->assertRedirect(url('thanh-toan'));
 
-        $this->assertSame(0, DB::table('transaction')->where('user_id', $user->id)->count());
-        $this->assertSame(1, (int) DB::table('voucher')->where('id', $voucher->id)->value('used_count'));
+        $this->assertSame(0, DB::table('orders')->where('user_id', $user->id)->count());
+        $this->assertSame(1, (int) DB::table('vouchers')->where('id', $voucher->id)->value('used_count'));
     }
 
     public function test_double_submit_does_not_create_second_order(): void
@@ -201,7 +231,7 @@ class OrderTest extends OrderTestCase
         $this->post('/thanh-toan', $payload)->assertRedirect(url('gio-hang'));
         $this->post('/thanh-toan', $payload)->assertRedirect(url('gio-hang'));
 
-        $this->assertSame(1, DB::table('transaction')->where('user_id', $user->id)->count());
+        $this->assertSame(1, DB::table('orders')->where('user_id', $user->id)->count());
     }
 
     public function test_user_cannot_view_or_cancel_another_users_order(): void
@@ -217,7 +247,7 @@ class OrderTest extends OrderTestCase
         $this->actingAs($other, 'web');
         $this->get('/thanh-toan/checkout_qr/' . $txId)->assertRedirect(url('/'));
         $this->post('/thanh-toan/cancel/' . $txId)->assertRedirect(url('/'));
-        $this->assertSame(0, (int) DB::table('transaction')->where('id', $txId)->value('status'));
+        $this->assertSame('pending', DB::table('orders')->where('id', $txId)->value('status'));
     }
 
     public function test_owner_can_cancel_new_order_and_stock_is_restored(): void
@@ -235,11 +265,11 @@ class OrderTest extends OrderTestCase
         $this->post('/thanh-toan/cancel/' . $txId, ['reason' => 'Đổi ý'])
             ->assertRedirect(url('user'));
 
-        $tx = DB::table('transaction')->where('id', $txId)->first();
-        $this->assertSame(4, (int) $tx->status);
-        $this->assertSame('Đổi ý', $tx->reason);
+        $tx = DB::table('orders')->where('id', $txId)->first();
+        $this->assertSame('cancelled', $tx->status);
+        $this->assertSame('Đổi ý', $tx->cancel_reason);
         $this->assertSame($stockBefore, $this->variantStock($variantId));
-        $this->assertSame(0, DB::table('voucher_use')->where('transaction_id', $txId)->count());
+        $this->assertSame(0, DB::table('voucher_uses')->where('order_id', $txId)->count());
         $this->assertSame(1, DB::table('stock_movements')->where('reference_id', $txId)->where('movement_type', 'in')->count());
     }
 
@@ -251,10 +281,10 @@ class OrderTest extends OrderTestCase
         $this->addToCart($product, ['size' => 'S', 'color' => 'Đen']);
         $this->post('/thanh-toan', $this->checkoutPayload($user));
         $txId = $this->lastTransactionId($user);
-        DB::table('transaction')->where('id', $txId)->update(['status' => Transaction::STATUS_COMPLETED]);
+        DB::table('orders')->where('id', $txId)->update(['status' => Transaction::STATUS_COMPLETED]);
 
         $this->post('/thanh-toan/cancel/' . $txId)->assertRedirect(url('user'));
-        $this->assertSame(3, (int) DB::table('transaction')->where('id', $txId)->value('status'));
+        $this->assertSame('completed', DB::table('orders')->where('id', $txId)->value('status'));
     }
 
     public function test_unknown_payment_falls_back_to_cod(): void
@@ -264,7 +294,7 @@ class OrderTest extends OrderTestCase
         $product = $this->standardProduct();
         $this->addToCart($product, ['size' => 'S', 'color' => 'Đen']);
         $this->post('/thanh-toan', $this->checkoutPayload($user, ['payment' => 'paypal']));
-        $this->assertSame('COD', DB::table('transaction')->where('user_id', $user->id)->value('payment'));
+        $this->assertSame('cod', DB::table('payments')->where('order_id', DB::table('orders')->where('user_id', $user->id)->value('id'))->value('method'));
     }
 
     public function test_validation_errors_redisplay_checkout(): void
@@ -281,7 +311,7 @@ class OrderTest extends OrderTestCase
             'address' => '',
         ])->assertRedirect(url('thanh-toan'))->assertSessionHasErrors(['name', 'email', 'phone', 'address']);
 
-        $this->assertSame(0, DB::table('transaction')->where('user_id', $user->id)->count());
+        $this->assertSame(0, DB::table('orders')->where('user_id', $user->id)->count());
     }
 
     public function test_missing_qr_transaction_redirects_home(): void

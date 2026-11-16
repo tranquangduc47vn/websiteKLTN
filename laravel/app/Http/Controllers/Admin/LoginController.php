@@ -19,12 +19,10 @@ use Illuminate\View\View;
  *   - GET  /admin/login  -> index()      : nếu đã đăng nhập thì về dashboard, ngược lại render form.
  *   - POST /admin/login  -> check_login(): rate-limit theo IP+email (5 lần / 15 phút),
  *                             verify mật khẩu (bcrypt HOẶC MD5 legacy), kiểm tra
- *                             `admin_can_access_panel()`, set session `login`.
+ *                             `admin_can_access_panel()`, đăng nhập guard `admin`.
  *
  * Khác biệt có chủ đích so với CI3:
- *   - Session lưu qua guard `admin` (không phải session key thô).
- *     Session key `login` được đồng bộ lại bởi middleware `admin.session`
- *     (App\Http\Middleware\SyncLegacyAdminSession) để các module CI3 còn lại đọc được.
+ *   - Session lưu qua guard `admin`. Không ghi session key `login`.
  *   - Rate-limit dùng RateLimiter của Laravel (cache store `file`, CACHE_STORE=file)
  *     thay cho rate_limit_helper.php của CI3 — cùng ngữ nghĩa: 5 lần / 900 giây.
  *   - Mật khẩu MD5 legacy được rehash bcrypt ngay khi đăng nhập thành công

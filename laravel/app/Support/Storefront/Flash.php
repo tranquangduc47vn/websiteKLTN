@@ -118,7 +118,8 @@ class Flash
 
         $session = session();
         $authSuccess = (string) ($session->pull('message_success', '') ?: '');
-        $authFail = (string) ($session->pull('message_fail', '') ?: '');
+file_put_contents(storage_path('logs/qa-flash-pull.log'), 'pull msg_fail @ '.date('H:i:s').' bt: '.json_encode(array_slice(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS,8),0,8, false), JSON_UNESCAPED_UNICODE|JSON_PARTIAL_OUTPUT_ON_ERROR).PHP_EOL, FILE_APPEND);
+                $authFail = (string) ($session->pull('message_fail', '') ?: '');
 
         return [
             'success' => $store['success'] !== '' ? $store['success'] : $authSuccess,
@@ -127,3 +128,4 @@ class Flash
         ];
     }
 }
+

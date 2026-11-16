@@ -1012,6 +1012,17 @@ div.col-md-3:has(form) {
     padding: 0 4px;
 }
 
+.jm-add-cart-form {
+    display: contents;
+}
+
+button.jm-pdp-related-card__cta {
+    font-family: inherit;
+    cursor: pointer;
+    width: 100%;
+    border: 0;
+}
+
 .jm-pdp-lux .jm-pdp-related-card__cta {
     display: block;
     margin-top: auto;

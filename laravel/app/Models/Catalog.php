@@ -21,7 +21,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Catalog extends BaseModel
 {
-    protected $table = 'catalog';
+    protected $table = 'categories';
+
+    public $timestamps = true;
 
     protected function casts(): array
     {
@@ -29,7 +31,7 @@ class Catalog extends BaseModel
             'id' => 'int',
             'parent_id' => 'int',
             'sort_order' => 'int',
-            'created' => 'datetime',
+            'created_at' => 'datetime',
         ];
     }
 
@@ -48,12 +50,12 @@ class Catalog extends BaseModel
      */
     public function products(): HasMany
     {
-        return $this->hasMany(Product::class, 'catalog_id');
+        return $this->hasMany(Product::class, 'category_id');
     }
 
     public function scopeRoots($query)
     {
-        return $query->where('parent_id', 0);
+        return $query->whereNull('parent_id');
     }
 
     public function scopeOrdered($query)

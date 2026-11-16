@@ -21,17 +21,20 @@ class AdminDashboardTest extends AdminTestCase
         $customer = User::query()->create([
             'name' => 'B8 Customer',
             'email' => 'b8cust.' . Str::lower(Str::random(6)) . '@example.test',
-            'password' => LegacyPassword::hash('CustomerPass1'),
-            'phone' => '0900000001',
-            'address' => 'HN',
-            'created' => time(),
+            'password_hash' => LegacyPassword::hash('CustomerPass1'),
+            'created_at' => now(),
         ]);
         $this->actingAs($customer, 'web');
         $this->get('/admin')->assertRedirect(route('admin.login'));
         $this->assertFalse(Auth::guard('admin')->check());
+        $this->assertTrue(Auth::guard('web')->check());
+
+        $this->get('/admin/logout')->assertRedirect(route('admin.login'));
+        $this->assertTrue(Auth::guard('web')->check());
+        $this->assertFalse(Auth::guard('admin')->check());
     }
 
-    public function test_admin_login_mirrors_session_without_password_and_opens_dashboard(): void
+    public function test_admin_login_uses_guard_and_does_not_store_login_session(): void
     {
         $admin = $this->makeAdmin(Admin::ROLE_ADMIN);
 
@@ -41,11 +44,8 @@ class AdminDashboardTest extends AdminTestCase
         ])->assertRedirect(route('admin.home'));
 
         $this->get('/admin')->assertOk();
-        $login = session('login');
-        $this->assertIsArray($login);
-        $this->assertSame($admin->id, (int) $login['id']);
-        $this->assertSame(Admin::ROLE_ADMIN, (int) $login['level']);
-        $this->assertArrayNotHasKey('password', $login);
+        $this->assertNull(session('login'));
+        $this->assertArrayNotHasKey('password', session()->all());
         $this->assertTrue(Auth::guard('admin')->check());
 
         $this->get('/admin')
@@ -113,19 +113,21 @@ class AdminDashboardTest extends AdminTestCase
             }
         }
 
-        DB::table('transaction')->insert([
-            'status' => 3,
-            'user_id' => 0,
-            'user_name' => 'B8 Buyer',
-            'user_email' => 'b8buyer@example.test',
-            'user_phone' => '0900111222',
-            'user_address' => 'HN',
-            'message' => '',
-            'amount' => 123000,
-            'voucher_code' => '',
+        DB::table('orders')->insert([
+            'status' => 'completed',
+            'user_id' => null,
+            'customer_name' => 'B8 Buyer',
+            'customer_email' => 'b8buyer@example.test',
+            'customer_phone' => '0900111222',
+            'shipping_address' => 'HN',
+            'note' => '',
+            'subtotal' => 123000,
             'discount_amount' => 0,
-            'payment' => 'COD',
-            'created' => time(),
+            'shipping_fee' => 0,
+            'total' => 123000,
+            'voucher_code' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         $after = $service->data($admin, 'today');
@@ -149,11 +151,35 @@ class AdminDashboardTest extends AdminTestCase
         $cart = ['row' => ['rowid' => 'row', 'id' => 1, 'qty' => 1, 'price' => 10, 'name' => 'A', 'subtotal' => 10, 'options' => []]];
         $this->withSession(['custom_cart' => $cart]);
 
+        $this->get('/admin')->assertOk()
+            ->assertSee('method="post"', false)
+            ->assertSee('name="_token"', false)
+            ->assertDontSee('href="' . route('admin.logout') . '"', false);
+
         $this->get('/admin/logout')->assertRedirect(route('admin.login'));
+        $this->assertTrue(Auth::guard('admin')->check());
+
+        $this->post('/admin/logout')->assertRedirect(route('admin.login'));
         $this->assertFalse(Auth::guard('admin')->check());
         $this->assertNull(session('login'));
         $this->get('/admin')->assertRedirect(route('admin.login'));
         $this->assertSame($cart, session('custom_cart'));
+    }
+
+    public function test_admin_logout_post_without_csrf_is_rejected(): void
+    {
+        $this->app->bind(ValidateCsrfToken::class, fn ($app) => new class($app, $app['encrypter']) extends ValidateCsrfToken
+        {
+            protected function runningUnitTests()
+            {
+                return false;
+            }
+        });
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin, 'admin');
+        $this->post('/admin/logout')->assertStatus(419);
+        $this->assertTrue(Auth::guard('admin')->check());
     }
 
     public function test_admin_login_post_without_csrf_is_rejected(): void

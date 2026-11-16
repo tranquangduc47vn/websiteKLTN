@@ -45,7 +45,6 @@ class SuppliersController extends Controller
 
     public function store(StoreSupplierRequest $request): RedirectResponse
     {
-        $now = time();
         Supplier::query()->create([
             'code' => trim((string) $request->input('code')),
             'name' => trim((string) $request->input('name')),
@@ -54,9 +53,9 @@ class SuppliersController extends Controller
             'email' => trim((string) $request->input('email', '')),
             'address' => trim((string) $request->input('address', '')),
             'note' => trim((string) $request->input('note', '')),
-            'status' => 1,
-            'created' => $now,
-            'updated' => $now,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         return redirect()->to(url('admin/suppliers'))->with('message_success', 'Đã thêm nhà cung cấp.');

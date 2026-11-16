@@ -26,9 +26,8 @@ class PasswordReset extends BaseModel
         return [
             'id' => 'int',
             'user_id' => 'int',
-            'expires_at' => 'int',
-            'used_at' => 'int',
-            'created' => 'int',
+            'expires_at' => 'datetime',
+            'used_at' => 'datetime',
         ];
     }
 
@@ -42,16 +41,18 @@ class PasswordReset extends BaseModel
      */
     public function isUsable(): bool
     {
-        return (int) $this->used_at === 0 && (int) $this->expires_at > now()->timestamp;
+        return $this->used_at === null
+            && $this->expires_at !== null
+            && $this->expires_at->isFuture();
     }
 
     public function scopeUnused($query)
     {
-        return $query->where('used_at', 0);
+        return $query->whereNull('used_at');
     }
 
     public function scopeValid($query)
     {
-        return $query->where('used_at', 0)->where('expires_at', '>', now()->timestamp);
+        return $query->whereNull('used_at')->where('expires_at', '>', now());
     }
 }

@@ -2,27 +2,25 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\LegacyTimestamps;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Model cho bảng `ai_message`.
- *
- * `sender`: customer | ai | staff | system.
- * `meta` là JSON string (intent handoff, staff_name, ...).
+ * Tin nhắn AI. Chỉ có `created_at` DATETIME, không có `updated_at`.
  *
  * @property int $id
  * @property int $conversation_id
  * @property string $sender
  * @property string $content
  * @property string $meta
- * @property int $created
+ * @property \Illuminate\Support\Carbon|null $created_at
  */
 class AiMessage extends BaseModel
 {
-    use LegacyTimestamps;
+    protected $table = 'ai_messages';
 
-    protected $table = 'ai_message';
+    public const UPDATED_AT = null;
+
+    public $timestamps = true;
 
     public const SENDER_CUSTOMER = 'customer';
     public const SENDER_AI = 'ai';
@@ -34,7 +32,7 @@ class AiMessage extends BaseModel
         return [
             'id' => 'int',
             'conversation_id' => 'int',
-            'created' => 'int',
+            'created_at' => 'datetime',
         ];
     }
 
@@ -53,10 +51,5 @@ class AiMessage extends BaseModel
         $decoded = json_decode((string) $this->meta, true);
 
         return is_array($decoded) ? $decoded : [];
-    }
-
-    public function createdAt(): ?\Illuminate\Support\Carbon
-    {
-        return $this->legacyTimestamp('created');
     }
 }

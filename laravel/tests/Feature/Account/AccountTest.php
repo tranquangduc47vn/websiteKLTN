@@ -7,6 +7,8 @@ use App\Models\UserAddress;
 use App\Models\UserPhone;
 use App\Support\LegacyPassword;
 use App\Support\Storefront\Product as ProductDisplay;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -82,7 +84,7 @@ class AccountTest extends AccountTestCase
     public function test_password_change_accepts_legacy_md5_current_password(): void
     {
         $user = $this->makeUser();
-        User::query()->whereKey($user->id)->update(['password' => md5('Md5Old99x')]);
+        User::query()->whereKey($user->id)->update(['password_hash' => md5('Md5Old99x')]);
         $this->actingAs($user->fresh(), 'web');
 
         $this->post('/user/password_change', [
@@ -121,7 +123,7 @@ class AccountTest extends AccountTestCase
             'phone_label' => '',
             'phone_number' => '0987654321',
             'is_default' => 1,
-            'created' => time(),
+            'created_at' => now(),
         ]);
 
         $this->post('/user/phone_delete/' . $otherPhone->id)->assertRedirect(url('user') . '#phones');
@@ -143,7 +145,7 @@ class AccountTest extends AccountTestCase
         $this->post('/user/address_add', $this->addressPayload())
             ->assertRedirect(url('user') . '#addresses');
 
-        $row = UserAddress::query()->where('user_id', $user->id)->where('address_note', '123 Test B7')->first();
+        $row = UserAddress::query()->where('user_id', $user->id)->where('note', '123 Test B7')->first();
         $this->assertNotNull($row);
         $this->assertStringContainsString('Phường Phúc Xá', (string) $row->address_line);
         $this->assertSame('Test', $user->fresh()->address);
@@ -163,7 +165,7 @@ class AccountTest extends AccountTestCase
             'ward_id' => '00001',
             'address_line' => 'SECRET-B7-ADDR',
             'is_default' => 1,
-            'created' => time(),
+            'created_at' => now(),
         ]);
 
         $this->post('/user/address_delete/' . $foreign->id)->assertRedirect(url('user') . '#addresses');
@@ -242,7 +244,7 @@ class AccountTest extends AccountTestCase
         $this->actingAs($other, 'web');
         $this->get('/thanh-toan/checkout_qr/' . $txId)->assertRedirect(url('/'));
         $this->post('/thanh-toan/cancel/' . $txId, ['reason' => 'hack'])->assertRedirect(url('/'));
-        $this->assertSame(0, (int) DB::table('transaction')->where('id', $txId)->value('status'));
+        $this->assertSame('pending', DB::table('orders')->where('id', $txId)->value('status'));
         $this->get('/user/order_detail/' . $txId)->assertNotFound();
     }
 
@@ -260,12 +262,12 @@ class AccountTest extends AccountTestCase
         $this->get('/user')->assertOk()->assertSee('Hủy đơn');
         $this->post('/thanh-toan/cancel/' . $txId, ['reason' => 'Đổi ý từ tài khoản'])
             ->assertRedirect(url('user'));
-        $this->assertSame(4, (int) DB::table('transaction')->where('id', $txId)->value('status'));
+        $this->assertSame('cancelled', DB::table('orders')->where('id', $txId)->value('status'));
         $this->assertSame($stockBefore, $this->variantStock($variantId));
 
         $inMoves = (int) DB::table('stock_movements')->where('reference_id', $txId)->where('movement_type', 'in')->count();
         $this->post('/thanh-toan/cancel/' . $txId, ['reason' => 'lần 2'])->assertRedirect(url('user'));
-        $this->assertSame(4, (int) DB::table('transaction')->where('id', $txId)->value('status'));
+        $this->assertSame('cancelled', DB::table('orders')->where('id', $txId)->value('status'));
         $this->assertSame($inMoves, (int) DB::table('stock_movements')->where('reference_id', $txId)->where('movement_type', 'in')->count());
         $this->assertSame($stockBefore, $this->variantStock($variantId));
     }
@@ -280,6 +282,102 @@ class AccountTest extends AccountTestCase
         $this->post('/user/logout')->assertRedirect(route('storefront.home'));
         $this->get('/user')->assertRedirect(url('dang-nhap'));
         $this->assertNotEmpty($this->savedCart($user));
+    }
+
+    public function test_get_logout_does_not_end_the_session(): void
+    {
+        $user = $this->makeUser();
+        $this->actingAs($user, 'web');
+
+        $this->get('/user/logout')->assertNotFound();
+        $this->assertTrue(auth('web')->check());
+
+        $this->app->bind(ValidateCsrfToken::class, fn ($app) => new class($app, $app['encrypter']) extends ValidateCsrfToken
+        {
+            protected function runningUnitTests()
+            {
+                return false;
+            }
+        });
+        $this->post('/user/logout')->assertStatus(419)
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeaderMissing('X-Powered-By');
+        $this->assertTrue(Auth::guard('web')->check());
+        $this->get('/')->assertOk()
+            ->assertSee('name="_token"', false)
+            ->assertSee('wf-chrome-logout', false)
+            ->assertDontSee('href="' . url('user/logout') . '"', false);
+    }
+
+    public function test_form_email_does_not_grant_access_to_another_account(): void
+    {
+        $owner = $this->makeUser();
+        $other = $this->makeUser();
+        $this->actingAs($owner, 'web');
+        $product = $this->standardProduct();
+        $this->addToCart($product, ['size' => 'S', 'color' => 'Đen', 'qty' => 1]);
+        $marker = 'ADDR-PHASE5-ONLY-OWNER';
+        $phone = '0905888001';
+
+        $this->post('/thanh-toan', $this->checkoutPayload($owner, [
+            'email' => $other->email,
+            'phone' => $phone,
+            'address' => $marker,
+        ]))->assertRedirect();
+
+        $txId = $this->lastTransactionId($owner);
+        $this->assertSame($other->email, DB::table('orders')->where('id', $txId)->value('customer_email'));
+        $this->assertSame((int) $owner->id, (int) DB::table('orders')->where('id', $txId)->value('user_id'));
+
+        $this->get('/user/order_detail/' . $txId)->assertOk()->assertSee($marker);
+        $this->get('/user')->assertOk()->assertSee($phone);
+
+        $this->actingAs($other, 'web');
+        $this->get('/user/order_detail/' . $txId)->assertNotFound();
+        $this->get('/user')->assertOk()->assertDontSee($phone)->assertDontSee($marker);
+        $this->get('/thanh-toan/checkout_qr/' . $txId)->assertRedirect(url('/'));
+        $this->post('/thanh-toan/cancel/' . $txId, ['reason' => 'lay don'])
+            ->assertRedirect(url('/'))
+            ->assertSessionHas('message_fail', 'Đơn hàng không tồn tại trên hệ thống!');
+        $this->assertSame('pending', DB::table('orders')->where('id', $txId)->value('status'));
+
+        $missing = $this->post('/thanh-toan/cancel/999999991', ['reason' => 'khong co']);
+        $missing->assertRedirect(url('/'))
+            ->assertSessionHas('message_fail', 'Đơn hàng không tồn tại trên hệ thống!');
+
+        $this->actingAs($owner, 'web');
+        $this->post('/thanh-toan/cancel/' . $txId, ['reason' => 'chu don huy'])
+            ->assertRedirect(url('user'));
+        $this->assertSame('cancelled', DB::table('orders')->where('id', $txId)->value('status'));
+    }
+
+    public function test_historical_null_user_order_is_not_claimed_by_email(): void
+    {
+        $user = $this->makeUser();
+        $phone = '0905888002';
+        $txId = $this->insertOrder($user, [
+            'user_id' => null,
+            'status' => 'pending',
+            'customer_email' => $user->email,
+            'customer_phone' => $phone,
+            'amount' => 444000,
+        ]);
+        $this->assertNull(DB::table('orders')->where('id', $txId)->value('user_id'));
+
+        $this->actingAs($user, 'web');
+        $this->get('/user/order_detail/' . $txId)->assertNotFound();
+        $this->get('/user')->assertOk()->assertDontSee($phone);
+        $this->get('/')->assertOk()->assertDontSee('wf-chrome-order-badge', false);
+        $this->post('/thanh-toan/cancel/' . $txId, ['reason' => 'claim'])
+            ->assertRedirect(url('/'));
+        $this->assertSame('pending', DB::table('orders')->where('id', $txId)->value('status'));
+        $this->assertNull(DB::table('orders')->where('id', $txId)->value('user_id'));
+
+        $this->withSession(['order_access_ids' => [$txId => time()]])
+            ->get('/user/order_detail/' . $txId)
+            ->assertOk()
+            ->assertSee($phone);
+        $this->assertNull(DB::table('orders')->where('id', $txId)->value('user_id'));
     }
 
     public function test_handle_path_and_leftover_validation_urls(): void

@@ -28,18 +28,18 @@ class OrderCustomerTest extends AdminTestCase
     {
         if ($this->orderIds !== []) {
             DB::table('stock_movements')->where('reference_type', 'order')->whereIn('reference_id', $this->orderIds)->delete();
-            DB::table('user_point_log')->whereIn('transaction_id', $this->orderIds)->delete();
-            DB::table('order')->whereIn('transaction_id', $this->orderIds)->delete();
-            DB::table('transaction')->whereIn('id', $this->orderIds)->delete();
+            DB::table('point_logs')->whereIn('order_id', $this->orderIds)->delete();
+            DB::table('order_items')->whereIn('order_id', $this->orderIds)->delete();
+            DB::table('orders')->whereIn('id', $this->orderIds)->delete();
         }
         if ($this->productIds !== []) {
             DB::table('product_variants')->whereIn('product_id', $this->productIds)->delete();
-            DB::table('product')->whereIn('id', $this->productIds)->delete();
+            DB::table('products')->whereIn('id', $this->productIds)->delete();
         }
         if ($this->userIds !== []) {
-            DB::table('user_address')->whereIn('user_id', $this->userIds)->delete();
-            DB::table('user_phone')->whereIn('user_id', $this->userIds)->delete();
-            DB::table('user')->whereIn('id', $this->userIds)->delete();
+            DB::table('user_addresses')->whereIn('user_id', $this->userIds)->delete();
+            DB::table('user_phones')->whereIn('user_id', $this->userIds)->delete();
+            DB::table('users')->whereIn('id', $this->userIds)->delete();
         }
         parent::tearDown();
     }
@@ -52,10 +52,8 @@ class OrderCustomerTest extends AdminTestCase
         $customer = User::query()->create([
             'name' => 'B10 Customer Guard',
             'email' => 'b10guard.' . Str::lower(Str::random(6)) . '@example.test',
-            'password' => LegacyPassword::hash('CustomerPass1'),
-            'phone' => '0900000099',
-            'address' => 'HN',
-            'created' => time(),
+            'password_hash' => LegacyPassword::hash('CustomerPass1'),
+            'created_at' => now(),
         ]);
         $this->userIds[] = (int) $customer->id;
         $this->actingAs($customer, 'web');
@@ -94,7 +92,7 @@ class OrderCustomerTest extends AdminTestCase
             'line_amount' => 50000,
         ]);
 
-        $product->update(['price' => 1]);
+        $product->update(['list_price' => 1]);
         $this->get('/admin/orders/detail/' . $first)
             ->assertOk()
             ->assertSee('50.000')
@@ -106,7 +104,7 @@ class OrderCustomerTest extends AdminTestCase
             ->assertSee($token);
 
         $this->get('/admin/orders/accept/' . $first)->assertRedirect(url('admin/orders/detail/' . $first));
-        $this->assertSame(1, (int) Transaction::query()->find($first)->status);
+        $this->assertSame('confirmed', Transaction::query()->find($first)->status);
         $this->get('/admin/orders/accept/' . $first)
             ->assertRedirect(url('admin/orders/detail/' . $first))
             ->assertSessionHas('message_fail', 'Chỉ có thể xác nhận đơn đang ở trạng thái chờ xử lý.');
@@ -114,7 +112,7 @@ class OrderCustomerTest extends AdminTestCase
         $this->get('/admin/orders/complete/' . $first)->assertSessionHas('message_success');
         $product->refresh();
         $buyer->refresh();
-        $this->assertSame(3, (int) Transaction::query()->find($first)->status);
+        $this->assertSame('completed', Transaction::query()->find($first)->status);
         $this->assertSame(2, (int) $product->buyed);
         $this->assertSame(5, (int) $buyer->loyalty_points);
         $this->assertSame(1, (int) $buyer->loyalty_completed_orders);
@@ -134,7 +132,7 @@ class OrderCustomerTest extends AdminTestCase
         ]);
         $stockBefore = (int) ProductVariant::query()->where('product_id', $product->id)->value('stock');
         $this->post('/admin/orders/cancel/' . $open, ['reason' => ''])->assertSessionHas('message_success');
-        $this->assertSame(4, (int) Transaction::query()->find($open)->status);
+        $this->assertSame('cancelled', Transaction::query()->find($open)->status);
         $this->assertSame($stockBefore + 1, (int) ProductVariant::query()->where('product_id', $product->id)->value('stock'));
 
         $lineOrder = $this->makeOrder($buyer, $product, [
@@ -144,10 +142,10 @@ class OrderCustomerTest extends AdminTestCase
             'qty' => 1,
             'line_amount' => 20000,
         ]);
-        $lineId = (int) DB::table('order')->where('transaction_id', $lineOrder)->value('id');
+        $lineId = (int) DB::table('order_items')->where('order_id', $lineOrder)->value('id');
         $stockBeforeLine = (int) ProductVariant::query()->where('product_id', $product->id)->value('stock');
         $this->post('/admin/orders/deldetail/' . $lineId)->assertSessionHas('message_success', 'Xóa thành công');
-        $this->assertNull(DB::table('order')->where('id', $lineId)->first());
+        $this->assertNull(DB::table('order_items')->where('id', $lineId)->first());
         $this->assertSame(0.0, (float) Transaction::query()->find($lineOrder)->amount);
         $this->assertSame($stockBeforeLine + 1, (int) ProductVariant::query()->where('product_id', $product->id)->value('stock'));
         $this->get('/admin/orders/deldetail/' . $lineId)->assertNotFound();
@@ -186,22 +184,22 @@ class OrderCustomerTest extends AdminTestCase
             'qty' => 1,
             'line_amount' => 30000,
         ]);
-        DB::table('user_address')->insert([
+        DB::table('user_addresses')->insert([
             'user_id' => $buyer->id,
-            'address_note' => 'Nha B10',
+            'note' => 'Nha B10',
             'province_id' => '01',
             'district_id' => '001',
             'ward_id' => '00001',
             'address_line' => '123 Duong B10',
             'is_default' => 1,
-            'created' => time(),
+            'created_at' => now(),
         ]);
-        DB::table('user_phone')->insert([
+        DB::table('user_phones')->insert([
             'user_id' => $buyer->id,
-            'phone_label' => 'Di dong',
+            'label' => 'Di dong',
             'phone_number' => '0988111222',
             'is_default' => 1,
-            'created' => time(),
+            'created_at' => now(),
         ]);
 
         $this->get('/admin/users?q=' . urlencode($buyer->email))
@@ -249,14 +247,12 @@ class OrderCustomerTest extends AdminTestCase
         $user = User::query()->create([
             'name' => 'B10 Buyer ' . Str::lower(Str::random(4)),
             'email' => 'b10buyer.' . Str::lower(Str::random(6)) . '@example.test',
-            'password' => LegacyPassword::hash('BuyerPass1'),
-            'phone' => '0900111000',
-            'address' => 'Ha Noi',
+            'password_hash' => LegacyPassword::hash('BuyerPass1'),
             'loyalty_points' => 0,
             'loyalty_lifetime_spend' => 0,
             'loyalty_completed_orders' => 0,
             'loyalty_tier' => 'member',
-            'created' => time(),
+            'created_at' => now(),
         ]);
         $this->userIds[] = (int) $user->id;
 
@@ -266,39 +262,27 @@ class OrderCustomerTest extends AdminTestCase
     private function makeProduct(int $stock, int $price): Product
     {
         $product = Product::query()->create([
-            'catalog_id' => (int) DB::table('catalog')->orderBy('id')->value('id'),
+            'category_id' => (int) DB::table('categories')->orderBy('id')->value('id'),
             'name' => 'B10 Product ' . Str::lower(Str::random(5)),
             'content' => '',
-            'price' => $price,
-            'discount' => 0,
-            'discount_type' => 'amount',
-            'discount_percent' => 0,
-            'image_link' => 'b10-none.jpg',
-            'image_list' => '[]',
-            'view' => 0,
-            'buyed' => 0,
-            'quantity' => $stock,
-            'rate_total' => 0,
-            'rate_count' => 0,
-            'created' => time(),
-            'code' => '',
-            'status' => 1,
-            'color' => 'Đen',
-            'size' => 'M',
+            'list_price' => $price,
+            'discount_amount' => 0,
+            'code' => 'B10' . strtoupper(Str::random(6)),
+            'status' => 'active',
+            'view_count' => 0,
+            'sold_count' => 0,
+            'rating_total' => 0,
+            'rating_count' => 0,
         ]);
         ProductVariant::query()->create([
             'product_id' => $product->id,
             'sku' => 'B10-' . $product->id . '-' . Str::lower(Str::random(4)),
-            'color' => 'Đen',
-            'size' => 'M',
-            'price' => $price,
+            'color_name' => 'Đen',
+            'size_name' => 'M',
             'cost_price' => 0,
             'stock' => $stock,
             'min_stock' => 1,
-            'image' => '',
-            'status' => 1,
-            'created' => time(),
-            'updated' => time(),
+            'status' => 'active',
         ]);
         $this->productIds[] = (int) $product->id;
 
@@ -308,32 +292,39 @@ class OrderCustomerTest extends AdminTestCase
     /** @param  array<string, mixed>  $data */
     private function makeOrder(User $buyer, Product $product, array $data): int
     {
-        $id = (int) DB::table('transaction')->insertGetId([
-            'status' => (int) $data['status'],
+        $enum = [0 => 'pending', 1 => 'confirmed', 2 => 'packed', 3 => 'completed', 4 => 'cancelled'][(int) $data['status']] ?? (string) $data['status'];
+        $id = (int) DB::table('orders')->insertGetId([
+            'status' => $enum,
             'user_id' => $buyer->id,
-            'user_name' => $data['user_name'],
-            'user_email' => $buyer->email,
-            'user_phone' => $data['user_phone'] ?? '0900111000',
-            'user_address' => 'Ha Noi',
-            'message' => '',
-            'amount' => $data['amount'],
-            'voucher_code' => '',
+            'customer_name' => $data['user_name'],
+            'customer_email' => $buyer->email,
+            'customer_phone' => $data['user_phone'] ?? '0900111000',
+            'shipping_address' => 'Ha Noi',
+            'note' => '',
+            'subtotal' => $data['amount'],
             'discount_amount' => 0,
-            'payment' => $data['payment'] ?? 'COD',
-            'created' => time(),
+            'shipping_fee' => 0,
+            'total' => $data['amount'],
+            'voucher_code' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
         $this->orderIds[] = $id;
         if (empty($data['skip_line'])) {
             $variantId = (int) ProductVariant::query()->where('product_id', $product->id)->value('id');
-            DB::table('order')->insert([
-                'transaction_id' => $id,
+            $qty = (int) $data['qty'];
+            $line = (float) $data['line_amount'];
+            DB::table('order_items')->insert([
+                'order_id' => $id,
                 'product_id' => $product->id,
                 'variant_id' => $variantId,
-                'size' => 'M',
-                'color' => 'Đen',
-                'qty' => (int) $data['qty'],
-                'amount' => $data['line_amount'],
-                'status' => 0,
+                'product_name' => $product->name,
+                'sku' => 'B10-' . $variantId,
+                'size_name' => 'M',
+                'color_name' => 'Đen',
+                'qty' => $qty,
+                'unit_price' => $qty > 0 ? $line / $qty : $line,
+                'line_subtotal' => $line,
                 'cost_price' => 0,
             ]);
         }

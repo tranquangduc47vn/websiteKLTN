@@ -11,7 +11,8 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Port phần giỏ hàng trong CI3 MY_Controller::__construct() (mọi trang trừ /admin):
  *   - khách đã đăng nhập: cart_ensure_for_logged_in_user() — giỏ session trống thì nạp từ user_saved_cart;
- *   - khách chưa đăng nhập: unset custom_cart (storefront không có giỏ cho guest).
+ *   - khách chưa đăng nhập: unset custom_cart.
+ *     POST /thanh-toan giữ bản sao ở checkout_pending_cart để đăng nhập không mất giỏ.
  */
 class SyncCartSession
 {
@@ -27,6 +28,12 @@ class SyncCartSession
             if ($user) {
                 $this->cart->ensureForLoggedInUser($request->session(), $user);
             } else {
+                if ($request->isMethod('post') && $request->path() === 'thanh-toan') {
+                    $pending = $this->cart->getSessionCart($request->session());
+                    if ($pending !== []) {
+                        $request->session()->put(CartSessionService::PENDING_CHECKOUT_KEY, $pending);
+                    }
+                }
                 $this->cart->forgetSessionCart($request->session());
             }
         }

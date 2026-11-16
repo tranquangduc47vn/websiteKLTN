@@ -49,7 +49,7 @@ class ChatService
             if ($message !== '') {
                 $this->log((int) $conversation->id, 'customer', $message);
                 $conversation->unread_staff = 1;
-                $conversation->last_message = time();
+                $conversation->last_message_at = now();
                 $conversation->save();
             }
 
@@ -59,7 +59,7 @@ class ChatService
             if ($message !== '') {
                 $this->log((int) $conversation->id, 'customer', $message);
                 $conversation->unread_staff = 1;
-                $conversation->last_message = time();
+                $conversation->last_message_at = now();
                 $conversation->save();
             }
 
@@ -254,7 +254,7 @@ class ChatService
         }
         $id = $this->log((int) $conversation->id, 'staff', $message, ['staff_name' => $staffName]);
         $conversation->unread_customer = 1;
-        $conversation->last_message = time();
+        $conversation->last_message_at = now();
         $conversation->save();
 
         return ['ok' => true, 'message_id' => $id, 'content' => $message, 'created' => time()];
@@ -275,7 +275,7 @@ class ChatService
         $conversation->staff_id = $staffId;
         $conversation->staff_name = $staffName;
         $conversation->status = 'staff_joined';
-        $conversation->last_message = time();
+        $conversation->last_message_at = now();
         $conversation->save();
         $this->log((int) $conversation->id, 'system', 'Nhân viên ' . $staffName . ' đã tham gia hỗ trợ.');
 
@@ -298,8 +298,8 @@ class ChatService
             'staff_id' => 0,
             'staff_name' => '',
             'status' => 'ai_active',
-            'started' => $now,
-            'last_message' => $now,
+            'started_at' => now(),
+            'last_message_at' => now(),
             'unread_staff' => 0,
             'unread_customer' => 0,
         ]);
@@ -324,7 +324,7 @@ class ChatService
         if ($hours !== '') {
             $parts[] = 'Giờ làm việc: ' . $hours;
         }
-        $catalogs = DB::table('catalog')->where('parent_id', 1)->orderBy('id')->limit(20)->pluck('name');
+        $catalogs = DB::table('categories')->where('parent_id', 1)->orderBy('id')->limit(20)->pluck('name');
         if ($catalogs->isNotEmpty()) {
             $parts[] = 'Danh mục chính: ' . $catalogs->implode(', ') . '.';
         }
@@ -332,12 +332,17 @@ class ChatService
 
         $products = [];
         if ($this->mentions($normalized, ['sản phẩm', 'áo', 'quần', 'đầm', 'váy', 'giá', 'bán chạy', 'khuyến mãi'])) {
-            $rows = DB::table('product')->orderByDesc('buyed')->limit(5)->get(['id', 'name', 'price', 'discount', 'color']);
+            $rows = DB::table('products')->orderByDesc('sold_count')->limit(5)->get([
+                'id',
+                'name',
+                'list_price as price',
+                'discount_amount as discount',
+            ]);
             $lines = ['Sản phẩm phù hợp câu hỏi:'];
             foreach ($rows as $row) {
                 $price = max(0, (int) $row->price - (int) $row->discount);
                 $products[] = ['id' => (int) $row->id, 'name' => (string) $row->name, 'price' => $price];
-                $lines[] = $row->name . ' — ' . $price . ($row->color ? ' — màu: ' . $row->color : '');
+                $lines[] = $row->name . ' — ' . $price;
             }
             $parts[] = implode("\n", $lines);
         }
@@ -347,16 +352,22 @@ class ChatService
 
     private function orderContext(int $userId): string
     {
-        $orders = DB::table('transaction')->where('user_id', $userId)->orderByDesc('id')->limit(5)->get(['id', 'status', 'amount', 'created']);
+        $orders = DB::table('orders')->where('user_id', $userId)->orderByDesc('id')->limit(5)->get(['id', 'status', 'total', 'created_at']);
         if ($orders->isEmpty()) {
             return 'Đơn hàng của khách đang đăng nhập: chưa có đơn nào.';
         }
-        $labels = [0 => 'Mới đặt', 1 => 'Đã xác nhận', 2 => 'Đang giao hàng', 3 => 'Hoàn thành', 4 => 'Đã hủy / Hoàn'];
+        $labels = [
+            'pending' => 'Mới đặt',
+            'confirmed' => 'Đã xác nhận',
+            'packed' => 'Đang giao hàng',
+            'completed' => 'Hoàn thành',
+            'cancelled' => 'Đã hủy / Hoàn',
+        ];
         $lines = ['Đơn hàng gần đây của khách đang đăng nhập:'];
         foreach ($orders as $order) {
-            $lines[] = '- Đơn #' . $order->id . ' ngày ' . date('d/m/Y', (int) $order->created)
-                . ': ' . ($labels[(int) $order->status] ?? 'Không rõ')
-                . ', tổng ' . (int) $order->amount;
+            $lines[] = '- Đơn #' . $order->id . ' ngày ' . date('d/m/Y', strtotime((string) $order->created_at))
+                . ': ' . ($labels[(string) $order->status] ?? 'Không rõ')
+                . ', tổng ' . (int) $order->total;
         }
 
         return implode("\n", $lines);
@@ -428,7 +439,7 @@ class ChatService
             'sender' => $sender,
             'content' => $content,
             'meta' => $meta === [] ? '' : json_encode($meta, JSON_UNESCAPED_UNICODE),
-            'created' => time(),
+            'created_at' => now(),
         ]);
 
         return (int) $row->id;
@@ -437,7 +448,7 @@ class ChatService
     private function touch(AiConversation $conversation, string $status, bool $unreadStaff): void
     {
         $conversation->status = $status;
-        $conversation->last_message = time();
+        $conversation->last_message_at = now();
         if ($unreadStaff) {
             $conversation->unread_staff = 1;
         }
@@ -480,7 +491,7 @@ class ChatService
         $conversation->staff_id = 0;
         $conversation->staff_name = '';
         $conversation->status = 'ai_active';
-        $conversation->last_message = time();
+        $conversation->last_message_at = now();
         $conversation->save();
         $this->log((int) $conversation->id, 'system', 'Trợ lý AI tiếp tục hỗ trợ bạn.');
 
@@ -534,7 +545,7 @@ class ChatService
     /** @return \Illuminate\Support\Collection<int, AiConversation> */
     public function inbox(string $status, string $q, bool $unreadOnly)
     {
-        $query = AiConversation::query()->orderByDesc('last_message')->limit(100);
+        $query = AiConversation::query()->orderByDesc('last_message_at')->limit(100);
         if ($status !== '' && $status !== 'all') {
             $query->where('status', $status);
         }
@@ -564,7 +575,7 @@ class ChatService
         $conversation->staff_id = 0;
         $conversation->staff_name = '';
         $conversation->status = 'closed';
-        $conversation->last_message = time();
+        $conversation->last_message_at = now();
         $conversation->save();
 
         return ['ok' => true, 'status' => 'closed'];
@@ -584,7 +595,7 @@ class ChatService
                 'id' => (int) $row->id,
                 'sender_type' => (string) $row->sender,
                 'content' => (string) $row->content,
-                'created' => (int) $row->created,
+                'created' => $row->created_at ? (int) strtotime((string) $row->created_at) : 0,
                 'staff_name' => is_array($meta) ? (string) ($meta['staff_name'] ?? '') : '',
             ];
         }

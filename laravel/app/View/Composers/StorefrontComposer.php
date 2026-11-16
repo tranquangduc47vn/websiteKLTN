@@ -14,13 +14,13 @@ use Illuminate\View\View;
  *
  * Port từ CI3 MY_Controller::__construct() (application/core/MY_Controller.php):
  *   catalog          — danh mục cấp 1 + con trực tiếp (parent_id=1, sort_order ASC)
- *   user             — session 'user' (B3 guard 'web' hoặc session legacy 'user')
+ *   user             — Auth::guard('web'); khách khi guard trống
  *   user_order_badge — số đơn đang xử lý của user
  *   carts / total_items — đếm số lượng trong session 'custom_cart' (CHỈ ĐỌC)
  *
  * KHÔNG ghi DB. Phần khôi phục / xóa giỏ theo trạng thái đăng nhập của MY_Controller
  * nằm ở middleware App\Http\Middleware\SyncCartSession.
- * Các key session 'user'/'custom_cart' vẫn giữ nguyên tương thích.
+ * Giỏ hàng vẫn đọc session 'custom_cart'. Không đọc session 'user' để xác định đăng nhập.
  */
 class StorefrontComposer
 {
@@ -62,45 +62,42 @@ class StorefrontComposer
             'cart_url' => Urls::cart(),
             'login_url' => Urls::login(),
             'register_url' => Urls::register(),
+            'robots_meta' => $this->privatePath(request()) ? 'noindex, nofollow' : null,
         ];
     }
 
-    /** User hiện tại: guard 'web' (B3) hoặc session legacy 'user'. */
-    private function currentUser(): mixed
+    private function privatePath(\Illuminate\Http\Request $request): bool
     {
-        if (Auth::guard('web')->check()) {
-            return Auth::guard('web')->user();
+        $path = trim($request->path(), '/');
+        foreach (['gio-hang', 'thanh-toan', 'dang-nhap', 'dang-ky', 'quen-mat-khau', 'dat-lai-mat-khau', 'user', 'admin'] as $prefix) {
+            if ($path === $prefix || str_starts_with($path, $prefix . '/')) {
+                return true;
+            }
         }
 
-        $sessionUser = session()->get('user');
+        return false;
+    }
 
-        return is_object($sessionUser) ? $sessionUser : null;
+    /** User hiện tại chỉ lấy từ guard web. Session 'user' không cấp quyền. */
+    private function currentUser(): mixed
+    {
+        return Auth::guard('web')->user();
     }
 
     /**
-     * CI3 Transaction_model::count_active_for_user($uid, $email):
-     * đơn status 0/1/2, lọc theo user_id, chỉ khi không có id mới lọc theo user_email.
+     * Huy hiệu đơn đang xử lý. Chỉ đếm đơn gắn đúng user_id.
+     * Không đếm theo email form, kể cả đơn lịch sử user_id NULL.
      */
     private function orderBadge(mixed $user): int
     {
-        if (! $user) {
-            return 0;
-        }
-
         $uid = (int) ($user->id ?? 0);
-        $email = trim((string) ($user->email ?? ''));
-
-        if ($uid <= 0 && $email === '') {
+        if ($uid <= 0) {
             return 0;
         }
 
-        return (int) DB::table('transaction')
-            ->when(
-                $uid > 0,
-                fn ($q) => $q->where('user_id', $uid),
-                fn ($q) => $q->where('user_email', $email)
-            )
-            ->whereIn('status', [0, 1, 2])
+        return (int) DB::table('orders')
+            ->where('user_id', $uid)
+            ->whereIn('status', ['pending', 'confirmed', 'packed'])
             ->count();
     }
 

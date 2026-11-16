@@ -3,29 +3,43 @@
 @section('title', 'Quên mật khẩu')
 
 @section('content')
-<div class="wrap" style="max-width:440px;margin:40px auto;">
-    <h1>Quên mật khẩu</h1>
+	<div class="jm-auth-standalone-wrap">
+		<a href="{{ route('storefront.user.login') }}" class="jm-auth-back" title="Quay lại đăng nhập">
+			<span class="jm-auth-back-icon" aria-hidden="true">←</span>
+			Quay lại
+		</a>
 
-    @if (session('message_success'))
-        <div class="alert alert-success">{{ session('message_success') }}</div>
-    @endif
-    @if (session('message_fail'))
-        <div class="alert alert-danger">{{ session('message_fail') }}</div>
-    @endif
+		<div class="jm-auth-card">
+			<div class="jm-auth-card-head">
+				<h1 class="jm-auth-title">Quên mật khẩu</h1>
+				<p class="jm-auth-subtitle">Nhập email đăng ký — chúng tôi sẽ gửi liên kết đặt lại mật khẩu</p>
+			</div>
 
-    <form method="POST" action="{{ route('storefront.user.forgot_password.post') }}">
-        @csrf
+			@if (session('message_success'))
+				<div class="jm-auth-alert jm-auth-alert-success">{{ session('message_success') }}</div>
+			@endif
+			@if (session('message_fail'))
+				<div class="jm-auth-alert jm-auth-alert-error">{{ session('message_fail') }}</div>
+			@endif
 
-        <div>
-            <label for="email">Email</label>
-            <input id="email" name="email" type="email" value="{{ old('email') }}" required autofocus autocomplete="email">
-            @error('email')<span class="error">{{ $message }}</span>@enderror
-        </div>
+			<form class="jm-auth-form" method="POST" action="{{ route('storefront.user.forgot_password.post') }}" novalidate>
+				@csrf
+				<div class="jm-auth-field">
+					<label for="forgotEmail">Email</label>
+					<input type="email" class="jm-auth-input" id="forgotEmail" name="email"
+						placeholder="email@example.com"
+						value="{{ old('email') }}"
+						autocomplete="email" required autofocus>
+					@error('email')<span class="jm-auth-field-error">{{ $message }}</span>@enderror
+				</div>
 
-        <button type="submit">Gửi liên kết đặt lại mật khẩu</button>
-    </form>
+				<button type="submit" class="jm-auth-submit">Gửi liên kết đặt lại</button>
+			</form>
 
-    <p><a href="{{ route('storefront.user.login') }}">Đăng nhập</a> ·
-       <a href="{{ route('storefront.user.register') }}">Tạo tài khoản mới</a></p>
-</div>
+			<p class="jm-auth-footer-link">
+				Nhớ mật khẩu?
+				<a href="{{ route('storefront.user.login') }}">Đăng nhập</a>
+			</p>
+		</div>
+	</div>
 @endsection

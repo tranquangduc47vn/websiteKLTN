@@ -49,4 +49,19 @@ class StockReceiptItem extends BaseModel
     {
         return $this->belongsTo(ProductVariant::class, 'variant_id');
     }
+
+    public function getSubtotalAttribute(): string
+    {
+        return (string) ($this->attributes['line_total'] ?? '0');
+    }
+
+    public function getColorAttribute(): string
+    {
+        return (string) ($this->attributes['color_name'] ?? '');
+    }
+
+    public function getSizeAttribute(): string
+    {
+        return (string) ($this->attributes['size_name'] ?? '');
+    }
 }

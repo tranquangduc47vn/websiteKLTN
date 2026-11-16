@@ -18,6 +18,7 @@ use App\Services\Account\AccountResult;
 use App\Services\AccountService;
 use App\Services\AuthMailService;
 use App\Services\CartSessionService;
+use App\Services\CheckoutService;
 use App\Services\LoyaltyService;
 use App\Services\PasswordResetService;
 use App\Services\VoucherService;
@@ -40,8 +41,8 @@ use Illuminate\View\View;
  *   - MD5 legacy được xác thực bằng md5() rồi TỰ ĐỘNG rehash sang bcrypt khi login thành công;
  *   - KHÔNG bao giờ lưu plaintext vào session.
  *
- * Session key giữ nguyên tương thích CI3: `user` (mirror, xem middleware user.session),
- * `custom_cart`, `checkout_voucher`, `redirect_back`.
+ * Session giữ `custom_cart`, `checkout_voucher`, `redirect_back`.
+ * Đăng nhập chỉ qua guard `web`. Session key `user` không xác thực.
  *
  * 7 chức năng auth đã migrate: login, logout, register, forgotPassword, resetPassword.
  * B7: trang tài khoản, sổ điện thoại/địa chỉ, đổi mật khẩu, lịch sử + chi tiết đơn.
@@ -70,7 +71,6 @@ class UserController extends Controller
         'address_delete' => 'addressDelete',
         'address_default' => 'addressDefault',
         'order_detail' => 'orderDetail',
-        'logout' => 'logout',
         'login' => 'login',
         'register' => 'register',
         'forgot_password' => 'forgotPassword',
@@ -99,11 +99,7 @@ class UserController extends Controller
         if ($user) {
             $this->cart->ensureForLoggedInUser($request->session(), $user);
 
-            $redirectUrl = (string) ($request->session()->get(self::LEGACY_REDIRECT_KEY)
-                ?: $this->cart->cartUrl());
-            $request->session()->forget(self::LEGACY_REDIRECT_KEY);
-
-            return redirect($redirectUrl);
+            return $this->redirectAfterAuth($request);
         }
 
         if ($request->isMethod('post')) {
@@ -134,28 +130,52 @@ class UserController extends Controller
 
             $user = Auth::guard('web')->user();
 
-            // Nạp giỏ hàng đã lưu từ DB cho user vừa đăng nhập (CI3: unset custom_cart rồi cart_restore_for_user).
+            // Nạp giỏ đã lưu. Nếu chưa có giỏ lưu, giữ giỏ khách vừa mang sang trang đăng nhập.
+            $pending = $request->session()->get(CartSessionService::PENDING_CHECKOUT_KEY);
             $request->session()->forget(self::CART_KEY);
             $this->cart->restoreForUser($request->session(), (int) $user->id);
+            if ($this->cart->getSessionCart($request->session()) === [] && is_array($pending) && $pending !== []) {
+                $this->cart->putSessionCart($request->session(), $pending);
+                $this->cart->syncToUser($request->session(), (int) $user->id, $pending);
+            }
+            $request->session()->forget(CartSessionService::PENDING_CHECKOUT_KEY);
 
             $request->session()->regenerate(); // chống session fixation
 
-            $redirectUrl = (string) ($request->session()->get(self::LEGACY_REDIRECT_KEY)
-                ?: $this->cart->cartUrl());
-            $request->session()->forget(self::LEGACY_REDIRECT_KEY);
-
-            return redirect($redirectUrl);
+            return $this->redirectAfterAuth($request);
         }
 
         return view('auth.user-login');
     }
 
+    private function redirectAfterAuth(Request $request): RedirectResponse
+    {
+        $added = $this->cart->consumePendingAdd($request->session());
+        if ($added !== null) {
+            Flash::store($added->ok ? Flash::SUCCESS : Flash::FAIL, $added->message);
+            $request->session()->forget(self::LEGACY_REDIRECT_KEY);
+
+            return redirect()->to($this->cart->cartUrl());
+        }
+
+        $redirectUrl = (string) ($request->session()->get(self::LEGACY_REDIRECT_KEY)
+            ?: $this->cart->cartUrl());
+        $request->session()->forget(self::LEGACY_REDIRECT_KEY);
+
+        return redirect($redirectUrl);
+    }
+
     /* =====================================================================
-     | GET|POST /user/logout  (CI3: User::logout)
+     | POST /user/logout  (CI3: User::logout)
+     | GET không đi vào đây. CSRF do middleware web.
      |====================================================================*/
 
     public function logout(Request $request): RedirectResponse
     {
+        if (! $request->isMethod('post')) {
+            abort(404);
+        }
+
         $user = Auth::guard('web')->user();
 
         if ($user) {
@@ -193,11 +213,12 @@ class UserController extends Controller
             $user = User::query()->create([
                 'name' => trim((string) $validated['name']),
                 'email' => trim((string) $validated['email']),
-                // Password MỚI luôn dùng Hash::make — không bao giờ MD5.
-                'password' => LegacyPassword::hash((string) $validated['password']),
-                'phone' => trim((string) $validated['phone']),
-                'address' => $addressLine,
-                'created' => time(),
+                'password_hash' => LegacyPassword::hash((string) $validated['password']),
+                'loyalty_points' => 0,
+                'loyalty_lifetime_spend' => 0,
+                'loyalty_completed_orders' => 0,
+                'loyalty_tier' => User::TIER_MEMBER,
+                'status' => User::STATUS_ACTIVE,
             ]);
 
             // Tạo sổ địa chỉ + số điện thoại mặc định (CI3: user_address/user_phone is_default=1).
@@ -210,7 +231,6 @@ class UserController extends Controller
                     'ward_id' => trim((string) $validated['ward_id']),
                     'address_line' => $addressLine,
                     'is_default' => 1,
-                    'created' => time(),
                 ]);
 
                 $phoneNumber = preg_replace('/\s+/', '', trim((string) $validated['phone']));
@@ -221,7 +241,6 @@ class UserController extends Controller
                         'phone_label' => '',
                         'phone_number' => $phoneNumber,
                         'is_default' => 1,
-                        'created' => time(),
                     ]);
                 }
 
@@ -298,7 +317,7 @@ class UserController extends Controller
 
             User::query()
                 ->whereKey((int) $record->user_id)
-                ->update(['password' => LegacyPassword::hash((string) $validated['password'])]);
+                ->update(['password_hash' => LegacyPassword::hash((string) $validated['password'])]);
 
             $this->passwordResets->markUsed((int) $record->id);
 
@@ -326,7 +345,7 @@ class UserController extends Controller
         $addresses = $this->account->addresses((int) $user->id);
 
         $orderStatus = trim((string) $request->query('order_status', ''));
-        $allowed = ['', 'all', '0', '1', '2', '3', '4'];
+        $allowed = ['', 'all', '0', '1', '2', '3', '4', 'pending', 'confirmed', 'packed', 'completed', 'cancelled'];
         if (! in_array($orderStatus, $allowed, true)) {
             $orderStatus = '';
         }
@@ -367,7 +386,8 @@ class UserController extends Controller
     public function orderDetail(Request $request, int $id = 0): View
     {
         $user = $this->accountUser();
-        $transaction = $this->account->ownedTransaction($user, $id);
+        $access = $request->session()->get(CheckoutService::SESSION_ACCESS);
+        $transaction = $this->account->ownedTransaction($user, $id, is_array($access) ? $access : null);
         if (! $transaction) {
             abort(404);
         }

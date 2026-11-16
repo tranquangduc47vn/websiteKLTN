@@ -15,9 +15,9 @@ class ReviewTest extends AdminTestCase
 
     protected function tearDown(): void
     {
-        DB::table('product_review')->where('comment', 'like', 'B14-%')->delete();
+        DB::table('product_reviews')->where('comment', 'like', 'B14-%')->delete();
         foreach ($this->rates as $id => $rate) {
-            DB::table('product')->where('id', $id)->update($rate);
+            DB::table('products')->where('id', $id)->update($rate);
         }
         parent::tearDown();
     }
@@ -47,35 +47,35 @@ class ReviewTest extends AdminTestCase
     {
         $productId = $this->productId();
         $stock = (int) DB::table('product_variants')->sum('stock');
-        $approvedBefore = (int) DB::table('product_review')->where('product_id', $productId)->where('status', 1)->count();
-        $sumBefore = (int) DB::table('product_review')->where('product_id', $productId)->where('status', 1)->sum('stars');
-        $id = (int) DB::table('product_review')->insertGetId([
+        $approvedBefore = (int) DB::table('product_reviews')->where('product_id', $productId)->where('status', ProductReview::STATUS_APPROVED)->count();
+        $sumBefore = (int) DB::table('product_reviews')->where('product_id', $productId)->where('status', ProductReview::STATUS_APPROVED)->sum('stars');
+        $id = (int) DB::table('product_reviews')->insertGetId([
             'product_id' => $productId,
-            'user_id' => 0,
+            'user_id' => null,
             'user_name' => 'B14 Admin',
             'stars' => 5,
             'comment' => 'B14-admin-row',
             'status' => ProductReview::STATUS_PENDING,
-            'reviewed_at' => 0,
-            'reviewed_by' => 0,
+            'reviewed_at' => null,
+            'reviewed_by' => null,
             'session_token' => '',
-            'created' => time(),
+            'created_at' => now(),
         ]);
 
         $this->actingAs($this->makeAdmin(Admin::ROLE_ADMIN), 'admin');
         $this->get('/admin/product-reviews?q=B14-admin-row')->assertOk()->assertSee('B14-admin-row')->assertSee('Chờ duyệt');
 
         $this->post('/admin/product-reviews/approve/' . $id)->assertRedirect('/admin/product-reviews');
-        $this->assertSame(ProductReview::STATUS_APPROVED, (int) DB::table('product_review')->where('id', $id)->value('status'));
-        $this->assertSame($approvedBefore + 1, (int) DB::table('product')->where('id', $productId)->value('rate_count'));
-        $this->assertSame($sumBefore + 5, (int) DB::table('product')->where('id', $productId)->value('rate_total'));
+        $this->assertSame(ProductReview::STATUS_APPROVED, DB::table('product_reviews')->where('id', $id)->value('status'));
+        $this->assertSame($approvedBefore + 1, (int) DB::table('products')->where('id', $productId)->value('rating_count'));
+        $this->assertSame($sumBefore + 5, (int) DB::table('products')->where('id', $productId)->value('rating_total'));
 
         $this->post('/admin/product-reviews/reject/' . $id)->assertRedirect();
-        $this->assertSame(ProductReview::STATUS_REJECTED, (int) DB::table('product_review')->where('id', $id)->value('status'));
-        $this->assertSame($approvedBefore, (int) DB::table('product')->where('id', $productId)->value('rate_count'));
+        $this->assertSame(ProductReview::STATUS_REJECTED, DB::table('product_reviews')->where('id', $id)->value('status'));
+        $this->assertSame($approvedBefore, (int) DB::table('products')->where('id', $productId)->value('rating_count'));
 
         $this->post('/admin/product-reviews/delete/' . $id)->assertRedirect();
-        $this->assertNull(DB::table('product_review')->where('id', $id)->first());
+        $this->assertNull(DB::table('product_reviews')->where('id', $id)->first());
         $this->post('/admin/product-reviews/approve/99999999')->assertRedirect()->assertSessionHas('message_fail');
         $this->assertSame($stock, (int) DB::table('product_variants')->sum('stock'));
     }
@@ -96,12 +96,12 @@ class ReviewTest extends AdminTestCase
 
     private function productId(): int
     {
-        $id = (int) DB::table('product')->orderBy('id')->value('id');
+        $id = (int) DB::table('products')->orderBy('id')->value('id');
         if (! isset($this->rates[$id])) {
-            $row = DB::table('product')->where('id', $id)->first(['rate_count', 'rate_total']);
+            $row = DB::table('products')->where('id', $id)->first(['rating_count', 'rating_total']);
             $this->rates[$id] = [
-                'rate_count' => (int) $row->rate_count,
-                'rate_total' => (int) $row->rate_total,
+                'rating_count' => (int) $row->rating_count,
+                'rating_total' => (int) $row->rating_total,
             ];
         }
 

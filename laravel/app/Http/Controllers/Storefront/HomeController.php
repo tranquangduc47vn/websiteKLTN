@@ -32,9 +32,9 @@ class HomeController extends Controller
             "slider" => Slider::query()->orderByDesc("sort_order")->get(),
             "list_banner" => Banner::query()->orderBy("sort_order")->get(),
             "new_product" => $this->storefrontList("id"),
-            "hot_product" => Product::query()->active()->where("buyed", ">", 0)
-                ->orderByDesc("buyed")->limit(6)->get(),
-            "view_product" => $this->storefrontList("view"),
+            "hot_product" => Product::query()->active()->where("sold_count", ">", 0)
+                ->orderByDesc("sold_count")->limit(6)->get(),
+            "view_product" => $this->storefrontList("view_count"),
         ]);
     }
 
@@ -45,9 +45,11 @@ class HomeController extends Controller
      */
     protected function storefrontList(string $orderColumn): \Illuminate\Database\Eloquent\Collection
     {
-        $allowed = ["id" => true, "view" => true, "buyed" => true, "price" => true, "name" => true];
+        $allowed = ["id" => true, "view_count" => true, "sold_count" => true, "list_price" => true, "name" => true, "view" => "view_count", "buyed" => "sold_count", "price" => "list_price"];
 
-        if (! isset($allowed[$orderColumn])) {
+        if (isset($allowed[$orderColumn]) && is_string($allowed[$orderColumn])) {
+            $orderColumn = $allowed[$orderColumn];
+        } elseif (! isset($allowed[$orderColumn])) {
             $orderColumn = "id";
         }
 
@@ -56,15 +58,5 @@ class HomeController extends Controller
             ->orderByDesc($orderColumn)
             ->limit(6)
             ->get();
-    }
-
-    public function handlePath(Request $request, string $path = "")
-    {
-        abort(501, "Chua implement — xem TODO trong routes/web.php.");
-    }
-
-    public function __call(string $method, array $args)
-    {
-        abort(501, "Action {$method} chua implement — xem TODO trong routes/web.php.");
     }
 }

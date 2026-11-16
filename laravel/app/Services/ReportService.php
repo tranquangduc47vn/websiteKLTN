@@ -42,8 +42,8 @@ class ReportService
     public function page(string $type, string $dateFrom, string $dateTo): array
     {
         [$where, $whereT, $lines] = $this->completedRange($type, $dateFrom, $dateTo);
-        $totals = DB::selectOne("SELECT COUNT(id) AS total_orders, SUM(amount) AS total_revenue FROM transaction WHERE {$where}");
-        $qty = DB::selectOne("SELECT SUM(o.qty) AS total_qty FROM `order` o JOIN transaction t ON o.transaction_id = t.id WHERE {$whereT}");
+        $totals = DB::selectOne("SELECT COUNT(id) AS total_orders, SUM(total) AS total_revenue FROM orders WHERE {$where}");
+        $qty = DB::selectOne("SELECT SUM(o.qty) AS total_qty FROM order_items o JOIN orders t ON o.order_id = t.id WHERE {$whereT}");
         $products = DB::select($this->productSql($whereT));
 
         $year = (int) date('Y');
@@ -52,8 +52,8 @@ class ReportService
             $start = strtotime(sprintf('%04d-%02d-01 00:00:00', $year, $month));
             $end = strtotime(date('Y-m-t 23:59:59', $start));
             $row = DB::selectOne(
-                'SELECT SUM(amount) AS revenue FROM transaction WHERE status = 3 AND created BETWEEN ? AND ?',
-                [$start, $end]
+                'SELECT SUM(total) AS revenue FROM orders WHERE status = \'completed\' AND created_at BETWEEN ? AND ?',
+                [date('Y-m-d H:i:s', $start), date('Y-m-d H:i:s', $end)]
             );
             $chart[] = (int) ($row->revenue ?? 0);
         }
@@ -104,7 +104,7 @@ class ReportService
      */
     private function completedRange(string $type, string $dateFrom, string $dateTo): array
     {
-        $where = 'status = 3';
+        $where = "status = 'completed'";
         $start = 0;
         $end = 0;
         $lines = [];
@@ -144,14 +144,14 @@ class ReportService
         }
 
         if ($start && $end) {
-            $where .= " AND created BETWEEN {$start} AND {$end}";
+            $where .= " AND created_at BETWEEN '" . date('Y-m-d H:i:s', $start) . "' AND '" . date('Y-m-d H:i:s', $end) . "'";
         } elseif ($start) {
-            $where .= " AND created >= {$start}";
+            $where .= " AND created_at >= '" . date('Y-m-d H:i:s', $start) . "'";
         } elseif ($end) {
-            $where .= " AND created <= {$end}";
+            $where .= " AND created_at <= '" . date('Y-m-d H:i:s', $end) . "'";
         }
 
-        $whereT = str_replace(['status', 'created'], ['t.status', 't.created'], $where);
+        $whereT = str_replace(['created_at', 'status'], ['t.created_at', 't.status'], $where);
 
         return [$where, $whereT, $lines];
     }
@@ -159,24 +159,25 @@ class ReportService
     private function productSql(string $whereT): string
     {
         return "
-            SELECT p.id, p.name, p.quantity,
+            SELECT p.id, p.name,
+                (SELECT COALESCE(SUM(stock),0) FROM product_variants WHERE product_id = p.id AND status = 'active') AS quantity,
                 (
                     SELECT SUM(o.qty)
-                    FROM `order` o
-                    JOIN transaction t ON o.transaction_id = t.id
+                    FROM order_items o
+                    JOIN orders t ON o.order_id = t.id
                     WHERE o.product_id = p.id AND {$whereT}
                 ) AS da_ban,
                 COALESCE(
                     (
-                        SELECT o.amount / o.qty
-                        FROM `order` o
-                        JOIN transaction t ON o.transaction_id = t.id
+                        SELECT o.unit_price
+                        FROM order_items o
+                        JOIN orders t ON o.order_id = t.id
                         WHERE o.product_id = p.id AND {$whereT}
                         LIMIT 1
                     ),
-                    p.price
+                    p.list_price
                 ) AS price
-            FROM product p
+            FROM products p
             ORDER BY da_ban DESC
         ";
     }
@@ -303,7 +304,7 @@ class ReportService
                 'id' => (int) $row->id,
                 'user_name' => (string) $row->user_name,
                 'user_phone' => (string) $row->user_phone,
-                'created' => $this->dateTime((int) $row->created),
+                'created' => $row->created_at ? date('d/m/Y H:i', strtotime((string) $row->created_at)) : '—',
                 'amount' => $amount,
                 'payment' => ((string) $row->payment === 'Chuyển khoản') ? 'Chuyển khoản' : 'COD',
                 'status' => $this->orderStatus((string) $row->status),
@@ -358,27 +359,27 @@ class ReportService
         $name = trim((string) ($query['name'] ?? ''));
         $catalogId = (int) ($query['catalog_id'] ?? 0);
         [$limit, $offset, $scope] = $this->pageWindow($query, 10);
-        $builder = DB::table('product')
-            ->join('catalog', 'catalog.id', '=', 'product.catalog_id')
-            ->orderByDesc('product.id');
+        $builder = DB::table('products')
+            ->join('categories', 'categories.id', '=', 'products.category_id')
+            ->orderByDesc('products.id');
         if ($name !== '') {
-            $builder->where('product.name', 'like', '%' . addcslashes($name, '%_\\') . '%');
+            $builder->where('products.name', 'like', '%' . addcslashes($name, '%_\\') . '%');
         }
         if ($catalogId > 0) {
-            $builder->where('product.catalog_id', $catalogId);
+            $builder->where('products.category_id', $catalogId);
         }
         if ($limit !== null) {
             $builder->offset($offset)->limit($limit);
         }
         $rows = $builder->get([
-            'product.id as id',
-            'product.name as name',
-            'product.price',
-            'product.discount',
-            'product.view',
-            'product.buyed',
-            'product.quantity',
-            'catalog.name as namecatalog',
+            'products.id as id',
+            'products.name as name',
+            'products.list_price as price',
+            'products.discount_amount as discount',
+            'products.view_count as view',
+            'products.sold_count as buyed',
+            'categories.name as namecatalog',
+            DB::raw("(SELECT COALESCE(SUM(stock),0) FROM product_variants WHERE product_id = products.id AND status = 'active') as quantity"),
         ]);
         $out = [];
         $stt = $offset ?? 0;
@@ -401,7 +402,7 @@ class ReportService
             $lines[] = ['label' => 'Tên sản phẩm', 'value' => $name];
         }
         if ($catalogId > 0) {
-            $catalog = DB::table('catalog')->where('id', $catalogId)->value('name');
+            $catalog = DB::table('categories')->where('id', $catalogId)->value('name');
             $lines[] = ['label' => 'Danh mục', 'value' => $catalog ? (string) $catalog : '#' . $catalogId];
         }
         $def = $this->blank('Báo cáo sản phẩm', 'san-pham', '', $query);
@@ -429,7 +430,7 @@ class ReportService
      */
     private function customersDefinition(): array
     {
-        $rows = User::query()->orderByDesc('id')->get(['id', 'name', 'email', 'phone', 'address']);
+        $rows = User::query()->orderByDesc('id')->get();
         $out = [];
         $stt = 0;
         foreach ($rows as $row) {
@@ -505,7 +506,7 @@ class ReportService
             $lines[] = ['label' => 'SKU', 'value' => $filters['sku']];
         }
         if ($filters['catalog_id'] > 0) {
-            $catalog = DB::table('catalog')->where('id', $filters['catalog_id'])->value('name');
+            $catalog = DB::table('categories')->where('id', $filters['catalog_id'])->value('name');
             $lines[] = ['label' => 'Danh mục', 'value' => $catalog ? (string) $catalog : '#' . $filters['catalog_id']];
         }
         if ($filters['stock'] !== '') {
@@ -549,11 +550,11 @@ class ReportService
             $used = (int) $row->used_count;
             $limit = (int) $row->usage_limit;
             $valid = '';
-            if ((int) $row->valid_from > 0) {
-                $valid .= 'Từ ' . date('d/m/Y', (int) $row->valid_from);
+            if ($row->starts_at) {
+                $valid .= 'Từ ' . $row->starts_at->format('d/m/Y');
             }
-            if ((int) $row->valid_to > 0) {
-                $valid .= ($valid !== '' ? ' · ' : '') . 'Đến ' . date('d/m/Y', (int) $row->valid_to);
+            if ($row->ends_at) {
+                $valid .= ($valid !== '' ? ' · ' : '') . 'Đến ' . $row->ends_at->format('d/m/Y');
             }
             $out[] = [
                 'stt' => $stt,
@@ -691,10 +692,15 @@ class ReportService
     {
         return [
             '0' => 'Chờ xử lý',
+            'pending' => 'Chờ xử lý',
             '1' => 'Đã xác nhận',
+            'confirmed' => 'Đã xác nhận',
             '2' => 'Đang giao',
+            'packed' => 'Đang giao',
             '3' => 'Thành công',
+            'completed' => 'Thành công',
             '4' => 'Đã hủy / Hoàn',
+            'cancelled' => 'Đã hủy / Hoàn',
         ][$status] ?? $status;
     }
 

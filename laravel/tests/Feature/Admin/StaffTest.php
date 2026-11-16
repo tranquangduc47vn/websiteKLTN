@@ -17,9 +17,9 @@ class StaffTest extends AdminTestCase
     protected function tearDown(): void
     {
         if ($this->extraIds !== []) {
-            DB::table('admin')->whereIn('id', $this->extraIds)->delete();
+            DB::table('admins')->whereIn('id', $this->extraIds)->delete();
         }
-        DB::table('admin')->where('email', 'like', 'b16staff.%')->delete();
+        DB::table('admins')->where('email', 'like', 'b16staff.%')->delete();
         parent::tearDown();
     }
 
@@ -49,7 +49,7 @@ class StaffTest extends AdminTestCase
         $this->post('/admin/admin/add', $this->payload(['email' => $email, 'level' => 99]))
             ->assertRedirect()
             ->assertSessionHas('message_fail', 'Phân quyền không hợp lệ.');
-        $this->assertNull(DB::table('admin')->where('email', $email)->first());
+        $this->assertNull(DB::table('admins')->where('email', $email)->first());
 
         $this->post('/admin/admin/add', $this->payload([
             'email' => $email,
@@ -61,14 +61,14 @@ class StaffTest extends AdminTestCase
             ->assertRedirect('/admin/admin')
             ->assertSessionHas('message_success', 'Thêm thành viên thành công');
 
-        $row = DB::table('admin')->where('email', $email)->first();
+        $row = DB::table('admins')->where('email', $email)->first();
         $this->assertNotNull($row);
         $this->extraIds[] = (int) $row->id;
         $this->assertSame(Admin::ROLE_MOD, (int) $row->level);
-        $this->assertTrue(LegacyPassword::verify('B16-Staff#1', (string) $row->password)['verified']);
-        $this->assertStringNotContainsString('B16-Staff#1', (string) $row->password);
+        $this->assertTrue(LegacyPassword::verify('B16-Staff#1', (string) $row->password_hash)['verified']);
+        $this->assertStringNotContainsString('B16-Staff#1', (string) $row->password_hash);
 
-        $hash = (string) $row->password;
+        $hash = (string) $row->password_hash;
         $this->post('/admin/admin/edit/' . $row->id, [
             'name' => 'B16 Da sua',
             'email' => $email,
@@ -76,20 +76,20 @@ class StaffTest extends AdminTestCase
             're_password' => '',
             'level' => Admin::ROLE_USER,
         ])->assertRedirect('/admin/admin');
-        $updated = DB::table('admin')->where('id', $row->id)->first();
+        $updated = DB::table('admins')->where('id', $row->id)->first();
         $this->assertSame('B16 Da sua', $updated->name);
         $this->assertSame(Admin::ROLE_USER, (int) $updated->level);
-        $this->assertSame($hash, (string) $updated->password);
+        $this->assertSame($hash, (string) $updated->password_hash);
 
         $protected = $this->makeAdmin(Admin::ROLE_ADMIN);
         $this->post('/admin/admin/del/' . $protected->id)
             ->assertRedirect('/admin/admin')
             ->assertSessionHas('message_fail', 'Hệ thống bảo vệ: Không thể xóa tài khoản Quản trị tối cao (ADMIN)!');
-        $this->assertNotNull(DB::table('admin')->where('id', $protected->id)->first());
+        $this->assertNotNull(DB::table('admins')->where('id', $protected->id)->first());
 
         $this->post('/admin/admin/del/' . $row->id)->assertRedirect('/admin/admin')
             ->assertSessionHas('message_success', 'Xóa admin thành công');
-        $this->assertNull(DB::table('admin')->where('id', $row->id)->first());
+        $this->assertNull(DB::table('admins')->where('id', $row->id)->first());
         $this->get('/admin/admin/del/' . $row->id)->assertNotFound();
         $this->post('/admin/admin/edit/99999999')->assertRedirect()->assertSessionHas('message_fail', 'Thành viên không tồn tại');
     }

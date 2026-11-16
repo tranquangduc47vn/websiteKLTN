@@ -3,12 +3,14 @@
 namespace App\Services;
 
 use App\Models\OrderItem;
+use App\Models\Payment;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Checkout\CheckoutFailedException;
 use App\Services\Checkout\CheckoutResult;
+use App\Support\Payment\BankTransfer;
 use App\Support\Storefront\Loyalty;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Database\QueryException;
@@ -27,15 +29,18 @@ class CheckoutService
 
     public const MSG_EMPTY_CART = 'Giỏ hàng trống, không thể đặt hàng.';
     public const MSG_EMPTY_CART_AJAX = 'Giỏ hàng trống.';
+    public const MSG_LOGIN_REQUIRED = 'Bạn cần đăng nhập để đặt hàng.';
     public const MSG_LOGIN_VOUCHER = 'Vui lòng đăng nhập để dùng voucher.';
     public const MSG_VOUCHER_CLEARED = 'Đã bỏ mã voucher.';
     public const MSG_COD_SUCCESS = 'Đặt hàng thành công! Đơn hàng của bạn sẽ được thanh toán bằng hình thức COD (Tiền mặt).';
     public const MSG_ORDER_FAIL = 'Đặt hàng thất bại. Vui lòng thử lại sau.';
     public const MSG_STOCK_FAIL = 'Không đủ tồn kho để đặt hàng. Vui lòng giảm số lượng hoặc thử lại sau.';
     public const MSG_QR_DENIED = 'Không thể xem mã QR cho đơn hàng này.';
+    /** Giữ chuỗi cũ. Response từ chối quyền dùng cùng lối với đơn không tồn tại. */
     public const MSG_QR_FORBIDDEN = 'Bạn không có quyền xem thông tin thanh toán đơn hàng này.';
     public const MSG_CANCEL_MISSING_ID = 'Không tìm thấy mã đơn hàng!';
     public const MSG_CANCEL_MISSING = 'Đơn hàng không tồn tại trên hệ thống!';
+    /** Giữ chuỗi cũ. Từ chối hủy đơn trả MSG_CANCEL_MISSING để không xác nhận đơn tồn tại. */
     public const MSG_CANCEL_FORBIDDEN = 'Bạn không có quyền xử lý đơn hàng này!';
     public const MSG_CANCEL_STATUS = 'Đơn hàng không thể hủy ở trạng thái hiện tại.';
     public const MSG_CANCEL_OK = 'Hủy đơn hàng thành công! Sản phẩm đã được hoàn lại kho hàng.';
@@ -64,6 +69,10 @@ class CheckoutService
      */
     public function place(Session $session, ?User $user, array $input): CheckoutResult
     {
+        if (! $user instanceof User || (int) $user->id <= 0) {
+            return CheckoutResult::fail(self::MSG_LOGIN_REQUIRED, CheckoutResult::REDIRECT_LOGIN);
+        }
+
         $sanitize = $this->cart->sanitizeForCheckout($session);
         $carts = $sanitize['cart'];
 
@@ -159,19 +168,28 @@ class CheckoutService
                 }
                 $finalAmount = max(0, $cartSubtotal - $discountAmount);
 
+                $note = trim((string) ($input['message'] ?? ''));
                 $tx = Transaction::query()->create([
-                    'user_id' => $userId,
-                    'user_name' => (string) $input['name'],
-                    'user_email' => (string) $input['email'],
-                    'user_address' => (string) $input['address'],
-                    'user_phone' => (string) $input['phone'],
-                    'message' => trim((string) ($input['message'] ?? '')),
-                    'amount' => $finalAmount,
-                    'voucher_code' => $voucherCode,
+                    'user_id' => $userId > 0 ? $userId : null,
+                    'customer_name' => (string) $input['name'],
+                    'customer_email' => (string) $input['email'],
+                    'customer_phone' => (string) $input['phone'],
+                    'shipping_address' => (string) $input['address'],
+                    'note' => $note !== '' ? $note : null,
+                    'subtotal' => $cartSubtotal,
                     'discount_amount' => $discountAmount,
-                    'payment' => $payment,
+                    'shipping_fee' => 0,
+                    'total' => $finalAmount,
+                    'voucher_code' => $voucherCode !== '' ? $voucherCode : null,
                     'status' => Transaction::STATUS_NEW,
-                    'created' => time(),
+                ]);
+
+                $isTransfer = $payment === Transaction::PAYMENT_TRANSFER;
+                Payment::query()->create([
+                    'order_id' => (int) $tx->id,
+                    'method' => $isTransfer ? Payment::METHOD_BANK : Payment::METHOD_COD,
+                    'status' => $isTransfer ? Payment::STATUS_PENDING : Payment::STATUS_COD,
+                    'reference' => $isTransfer ? BankTransfer::referenceFor((int) $tx->id) : null,
                 ]);
 
                 if ($appliedVoucher) {
@@ -188,7 +206,7 @@ class CheckoutService
                         (int) $variantId,
                         (int) $deductQty,
                         (int) $tx->id,
-                        $userId,
+                        0,
                         'Xuất kho đơn #' . (int) $tx->id
                     );
                     if (empty($deduct['ok'])) {
@@ -211,16 +229,21 @@ class CheckoutService
                         $cost = (float) (ProductVariant::query()->where('id', $variantId)->value('cost_price') ?? 0);
                     }
 
+                    $qty = (int) $line['qty'];
+                    $unitPrice = round((float) ($line['items']['price'] ?? 0), 2);
+                    $sku = (string) (ProductVariant::query()->where('id', $variantId)->value('sku') ?? '');
                     OrderItem::query()->create([
-                        'transaction_id' => (int) $tx->id,
+                        'order_id' => (int) $tx->id,
                         'product_id' => (int) $line['items']['id'],
                         'variant_id' => $variantId,
-                        'size' => $size !== '' ? $size : 'Mặc định',
-                        'color' => $color !== '' ? $color : 'Mặc định',
-                        'qty' => $line['qty'],
-                        'amount' => $line['items']['subtotal'],
+                        'product_name' => (string) $line['product']->name,
+                        'sku' => $sku !== '' ? $sku : ('SP' . (int) $line['items']['id']),
+                        'size_name' => $size !== '' ? $size : 'Mặc định',
+                        'color_name' => $color !== '' ? $color : 'Mặc định',
+                        'qty' => $qty,
+                        'unit_price' => $unitPrice,
+                        'line_subtotal' => round($qty * $unitPrice, 2),
                         'cost_price' => max(0, $cost),
-                        'status' => 0,
                     ]);
                 }
 
@@ -393,38 +416,35 @@ class CheckoutService
         }
 
         $transaction = Transaction::query()->find($transactionId);
-        if (! $transaction) {
+        if (! $transaction || ! $this->canAccess($session, $transaction, $user)) {
             return CheckoutResult::fail(self::MSG_CANCEL_MISSING, CheckoutResult::REDIRECT_HOME);
-        }
-        if (! $this->canAccess($session, $transaction, $user)) {
-            return CheckoutResult::fail(self::MSG_CANCEL_FORBIDDEN, CheckoutResult::REDIRECT_HOME);
         }
 
         $status = (string) $transaction->status;
-        if (! in_array($status, ['0', '1'], true)) {
+        if (! in_array($status, [Transaction::STATUS_NEW, Transaction::STATUS_CONFIRMED], true)) {
             return new CheckoutResult(false, self::MSG_CANCEL_STATUS, CheckoutResult::REDIRECT_USER, 'fail');
         }
 
         $reason = $reason !== '' ? $reason : self::MSG_DEFAULT_REASON;
-        if ((string) $transaction->status === '4') {
+        if ($status === Transaction::STATUS_CANCELLED) {
             return new CheckoutResult(false, self::MSG_CANCEL_ALREADY, CheckoutResult::REDIRECT_USER, 'fail');
         }
 
         try {
             DB::transaction(function () use ($transaction, $reason) {
                 $fresh = Transaction::query()->where('id', $transaction->id)->lockForUpdate()->first();
-                if (! $fresh || (string) $fresh->status === '4') {
+                if (! $fresh || (string) $fresh->status === Transaction::STATUS_CANCELLED) {
                     throw new CheckoutFailedException(self::MSG_CANCEL_ALREADY, CheckoutResult::REDIRECT_USER);
                 }
-                if (! in_array((string) $fresh->status, ['0', '1'], true)) {
+                if (! in_array((string) $fresh->status, [Transaction::STATUS_NEW, Transaction::STATUS_CONFIRMED], true)) {
                     throw new CheckoutFailedException(self::MSG_CANCEL_STATUS, CheckoutResult::REDIRECT_USER);
                 }
 
-                $reverseBuyed = ((string) $fresh->status === '3');
+                $reverseBuyed = ((string) $fresh->status === Transaction::STATUS_COMPLETED);
                 $this->releaseStock($fresh, $reverseBuyed);
                 $this->loyalty->onOrderCancelled($fresh, $reverseBuyed);
                 $fresh->status = Transaction::STATUS_CANCELLED;
-                $fresh->reason = $reason;
+                $fresh->cancel_reason = $reason;
                 $fresh->save();
             });
         } catch (CheckoutFailedException $e) {
@@ -438,36 +458,62 @@ class CheckoutService
         return new CheckoutResult(true, self::MSG_CANCEL_OK, CheckoutResult::REDIRECT_USER, 'success');
     }
 
+    /**
+     * Số tiền và nội dung QR lấy từ đơn đã lưu, không lấy từ request.
+     *
+     * @return array{bank: string, account: string, name: string, amount: int, reference: string}
+     */
+    public function transferInstructions(Transaction $transaction): array
+    {
+        $sepayAccount = trim((string) config('sepay.account_number'));
+        if ($sepayAccount !== '') {
+            $bank = trim((string) config('sepay.bank_code'));
+            $account = $sepayAccount;
+            $name = trim((string) config('sepay.account_name'));
+            if ($bank === '') {
+                $bank = (string) config('shop.vietqr.bank_id', 'vietcombank');
+            }
+            if ($name === '') {
+                $name = (string) config('shop.vietqr.account_name', 'NGUYEN VAN A');
+            }
+        } else {
+            $bank = (string) config('shop.vietqr.bank_id', 'vietcombank');
+            $account = (string) config('shop.vietqr.account_no', '1234567890');
+            $name = (string) config('shop.vietqr.account_name', 'NGUYEN VAN A');
+        }
+
+        $reference = trim((string) $transaction->payment_ref);
+        if ($reference === '') {
+            $reference = BankTransfer::referenceFor((int) $transaction->id);
+        }
+
+        return [
+            'bank' => $bank,
+            'account' => $account,
+            'name' => $name,
+            'amount' => BankTransfer::amountVnd($transaction->amount),
+            'reference' => $reference,
+        ];
+    }
+
     public function qrImageUrl(Transaction $transaction): string
     {
-        $bank = (string) config('shop.vietqr.bank_id', 'vietcombank');
-        $account = (string) config('shop.vietqr.account_no', '1234567890');
-        $name = (string) config('shop.vietqr.account_name', 'NGUYEN VAN A');
-        $amount = $transaction->amount;
-        $description = 'DH' . $transaction->id;
+        $info = $this->transferInstructions($transaction);
 
-        return 'https://img.vietqr.io/image/' . $bank . '-' . $account
-            . '-compact2.png?amount=' . $amount
-            . '&addInfo=' . rawurlencode($description)
-            . '&accountName=' . rawurlencode($name);
+        return 'https://img.vietqr.io/image/' . $info['bank'] . '-' . $info['account']
+            . '-compact2.png?amount=' . $info['amount']
+            . '&addInfo=' . rawurlencode($info['reference'])
+            . '&accountName=' . rawurlencode($info['name']);
     }
 
     public function normalizePayment(mixed $payment): string
     {
-        $payment = trim((string) $payment);
-        if ($payment === '') {
-            return Transaction::PAYMENT_COD;
-        }
-        if ($payment === Transaction::PAYMENT_TRANSFER) {
-            return Transaction::PAYMENT_TRANSFER;
-        }
-
-        return Transaction::PAYMENT_COD;
+        return Transaction::methodFromForm(trim((string) $payment));
     }
 
     private function releaseStock(Transaction $transaction, bool $reverseBuyed): void
     {
-        $lines = OrderItem::query()->where('transaction_id', (int) $transaction->id)->get();
+        $lines = OrderItem::query()->where('order_id', (int) $transaction->id)->get();
         foreach ($lines as $item) {
             $product = Product::query()->find((int) $item->product_id);
             if (! $product) {
@@ -493,19 +539,10 @@ class CheckoutService
                 $restored = ! empty($result['ok']);
             }
 
-            if (! $restored) {
-                $update = ['quantity' => (int) $product->quantity + $qty];
-                if ($reverseBuyed) {
-                    $update['buyed'] = max(0, (int) $product->buyed - $qty);
-                }
-                Product::query()->where('id', $product->id)->update($update);
-            } elseif ($reverseBuyed) {
-                $product = Product::query()->find($product->id);
-                if ($product) {
-                    Product::query()->where('id', $product->id)->update([
-                        'buyed' => max(0, (int) $product->buyed - $qty),
-                    ]);
-                }
+            if ($reverseBuyed) {
+                Product::query()->where('id', $product->id)->update([
+                    'sold_count' => max(0, (int) $product->sold_count - $qty),
+                ]);
             }
         }
     }

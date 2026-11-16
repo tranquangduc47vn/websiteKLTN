@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\LegacyTimestamps;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
@@ -18,13 +17,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class UserPointLog extends BaseModel
 {
-    use LegacyTimestamps;
+    protected $table = 'point_logs';
 
-    protected $table = 'user_point_log';
+    public const UPDATED_AT = null;
+
+    public $timestamps = true;
 
     public const TYPE_EARN = 'earn';
-    public const TYPE_REDEEM = 'redeem';
-    public const TYPE_ADJUST = 'adjust';
+
     public const TYPE_REVERSE = 'reverse';
 
     protected function casts(): array
@@ -33,8 +33,7 @@ class UserPointLog extends BaseModel
             'id' => 'int',
             'user_id' => 'int',
             'points' => 'int',
-            'transaction_id' => 'int',
-            'created' => 'int',
+            'order_id' => 'int',
         ];
     }
 
@@ -45,11 +44,11 @@ class UserPointLog extends BaseModel
 
     public function transaction(): BelongsTo
     {
-        return $this->belongsTo(Transaction::class, 'transaction_id');
+        return $this->belongsTo(Transaction::class, 'order_id');
     }
 
-    public function createdAt(): ?\Illuminate\Support\Carbon
+    public function getTransactionIdAttribute(): int
     {
-        return $this->legacyTimestamp('created');
+        return (int) ($this->attributes['order_id'] ?? 0);
     }
 }

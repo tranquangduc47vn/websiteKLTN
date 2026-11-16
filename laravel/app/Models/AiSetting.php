@@ -2,30 +2,29 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\LegacyTimestamps;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Model cho bảng `ai_setting` (MyISAM — không FK, khóa duy nhất `setting_key`).
- *
- * Cột `setting_value` lưu chuỗi, đa số là "0"/"1" (cờ bật/tắt) hoặc văn bản.
+ * Cấu hình AI. Chỉ có `updated_at` DATETIME, không có `created_at`.
  *
  * @property int $id
  * @property string $setting_key
  * @property string $setting_value
- * @property int $updated
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class AiSetting extends BaseModel
 {
-    use LegacyTimestamps;
+    protected $table = 'ai_settings';
 
-    protected $table = 'ai_setting';
+    public const CREATED_AT = null;
+
+    public $timestamps = true;
 
     protected function casts(): array
     {
         return [
             'id' => 'int',
-            'updated' => 'int',
+            'updated_at' => 'datetime',
         ];
     }
 
@@ -46,7 +45,7 @@ class AiSetting extends BaseModel
     {
         static::query()->updateOrInsert(
             ['setting_key' => $key],
-            ['setting_value' => $value, 'updated' => now()->timestamp]
+            ['setting_value' => $value, 'updated_at' => now()]
         );
     }
 
@@ -67,10 +66,5 @@ class AiSetting extends BaseModel
     public function scopeByKey($query, string $key): Builder
     {
         return $query->where('setting_key', $key);
-    }
-
-    public function updatedAt(): ?\Illuminate\Support\Carbon
-    {
-        return $this->legacyTimestamp('updated');
     }
 }

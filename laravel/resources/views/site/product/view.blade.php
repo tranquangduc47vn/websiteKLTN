@@ -29,7 +29,7 @@
 <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12 clearpaddingr jm-pdp-lux">
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12 clearpadding">
 
-        <link rel="stylesheet" href="{{ $siteAssetUrl }}css/style-detail.css?v=17" type="text/css">
+        <link rel="stylesheet" href="{{ $siteAssetUrl }}css/style-detail.css?v=18" type="text/css">
         <link rel="stylesheet" href="{{ $siteAssetUrl }}css/stock-notice-modal.css?v=1" type="text/css">
         <script src="{{ $siteAssetUrl }}js/product-detail.js?v=3" type="text/javascript"></script>
 
@@ -169,7 +169,16 @@
                     <div class="style2-product-desc">{!! \App\Support\HtmlSanitizer::clean($product->content) !!}</div>
                     <hr class="style2-divider">
                     <div class="style2-meta-box">
-                        <p class="style2-meta-item"><strong>Size hiện có:</strong> {{ ! empty($product->size) ? $product->size : "Freesize" }}</p>
+                        @php
+                            $sizeLabel = trim((string) ($product->size ?? ""));
+                            if ($sizeLabel === "" && ! empty($product_sizes)) {
+                                $sizeLabel = implode(", ", array_map(static fn ($size) => trim((string) $size), $product_sizes));
+                            }
+                            if ($sizeLabel === "") {
+                                $sizeLabel = "Freesize";
+                            }
+                        @endphp
+                        <p class="style2-meta-item"><strong>Size hiện có:</strong> {{ $sizeLabel }}</p>
                         <p class="style2-meta-item"><strong>Số lượt xem:</strong> {{ number_format($product->view) }}</p>
                         <p class="style2-meta-item style2-rating">
                             <strong>Đánh giá:</strong>
@@ -502,7 +511,7 @@
                                                 <span>·</span>
                                                 <span>{{ (int) $value->buyed }} đã bán</span>
                                             </p>
-                                            <a href="{{ url("gio-hang/them/" . (int) $value->id) }}" class="jm-pdp-related-card__cta">Thêm vào giỏ</a>
+                                            @include("site.partials.add-to-cart-form", ["productId" => (int) $value->id, "buttonClass" => "jm-pdp-related-card__cta", "label" => "Thêm vào giỏ"])
                                         </div>
                                     </article>
                                 </div>

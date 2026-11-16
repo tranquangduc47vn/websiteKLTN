@@ -15,7 +15,7 @@ namespace App\Models;
  */
 class Slider extends BaseModel
 {
-    protected $table = 'slider';
+    protected $table = 'sliders';
 
     protected function casts(): array
     {

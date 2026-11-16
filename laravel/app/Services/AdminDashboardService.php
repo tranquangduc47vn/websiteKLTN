@@ -21,9 +21,9 @@ class AdminDashboardService
     public function data(mixed $admin, string $period = '30d', string $from = '', string $to = ''): array
     {
         $range = $this->resolvePeriod($period, $from, $to);
-        $rows = DB::table('transaction')
-            ->whereBetween('created', [$range['prev_start'], $range['end']])
-            ->get(['id', 'created', 'status', 'amount', 'user_id', 'user_name', 'user_email', 'user_phone']);
+        $rows = DB::table('orders')
+            ->whereBetween('created_at', [$this->sqlTime($range['prev_start']), $this->sqlTime($range['end'])])
+            ->get(['id', 'created_at', 'status', 'total', 'user_id', 'customer_name', 'customer_email', 'customer_phone']);
 
         $current = $this->bucket($rows, $range['start'], $range['end']);
         $previous = $this->bucket($rows, $range['prev_start'], $range['prev_end']);
@@ -118,7 +118,7 @@ class AdminDashboardService
     private function kpis(array $cur, array $prev, array $range): array
     {
         $hint = 'Trong ' . $range['label'];
-        $low = (int) DB::table('product')->where('quantity', '<=', self::LOW_STOCK)->count();
+        $low = $this->lowStockCount(self::LOW_STOCK);
 
         $item = function (string $key, string $label, float|int $value, float|int $previous, string $format, bool $static = false, string $extraHint = '') use ($hint) {
             return [
@@ -152,17 +152,24 @@ class AdminDashboardService
     {
         $out = ['all' => 0, 's0' => 0, 's1' => 0, 's2' => 0, 's3' => 0, 's4' => 0, 'revenue' => 0.0];
         foreach ($rows as $row) {
-            $created = (int) $row->created;
+            $created = $row->created_at ? strtotime((string) $row->created_at) : 0;
             if ($created < $start || $created > $end) {
                 continue;
             }
             $out['all']++;
-            $status = (string) $row->status;
-            if (isset($out['s' . $status])) {
-                $out['s' . $status]++;
+            $status = match ((string) $row->status) {
+                'pending' => 's0',
+                'confirmed' => 's1',
+                'packed' => 's2',
+                'completed' => 's3',
+                'cancelled' => 's4',
+                default => null,
+            };
+            if ($status !== null) {
+                $out[$status]++;
             }
-            if ($status === '3') {
-                $out['revenue'] += (float) $row->amount;
+            if ((string) $row->status === 'completed') {
+                $out['revenue'] += (float) $row->total;
             }
         }
 
@@ -261,16 +268,18 @@ class AdminDashboardService
     private function topProducts(array $range, int $limit): array
     {
         $rows = DB::select(
-            'SELECT p.id, p.name, p.image_link, p.price, p.quantity,
-                SUM(o.qty) AS total_sold, SUM(o.amount) AS total_amount
-             FROM `order` o
-             INNER JOIN product p ON o.product_id = p.id
-             INNER JOIN `transaction` t ON o.transaction_id = t.id
-             WHERE t.status = 3 AND t.created >= ? AND t.created <= ?
-             GROUP BY p.id, p.name, p.image_link, p.price, p.quantity
+            'SELECT p.id, p.name, p.list_price AS price,
+                (SELECT path FROM product_images WHERE product_id = p.id AND variant_id IS NULL AND is_primary = 1 ORDER BY id LIMIT 1) AS image_link,
+                (SELECT COALESCE(SUM(stock),0) FROM product_variants WHERE product_id = p.id AND status = \'active\') AS quantity,
+                SUM(o.qty) AS total_sold, SUM(o.line_subtotal) AS total_amount
+             FROM order_items o
+             INNER JOIN products p ON o.product_id = p.id
+             INNER JOIN orders t ON o.order_id = t.id
+             WHERE t.status = \'completed\' AND t.created_at >= ? AND t.created_at <= ?
+             GROUP BY p.id, p.name, p.list_price
              ORDER BY total_sold DESC
              LIMIT ' . (int) $limit,
-            [$range['start'], $range['end']]
+            [$this->sqlTime($range['start']), $this->sqlTime($range['end'])]
         );
 
         if ($rows === []) {
@@ -281,12 +290,12 @@ class AdminDashboardService
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         $prev = DB::select(
             "SELECT o.product_id, COALESCE(SUM(o.qty), 0) AS sold
-             FROM `order` o
-             INNER JOIN `transaction` t ON o.transaction_id = t.id
-             WHERE t.status = 3 AND o.product_id IN ({$placeholders})
-               AND t.created >= ? AND t.created <= ?
+             FROM order_items o
+             INNER JOIN orders t ON o.order_id = t.id
+             WHERE t.status = 'completed' AND o.product_id IN ({$placeholders})
+               AND t.created_at >= ? AND t.created_at <= ?
              GROUP BY o.product_id",
-            [...$ids, $range['prev_start'], $range['prev_end']]
+            [...$ids, $this->sqlTime($range['prev_start']), $this->sqlTime($range['prev_end'])]
         );
         $prevMap = [];
         foreach ($prev as $row) {
@@ -302,9 +311,16 @@ class AdminDashboardService
     /** @return list<object> */
     private function pendingOrders(int $limit): array
     {
-        return DB::table('transaction')
-            ->select(['id', 'user_name', 'user_phone', 'amount', 'status', 'created'])
-            ->whereIn('status', [0, 1])
+        return DB::table('orders')
+            ->select([
+                'id',
+                'customer_name as user_name',
+                'customer_phone as user_phone',
+                'total as amount',
+                'status',
+                'created_at',
+            ])
+            ->whereIn('status', ['pending', 'confirmed'])
             ->orderByDesc('id')
             ->limit($limit)
             ->get()
@@ -315,13 +331,13 @@ class AdminDashboardService
     private function topCustomers(array $range, int $limit): array
     {
         return DB::select(
-            'SELECT user_id, user_name, user_email, user_phone, COUNT(*) AS order_count, SUM(amount) AS total_spent
-             FROM `transaction`
-             WHERE status = 3 AND created >= ? AND created <= ? AND user_id > 0
-             GROUP BY user_id, user_name, user_email, user_phone
+            'SELECT user_id, customer_name AS user_name, customer_email AS user_email, customer_phone AS user_phone, COUNT(*) AS order_count, SUM(total) AS total_spent
+             FROM orders
+             WHERE status = \'completed\' AND created_at >= ? AND created_at <= ? AND user_id IS NOT NULL
+             GROUP BY user_id, customer_name, customer_email, customer_phone
              ORDER BY total_spent DESC
              LIMIT ' . (int) $limit,
-            [$range['start'], $range['end']]
+            [$this->sqlTime($range['start']), $this->sqlTime($range['end'])]
         );
     }
 
@@ -329,25 +345,27 @@ class AdminDashboardService
     private function topCategories(array $range, int $limit): array
     {
         return DB::select(
-            'SELECT c.id, c.name, SUM(o.qty) AS total_sold, SUM(o.amount) AS total_amount
-             FROM `order` o
-             INNER JOIN product p ON o.product_id = p.id
-             INNER JOIN catalog c ON p.catalog_id = c.id
-             INNER JOIN `transaction` t ON o.transaction_id = t.id
-             WHERE t.status = 3 AND t.created >= ? AND t.created <= ?
+            'SELECT c.id, c.name, SUM(o.qty) AS total_sold, SUM(o.line_subtotal) AS total_amount
+             FROM order_items o
+             INNER JOIN products p ON o.product_id = p.id
+             INNER JOIN categories c ON p.category_id = c.id
+             INNER JOIN orders t ON o.order_id = t.id
+             WHERE t.status = \'completed\' AND t.created_at >= ? AND t.created_at <= ?
              GROUP BY c.id, c.name
              ORDER BY total_sold DESC
              LIMIT ' . (int) $limit,
-            [$range['start'], $range['end']]
+            [$this->sqlTime($range['start']), $this->sqlTime($range['end'])]
         );
     }
 
     /** @return list<object> */
     private function lowStock(int $threshold, int $limit): array
     {
-        return DB::table('product')
-            ->select(['id', 'name', 'image_link', 'quantity', 'price'])
-            ->where('quantity', '<=', $threshold)
+        return DB::table('products')
+            ->select(['products.id', 'products.name', 'products.list_price as price'])
+            ->selectRaw("(SELECT path FROM product_images WHERE product_id = products.id AND variant_id IS NULL AND is_primary = 1 ORDER BY id LIMIT 1) as image_link")
+            ->selectRaw("(SELECT COALESCE(SUM(stock),0) FROM product_variants WHERE product_id = products.id AND status = 'active') as quantity")
+            ->whereRaw("(SELECT COALESCE(SUM(stock),0) FROM product_variants WHERE product_id = products.id AND status = 'active') <= ?", [$threshold])
             ->orderBy('quantity')
             ->limit($limit)
             ->get()
@@ -357,22 +375,22 @@ class AdminDashboardService
     /** @return list<object> */
     private function recentReviews(array $range, int $limit): array
     {
-        if (! Schema::hasTable('product_review')) {
+        if (! Schema::hasTable('product_reviews')) {
             return [];
         }
 
-        return DB::table('product_review')
-            ->leftJoin('product', 'product.id', '=', 'product_review.product_id')
-            ->where('product_review.status', ProductReview::STATUS_APPROVED)
-            ->whereBetween('product_review.created', [$range['start'], $range['end']])
-            ->orderByDesc('product_review.created')
+        return DB::table('product_reviews')
+            ->leftJoin('products', 'products.id', '=', 'product_reviews.product_id')
+            ->where('product_reviews.status', ProductReview::STATUS_APPROVED)
+            ->whereBetween('product_reviews.created_at', [$this->sqlTime($range['start']), $this->sqlTime($range['end'])])
+            ->orderByDesc('product_reviews.created_at')
             ->limit($limit)
             ->get([
-                'product_review.user_name',
-                'product_review.product_id',
-                'product_review.stars',
-                'product_review.created',
-                'product.name as product_name',
+                'product_reviews.user_name',
+                'product_reviews.product_id',
+                'product_reviews.stars',
+                'product_reviews.created_at as created',
+                'products.name as product_name',
             ])
             ->all();
     }
@@ -386,10 +404,10 @@ class AdminDashboardService
     {
         $groups = [];
         if (! empty($perm['orders'])) {
-            $counts = DB::table('transaction')->selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status');
-            $pendingNew = (int) ($counts[0] ?? $counts['0'] ?? 0);
-            $shipping = (int) ($counts[2] ?? $counts['2'] ?? 0);
-            $failed = (int) ($counts[4] ?? $counts['4'] ?? 0);
+            $counts = DB::table('orders')->selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status');
+            $pendingNew = (int) ($counts['pending'] ?? 0);
+            $shipping = (int) ($counts['packed'] ?? 0);
+            $failed = (int) ($counts['cancelled'] ?? 0);
             $badge = $pendingNew + $shipping + $failed;
             $groups[] = [
                 'title' => 'Đơn hàng',
@@ -406,8 +424,8 @@ class AdminDashboardService
         }
 
         if (! empty($perm['inventory'])) {
-            $low = (int) DB::table('product')->where('quantity', '<=', self::LOW_STOCK)->count();
-            $out = (int) DB::table('product')->where('quantity', 0)->count();
+            $low = $this->lowStockCount(self::LOW_STOCK);
+            $out = $this->lowStockCount(0);
             $groups[] = [
                 'title' => 'Kho hàng',
                 'icon' => 'fa-solid fa-boxes-stacked',
@@ -449,7 +467,7 @@ class AdminDashboardService
 
     private function countUsers(int $start, int $end): int
     {
-        return (int) DB::table('user')->whereBetween('created', [$start, $end])->count();
+        return (int) DB::table('users')->whereBetween('created_at', [$this->sqlTime($start), $this->sqlTime($end)])->count();
     }
 
     private function sumReceipts(int $start, int $end): float
@@ -460,8 +478,8 @@ class AdminDashboardService
 
         $row = DB::selectOne(
             'SELECT COALESCE(SUM(total_amount), 0) AS total FROM stock_receipts
-             WHERE status = ? AND IF(confirmed_at > 0, confirmed_at, created) >= ? AND IF(confirmed_at > 0, confirmed_at, created) <= ?',
-            ['confirmed', $start, $end]
+             WHERE status = ? AND COALESCE(confirmed_at, created_at) >= ? AND COALESCE(confirmed_at, created_at) <= ?',
+            ['confirmed', $this->sqlTime($start), $this->sqlTime($end)]
         );
 
         return (float) ($row->total ?? 0);
@@ -469,15 +487,15 @@ class AdminDashboardService
 
     private function sumCogs(int $start, int $end): float
     {
-        if (! Schema::hasTable('order') || ! Schema::hasColumn('order', 'cost_price')) {
+        if (! Schema::hasTable('order_items')) {
             return 0;
         }
 
         $row = DB::selectOne(
             'SELECT COALESCE(SUM(o.qty * COALESCE(o.cost_price, 0)), 0) AS total
-             FROM `order` o INNER JOIN `transaction` t ON t.id = o.transaction_id
-             WHERE t.status = 3 AND t.created >= ? AND t.created <= ?',
-            [$start, $end]
+             FROM order_items o INNER JOIN orders t ON t.id = o.order_id
+             WHERE t.status = \'completed\' AND t.created_at >= ? AND t.created_at <= ?',
+            [$this->sqlTime($start), $this->sqlTime($end)]
         );
 
         return (float) ($row->total ?? 0);
@@ -488,7 +506,7 @@ class AdminDashboardService
         if (! Schema::hasTable('product_variants')) {
             return 0;
         }
-        $where = Schema::hasColumn('product_variants', 'status') ? 'WHERE status = 1' : '';
+        $where = "WHERE status = 'active'";
         $row = DB::selectOne("SELECT COALESCE(SUM(stock * cost_price), 0) AS total FROM product_variants {$where}");
 
         return (float) ($row->total ?? 0);
@@ -519,5 +537,17 @@ class AdminDashboardService
     private function line(int $count, string $zero, string $template): string
     {
         return $count <= 0 ? $zero : sprintf($template, number_format($count, 0, ',', '.'));
+    }
+
+    private function sqlTime(int $unix): string
+    {
+        return date('Y-m-d H:i:s', $unix);
+    }
+
+    private function lowStockCount(int $threshold): int
+    {
+        return (int) DB::table('products')
+            ->whereRaw("(SELECT COALESCE(SUM(stock),0) FROM product_variants WHERE product_id = products.id AND status = 'active') <= ?", [$threshold])
+            ->count();
     }
 }

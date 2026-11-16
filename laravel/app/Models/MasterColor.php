@@ -15,20 +15,24 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class MasterColor extends BaseModel
 {
-    protected $table = 'master_colors';
+    protected $table = 'colors';
+
+    public $timestamps = true;
+
+    public const STATUS_ACTIVE = 'active';
 
     protected function casts(): array
     {
         return [
             'id' => 'int',
             'sort_order' => 'int',
-            'status' => 'int',
+            'status' => 'string',
         ];
     }
 
     public function scopeActive($query): Builder
     {
-        return $query->where('status', 1);
+        return $query->where('status', self::STATUS_ACTIVE);
     }
 
     public function scopeOrdered($query): Builder

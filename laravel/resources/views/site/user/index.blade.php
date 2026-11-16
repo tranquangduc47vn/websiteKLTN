@@ -191,14 +191,14 @@
 										<td class="jm-order-amount">{{ number_format($value->amount) }} ₫</td>
 										<td>
 											<span class="jm-account-status {{ $st['class'] }}">{{ $st['label'] }}</span>
-											@if ((string) $value->status === '4' && ! empty($value->reason))
+											@if ((string) $value->status === 'cancelled' && ! empty($value->reason))
 												<div style="margin-top:6px;font-size:11px;color:#888;max-width:180px;margin-left:auto;margin-right:auto;">{{ $value->reason }}</div>
 											@endif
 										</td>
 										<td class="jm-account-orders__actions">
 											<div class="jm-account-orders__action-stack">
 												<button type="button" class="jm-account-btn jm-account-btn--ghost" onclick="moModalChiTietDon({{ (int) $value->id }})">Chi tiết</button>
-											@if ((string) $value->status === '0' || (string) $value->status === '1')
+											@if ((string) $value->status === 'pending' || (string) $value->status === 'confirmed')
 												<button type="button" class="jm-account-btn jm-account-btn--danger" onclick="moModalHuyDon({{ (int) $value->id }})">Hủy đơn</button>
 											@endif
 											</div>

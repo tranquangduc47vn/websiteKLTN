@@ -14,6 +14,40 @@ use App\Models\Catalog;
  */
 class Urls
 {
+    /**
+     * Slug danh mục trùng route chức năng. Dữ liệu tên trong DB không đổi.
+     * URL danh mục của các slug này là /danh-muc/{slug}.
+     *
+     * @var list<string>
+     */
+    public const RESERVED_CATALOG_SLUGS = [
+        'ban-chay',
+        'khuyen-mai',
+        'tin-tuc',
+        'gio-hang',
+        'moi',
+        'tim-kiem',
+        'thanh-toan',
+        'dang-nhap',
+        'dang-ky',
+        'quen-mat-khau',
+        'dat-lai-mat-khau',
+        'user',
+        'admin',
+        'cart',
+        'order',
+        'news',
+        'posts',
+        'product',
+        'tich-diem',
+        'danh-muc',
+    ];
+
+    public static function isReservedCatalogSlug(string $slug): bool
+    {
+        return in_array($slug, self::RESERVED_CATALOG_SLUGS, true);
+    }
+
     /** CI3 build_cart_url(). */
     public static function cart(): string
     {
@@ -74,11 +108,16 @@ class Urls
             return url('/');
         }
 
-        $parts = [self::catalogSlug($catalog)];
-
-        if ($parts[0] === '') {
+        $slug = self::catalogSlug($catalog);
+        if ($slug === '') {
             return url('product/catalog/' . (int) $catalog->id);
         }
+
+        $parts = [];
+        if (self::isReservedCatalogSlug($slug)) {
+            $parts[] = 'danh-muc';
+        }
+        $parts[] = $slug;
 
         if ($priceRange !== null && $priceRange !== '') {
             $ps = self::priceRangeToSlug($priceRange);

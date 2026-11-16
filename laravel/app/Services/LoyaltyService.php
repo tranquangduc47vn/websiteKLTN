@@ -74,9 +74,8 @@ class LoyaltyService
                 'user_id' => $userId,
                 'points' => $points,
                 'type' => UserPointLog::TYPE_EARN,
-                'transaction_id' => $txId,
+                'order_id' => $txId,
                 'note' => 'Tích điểm đơn hoàn thành #' . $txId,
-                'created' => time(),
             ]);
         }
     }
@@ -110,7 +109,7 @@ class LoyaltyService
         }
 
         $earn = UserPointLog::query()
-            ->where('transaction_id', $txId)
+            ->where('order_id', $txId)
             ->where('type', UserPointLog::TYPE_EARN)
             ->first();
         $points = $earn ? (int) $earn->points : 0;
@@ -129,16 +128,15 @@ class LoyaltyService
             'user_id' => $userId,
             'points' => -$points,
             'type' => UserPointLog::TYPE_REVERSE,
-            'transaction_id' => $txId,
+            'order_id' => $txId,
             'note' => 'Hoàn tích điểm do hủy đơn #' . $txId,
-            'created' => time(),
         ]);
     }
 
     private function logExists(int $transactionId, string $type): bool
     {
         return UserPointLog::query()
-            ->where('transaction_id', $transactionId)
+            ->where('order_id', $transactionId)
             ->where('type', $type)
             ->exists();
     }

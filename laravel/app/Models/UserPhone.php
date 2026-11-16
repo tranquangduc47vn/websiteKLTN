@@ -2,28 +2,16 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\LegacyTimestamps;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/**
- * Model cho bảng `user_phone`.
- *
- * @property int $id
- * @property int $user_id
- * @property string $phone_label
- * @property string $phone_number
- * @property int $is_default
- * @property int $created
- */
 class UserPhone extends BaseModel
 {
-    use LegacyTimestamps;
+    protected $table = 'user_phones';
 
-    protected $table = 'user_phone';
+    public const UPDATED_AT = null;
 
-    /**
-     * Giới hạn số điện thoại mỗi user (đồng bộ với User_phone_model::MAX_PER_USER).
-     */
+    public $timestamps = true;
+
     public const MAX_PER_USER = 3;
 
     protected function casts(): array
@@ -32,7 +20,6 @@ class UserPhone extends BaseModel
             'id' => 'int',
             'user_id' => 'int',
             'is_default' => 'bool',
-            'created' => 'int',
         ];
     }
 
@@ -51,8 +38,13 @@ class UserPhone extends BaseModel
         return $query->where('is_default', 1);
     }
 
-    public function createdAt(): ?\Illuminate\Support\Carbon
+    public function getPhoneLabelAttribute(): string
     {
-        return $this->legacyTimestamp('created');
+        return (string) ($this->attributes['label'] ?? '');
+    }
+
+    public function setPhoneLabelAttribute(string $value): void
+    {
+        $this->attributes['label'] = $value;
     }
 }

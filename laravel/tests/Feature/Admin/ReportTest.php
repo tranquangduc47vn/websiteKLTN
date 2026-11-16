@@ -14,8 +14,8 @@ class ReportTest extends AdminTestCase
     protected function tearDown(): void
     {
         if ($this->orderIds !== []) {
-            DB::table('order')->whereIn('transaction_id', $this->orderIds)->delete();
-            DB::table('transaction')->whereIn('id', $this->orderIds)->delete();
+            DB::table('order_items')->whereIn('order_id', $this->orderIds)->delete();
+            DB::table('orders')->whereIn('id', $this->orderIds)->delete();
         }
         parent::tearDown();
     }
@@ -107,32 +107,38 @@ class ReportTest extends AdminTestCase
 
     private function insertOrder(int $status, int $amount, int $created, string $name, int $lineAmount = 0): void
     {
-        $productId = (int) DB::table('product')->orderBy('id')->value('id');
-        $id = (int) DB::table('transaction')->insertGetId([
-            'status' => $status,
-            'user_id' => 0,
-            'user_name' => $name,
-            'user_email' => 'b13@example.test',
-            'user_phone' => '0900131300',
-            'user_address' => 'HN',
-            'message' => '',
-            'amount' => $amount,
-            'voucher_code' => '',
+        $productId = (int) DB::table('products')->orderBy('id')->value('id');
+        $enum = [0 => 'pending', 1 => 'confirmed', 2 => 'packed', 3 => 'completed', 4 => 'cancelled'][$status] ?? 'pending';
+        $id = (int) DB::table('orders')->insertGetId([
+            'status' => $enum,
+            'user_id' => null,
+            'customer_name' => $name,
+            'customer_email' => 'b13@example.test',
+            'customer_phone' => '0900131300',
+            'shipping_address' => 'HN',
+            'note' => '',
+            'subtotal' => $amount,
             'discount_amount' => 0,
-            'payment' => 'COD',
-            'created' => $created,
+            'shipping_fee' => 0,
+            'total' => $amount,
+            'voucher_code' => null,
+            'created_at' => date('Y-m-d H:i:s', $created),
+            'updated_at' => date('Y-m-d H:i:s', $created),
         ]);
         $this->orderIds[] = $id;
         if ($lineAmount > 0) {
-            DB::table('order')->insert([
-                'transaction_id' => $id,
+            $variantId = (int) DB::table('product_variants')->where('product_id', $productId)->value('id');
+            DB::table('order_items')->insert([
+                'order_id' => $id,
                 'product_id' => $productId,
-                'variant_id' => (int) DB::table('product_variants')->where('product_id', $productId)->value('id'),
-                'size' => 'M',
-                'color' => 'Den',
+                'variant_id' => $variantId,
+                'product_name' => 'B13',
+                'sku' => 'B13-' . $variantId,
+                'size_name' => 'M',
+                'color_name' => 'Den',
                 'qty' => 1,
-                'amount' => $lineAmount,
-                'status' => 0,
+                'unit_price' => $lineAmount,
+                'line_subtotal' => $lineAmount,
                 'cost_price' => 1000,
             ]);
         }

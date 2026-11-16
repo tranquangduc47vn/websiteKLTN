@@ -2,7 +2,7 @@
 
 ## Giới thiệu
 
-Website bán hàng thời trang. Ứng dụng đang chạy là Laravel trong thư mục `laravel/`. Phần CodeIgniter 3 còn ở thư mục gốc để giữ URL, session và dữ liệu cũ trong lúc chuyển đổi.
+Website bán hàng thời trang. Ứng dụng đang chạy là Laravel trong thư mục `laravel/`. Source CodeIgniter 3 đã gỡ khỏi runtime. Bản rollback nằm ở archive `ci3-archive-*.zip` cùng thư mục gốc.
 
 ## Công nghệ
 

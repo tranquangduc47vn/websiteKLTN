@@ -40,9 +40,9 @@ class PasswordResetService
         PasswordReset::create([
             'user_id' => (int) $user->id,
             'token_hash' => $this->hashToken($plain),
-            'expires_at' => time() + self::EXPIRE_SECONDS,
-            'used_at' => 0,
-            'created' => time(),
+            'expires_at' => now()->addSeconds(self::EXPIRE_SECONDS),
+            'used_at' => null,
+            'created_at' => now(),
         ]);
 
         return $plain;
@@ -61,8 +61,8 @@ class PasswordResetService
 
         return PasswordReset::query()
             ->where('token_hash', $this->hashToken($plain))
-            ->where('used_at', 0)
-            ->where('expires_at', '>', time())
+            ->whereNull('used_at')
+            ->where('expires_at', '>', now())
             ->first();
     }
 
@@ -73,7 +73,7 @@ class PasswordResetService
     {
         return PasswordReset::query()
             ->where('id', $id)
-            ->update(['used_at' => time()]) > 0;
+            ->update(['used_at' => now()]) > 0;
     }
 
     /**
@@ -87,8 +87,8 @@ class PasswordResetService
 
         PasswordReset::query()
             ->where('user_id', $userId)
-            ->where('used_at', 0)
-            ->update(['used_at' => time()]);
+            ->whereNull('used_at')
+            ->update(['used_at' => now()]);
     }
 
     private function hashToken(string $plain): string

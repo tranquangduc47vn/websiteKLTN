@@ -44,7 +44,7 @@ class StoreVoucherRequest extends FormRequest
      */
     public function rules(): array
     {
-        $unique = Rule::unique('voucher', 'code');
+        $unique = Rule::unique('vouchers', 'code');
         $id = (int) $this->route('id');
         if ($id > 0) {
             $unique = $unique->ignore($id);
@@ -58,7 +58,7 @@ class StoreVoucherRequest extends FormRequest
             'discount_value' => ['nullable', 'integer'],
             'min_order_amount' => ['nullable', 'integer'],
             'max_discount' => ['nullable', 'integer'],
-            'tier_min' => ['nullable', 'string', 'max:32'],
+            'tier_min' => ['nullable', 'in:member,silver,gold,diamond,vip'],
             'user_id' => ['nullable', 'integer', 'min:0'],
             'usage_limit' => ['nullable', 'integer', 'min:0'],
             'per_user_limit' => ['nullable', 'integer'],
@@ -86,7 +86,10 @@ class StoreVoucherRequest extends FormRequest
 
         throw new ValidationException(
             $validator,
-            redirect()->to($to)->with('message_fail', (string) $validator->errors()->first())
+            redirect()->to($to)
+                ->withInput()
+                ->withErrors($validator)
+                ->with('message_fail', (string) $validator->errors()->first())
         );
     }
 
@@ -97,6 +100,11 @@ class StoreVoucherRequest extends FormRequest
     {
         $from = trim((string) $this->input('valid_from', ''));
         $to = trim((string) $this->input('valid_to', ''));
+        $userId = (int) $this->input('user_id', 0);
+        $tier = (string) $this->input('tier_min', 'member');
+        if ($tier === 'vip' || $tier === '') {
+            $tier = $tier === 'vip' ? 'diamond' : 'member';
+        }
 
         return [
             'code' => (string) $this->input('code'),
@@ -106,12 +114,12 @@ class StoreVoucherRequest extends FormRequest
             'discount_value' => (int) $this->input('discount_value', 0),
             'min_order_amount' => (int) $this->input('min_order_amount', 0),
             'max_discount' => (int) $this->input('max_discount', 0),
-            'tier_min' => (string) $this->input('tier_min', ''),
-            'user_id' => (int) $this->input('user_id', 0),
+            'tier_min' => $tier,
+            'user_id' => $userId > 0 ? $userId : null,
             'usage_limit' => (int) $this->input('usage_limit', 0),
             'per_user_limit' => max(1, (int) $this->input('per_user_limit', 1)),
-            'valid_from' => $from !== '' ? (int) strtotime($from) : 0,
-            'valid_to' => $to !== '' ? (int) strtotime($to . ' 23:59:59') : 0,
+            'starts_at' => $from !== '' ? $from . ' 00:00:00' : null,
+            'ends_at' => $to !== '' ? $to . ' 23:59:59' : null,
             'is_active' => $this->input('is_active') ? 1 : 0,
         ];
     }

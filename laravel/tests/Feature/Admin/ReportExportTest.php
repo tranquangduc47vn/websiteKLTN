@@ -16,8 +16,8 @@ class ReportExportTest extends AdminTestCase
     protected function tearDown(): void
     {
         if ($this->orderIds !== []) {
-            DB::table('order')->whereIn('transaction_id', $this->orderIds)->delete();
-            DB::table('transaction')->whereIn('id', $this->orderIds)->delete();
+            DB::table('order_items')->whereIn('order_id', $this->orderIds)->delete();
+            DB::table('orders')->whereIn('id', $this->orderIds)->delete();
         }
         parent::tearDown();
     }
@@ -101,10 +101,10 @@ class ReportExportTest extends AdminTestCase
 
     public function test_inventory_voucher_and_dashboard_exports_are_read_only(): void
     {
-        $jm10 = (int) DB::table('voucher')->where('code', 'JM10')->value('used_count');
-        $jm20 = (int) DB::table('voucher')->where('code', 'JM20')->value('used_count');
+        $jm10 = (int) DB::table('vouchers')->where('code', 'JM10')->value('used_count');
+        $jm20 = (int) DB::table('vouchers')->where('code', 'JM20')->value('used_count');
         $stock = (int) DB::table('product_variants')->sum('stock');
-        $products = (int) DB::table('product')->count();
+        $products = (int) DB::table('products')->count();
 
         $this->actingAs($this->makeAdmin(Admin::ROLE_ADMIN), 'admin');
         $this->get('/admin/export/preview/voucher')->assertOk()->assertSee('JM10')->assertSee('JM20')->assertSee('Báo cáo voucher');
@@ -114,10 +114,10 @@ class ReportExportTest extends AdminTestCase
         $this->get('/admin/export/preview/products')->assertOk()->assertSee('Báo cáo sản phẩm');
         $this->get('/admin/export/preview/top_products?type=year')->assertOk()->assertSee('Báo cáo sản phẩm bán chạy');
 
-        $this->assertSame($jm10, (int) DB::table('voucher')->where('code', 'JM10')->value('used_count'));
-        $this->assertSame($jm20, (int) DB::table('voucher')->where('code', 'JM20')->value('used_count'));
+        $this->assertSame($jm10, (int) DB::table('vouchers')->where('code', 'JM10')->value('used_count'));
+        $this->assertSame($jm20, (int) DB::table('vouchers')->where('code', 'JM20')->value('used_count'));
         $this->assertSame($stock, (int) DB::table('product_variants')->sum('stock'));
-        $this->assertSame($products, (int) DB::table('product')->count());
+        $this->assertSame($products, (int) DB::table('products')->count());
     }
 
     public function test_post_export_without_csrf_is_rejected(): void
@@ -135,19 +135,22 @@ class ReportExportTest extends AdminTestCase
 
     private function insertOrder(int $status, int $amount, int $created, string $name): int
     {
-        $id = (int) DB::table('transaction')->insertGetId([
-            'status' => $status,
-            'user_id' => 0,
-            'user_name' => $name,
-            'user_email' => 'b13export@example.test',
-            'user_phone' => '0900131301',
-            'user_address' => 'HN',
-            'message' => '',
-            'amount' => $amount,
-            'voucher_code' => '',
+        $enum = [0 => 'pending', 1 => 'confirmed', 2 => 'packed', 3 => 'completed', 4 => 'cancelled'][$status] ?? 'pending';
+        $id = (int) DB::table('orders')->insertGetId([
+            'status' => $enum,
+            'user_id' => null,
+            'customer_name' => $name,
+            'customer_email' => 'b13export@example.test',
+            'customer_phone' => '0900131301',
+            'shipping_address' => 'HN',
+            'note' => '',
+            'subtotal' => $amount,
             'discount_amount' => 0,
-            'payment' => 'COD',
-            'created' => $created,
+            'shipping_fee' => 0,
+            'total' => $amount,
+            'voucher_code' => null,
+            'created_at' => date('Y-m-d H:i:s', $created),
+            'updated_at' => date('Y-m-d H:i:s', $created),
         ]);
         $this->orderIds[] = $id;
 

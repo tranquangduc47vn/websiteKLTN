@@ -15,14 +15,19 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.auth' => \App\Http\Middleware\AdminAuth::class,
             'admin.permission' => \App\Http\Middleware\AdminPermission::class,
             'customer.auth' => \App\Http\Middleware\CustomerAuth::class,
-            'admin.session' => \App\Http\Middleware\SyncLegacyAdminSession::class,
-            'user.session' => \App\Http\Middleware\SyncLegacyUserSession::class,
         ]);
 
         $middleware->web(append: [
             \App\Http\Middleware\SyncCartSession::class,
+            \App\Http\Middleware\SecurityHeaders::class,
+        ]);
+
+        $middleware->validateCsrfTokens(except: [
+            'payment/webhook/sepay',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->respond(function (\Symfony\Component\HttpFoundation\Response $response) {
+            return \App\Http\Middleware\SecurityHeaders::apply($response);
+        });
     })->create();

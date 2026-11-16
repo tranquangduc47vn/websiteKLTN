@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 /**
  * Redirect 301 từ URL cũ sang URL SEO (CI3 application/controllers/Legacy.php).
  *
- * Giỏ, đơn, tin tức và URL sản phẩm/danh mục cũ chuyển 301. Method lạ vẫn 501.
+ * Giỏ, đơn, tin tức và URL sản phẩm/danh mục cũ chuyển 301.
  */
 class LegacyController extends Controller
 {
@@ -114,20 +114,5 @@ class LegacyController extends Controller
         $page = (int) $request->query('per_page', 0);
 
         return redirect()->to(Urls::search($keyword, $page > 0 ? $page : 0), 301);
-    }
-
-    public function index(Request $request)
-    {
-        abort(501, 'Chua implement — xem TODO trong routes/web.php.');
-    }
-
-    public function handlePath(Request $request, string $path = '')
-    {
-        abort(501, 'Chua implement — xem TODO trong routes/web.php.');
-    }
-
-    public function __call(string $method, array $args)
-    {
-        abort(501, "Action {$method} chua implement — xem TODO trong routes/web.php.");
     }
 }

@@ -743,3 +743,14 @@
 		padding-right: 10px !important;
 	}
 }
+
+.jm-add-cart-form {
+	display: contents;
+}
+
+button.jm-catalog-add-cart,
+button.jm-bs-card__cart-btn,
+button.jm-pdp-related-card__cta {
+	font-family: inherit;
+	cursor: pointer;
+}

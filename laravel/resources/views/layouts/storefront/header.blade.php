@@ -101,7 +101,12 @@
 							</button>
 							<ul class="jm-icon-popover jm-user-popover wf-chrome-popover wf-chrome-popover--menu">
 								<li><a href="{{ url("user") }}">Tài khoản</a></li>
-								<li><a href="{{ url("user/logout") }}">Đăng xuất</a></li>
+								<li>
+									<form method="post" action="{{ route('storefront.user.logout') }}">
+										@csrf
+										<button type="submit" class="wf-chrome-logout">Đăng xuất</button>
+									</form>
+								</li>
 							</ul>
 						@endif
 					</div>

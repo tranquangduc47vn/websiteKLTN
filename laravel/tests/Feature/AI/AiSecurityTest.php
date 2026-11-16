@@ -24,7 +24,7 @@ class AiSecurityTest extends AdminTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->settings = DB::table('ai_setting')->get()->map(fn ($row) => (array) $row)->all();
+        $this->settings = DB::table('ai_settings')->get()->map(fn ($row) => (array) $row)->all();
         config(['ai.gemini_api_key' => 'b15-test-key']);
     }
 
@@ -37,12 +37,12 @@ class AiSecurityTest extends AdminTestCase
             }
         }
         if ($this->userIds !== []) {
-            $conversationIds = DB::table('ai_conversation')->whereIn('user_id', $this->userIds)->pluck('id');
-            DB::table('ai_message')->whereIn('conversation_id', $conversationIds)->delete();
-            DB::table('ai_conversation')->whereIn('user_id', $this->userIds)->delete();
-            DB::table('user')->whereIn('id', $this->userIds)->delete();
+            $conversationIds = DB::table('ai_conversations')->whereIn('user_id', $this->userIds)->pluck('id');
+            DB::table('ai_messages')->whereIn('conversation_id', $conversationIds)->delete();
+            DB::table('ai_conversations')->whereIn('user_id', $this->userIds)->delete();
+            DB::table('users')->whereIn('id', $this->userIds)->delete();
         }
-        DB::table('ai_faq')->where('question', 'like', 'B15-%')->delete();
+        DB::table('ai_faqs')->where('question', 'like', 'B15-%')->delete();
         parent::tearDown();
     }
 
@@ -63,9 +63,9 @@ class AiSecurityTest extends AdminTestCase
         Auth::guard('admin')->logout();
         $this->actingAs($this->makeAdmin(Admin::ROLE_MOD), 'admin');
         $this->get('/admin/ai-assistant/settings')->assertOk()->assertSee('Lưu cấu hình')->assertDontSee('b15-test-key');
-        $before = (int) DB::table('ai_conversation')->count();
+        $before = (int) DB::table('ai_conversations')->count();
         $this->post('/admin/support-chat/purge')->assertRedirect('/admin/support-chat');
-        $this->assertSame($before, (int) DB::table('ai_conversation')->count());
+        $this->assertSame($before, (int) DB::table('ai_conversations')->count());
     }
 
     public function test_staff_cannot_take_another_staff_conversation_and_csrf_blocks_posts(): void
@@ -73,10 +73,8 @@ class AiSecurityTest extends AdminTestCase
         $user = User::query()->create([
             'name' => 'B15 Chat',
             'email' => 'b15chat.' . Str::lower(Str::random(6)) . '@example.test',
-            'password' => LegacyPassword::hash('B15-Secret#1'),
-            'phone' => '0900151501',
-            'address' => 'HN',
-            'created' => time(),
+            'password_hash' => LegacyPassword::hash('B15-Secret#1'),
+            'created_at' => now(),
         ]);
         $this->userIds[] = (int) $user->id;
         $conversation = AiConversation::query()->create([
@@ -101,7 +99,7 @@ class AiSecurityTest extends AdminTestCase
             'conversation_id' => $conversation->id,
             'message' => 'tin cua admin khac',
         ])->assertOk()->assertJson(['ok' => false]);
-        $this->assertSame(0, (int) DB::table('ai_message')->where('content', 'tin cua admin khac')->count());
+        $this->assertSame(0, (int) DB::table('ai_messages')->where('content', 'tin cua admin khac')->count());
 
         $this->app->bind(ValidateCsrfToken::class, fn ($app) => new class($app, $app['encrypter']) extends ValidateCsrfToken
         {
@@ -127,7 +125,7 @@ class AiSecurityTest extends AdminTestCase
             'gemini_api_key' => 'b15-test-key',
         ])->assertRedirect('/admin/ai-assistant/settings');
         $this->assertSame('B15-welcome', AiSetting::getValue('welcome_message'));
-        $this->assertNull(DB::table('ai_setting')->where('setting_value', 'b15-test-key')->first());
+        $this->assertNull(DB::table('ai_settings')->where('setting_value', 'b15-test-key')->first());
         $this->post('/admin/ai-assistant/faq/add', [
             'submit' => '1',
             'question' => 'B15-cau hoi',
@@ -135,7 +133,7 @@ class AiSecurityTest extends AdminTestCase
             'keywords' => 'b15',
             'is_active' => '1',
         ])->assertRedirect('/admin/ai-assistant/faq');
-        $this->assertNotNull(DB::table('ai_faq')->where('question', 'B15-cau hoi')->first());
-        $this->get('/admin/ai-assistant/faq/delete/' . (int) DB::table('ai_faq')->where('question', 'B15-cau hoi')->value('id'))->assertNotFound();
+        $this->assertNotNull(DB::table('ai_faqs')->where('question', 'B15-cau hoi')->first());
+        $this->get('/admin/ai-assistant/faq/delete/' . (int) DB::table('ai_faqs')->where('question', 'B15-cau hoi')->value('id'))->assertNotFound();
     }
 }

@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\LegacyTimestamps;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -33,9 +32,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Voucher extends BaseModel
 {
-    use LegacyTimestamps;
 
-    protected $table = 'voucher';
+    protected $table = 'vouchers';
+
+    public $timestamps = true;
 
     public const TYPE_PERCENT = 'percent';
     public const TYPE_FIXED = 'fixed';
@@ -44,17 +44,16 @@ class Voucher extends BaseModel
     {
         return [
             'id' => 'int',
-            'discount_value' => 'int',
-            'min_order_amount' => 'int',
-            'max_discount' => 'int',
+            'discount_value' => 'decimal:2',
+            'min_order_amount' => 'decimal:2',
+            'max_discount' => 'decimal:2',
             'user_id' => 'int',
             'usage_limit' => 'int',
             'used_count' => 'int',
             'per_user_limit' => 'int',
-            'valid_from' => 'int',
-            'valid_to' => 'int',
+            'starts_at' => 'datetime',
+            'ends_at' => 'datetime',
             'is_active' => 'bool',
-            'created' => 'int',
         ];
     }
 
@@ -95,13 +94,11 @@ class Voucher extends BaseModel
             return false;
         }
 
-        $now = now()->timestamp;
-
-        if ((int) $this->valid_from > 0 && $now < (int) $this->valid_from) {
+        if ($this->starts_at !== null && now()->lt($this->starts_at)) {
             return false;
         }
 
-        if ((int) $this->valid_to > 0 && $now > (int) $this->valid_to) {
+        if ($this->ends_at !== null && now()->gt($this->ends_at)) {
             return false;
         }
 
@@ -110,5 +107,45 @@ class Voucher extends BaseModel
         }
 
         return true;
+    }
+
+    public function getValidFromAttribute(): mixed
+    {
+        return $this->starts_at;
+    }
+
+    public function getValidToAttribute(): mixed
+    {
+        return $this->ends_at;
+    }
+
+    public function setValidFromAttribute(mixed $value): void
+    {
+        $this->attributes['starts_at'] = $this->dateOrNull($value);
+        unset($this->attributes['valid_from']);
+    }
+
+    public function setValidToAttribute(mixed $value): void
+    {
+        $this->attributes['ends_at'] = $this->dateOrNull($value);
+        unset($this->attributes['valid_to']);
+    }
+
+    public function setUserIdAttribute(mixed $value): void
+    {
+        $id = (int) $value;
+        $this->attributes['user_id'] = $id > 0 ? $id : null;
+    }
+
+    private function dateOrNull(mixed $value): mixed
+    {
+        if ($value === null || $value === '' || $value === 0 || $value === '0') {
+            return null;
+        }
+        if (is_numeric($value)) {
+            return \Illuminate\Support\Carbon::createFromTimestamp((int) $value);
+        }
+
+        return $value;
     }
 }

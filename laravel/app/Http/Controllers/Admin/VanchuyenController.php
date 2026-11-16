@@ -2,26 +2,26 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Admin\Concerns\ManagesContentPages;
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Models\ContentPage;
 
-/**
- * TODO B8+: implement logic tu CI3 admin/Vanchuyen.
- */
 class VanchuyenController extends Controller
 {
-    public function index(Request $request)
+    use ManagesContentPages;
+
+    protected function contentType(): string
     {
-        abort(501, 'Chua implement — xem TODO trong routes/web.php.');
+        return ContentPage::TYPE_VAN_CHUYEN;
     }
 
-    public function handlePath(Request $request, string $path = '')
+    protected function contentBase(): string
     {
-        abort(501, 'Chua implement — xem TODO trong routes/web.php.');
+        return '/admin/vanchuyen';
     }
 
-    public function __call(string $method, array $args)
+    protected function contentHeading(): string
     {
-        abort(501, 'Action $method chua implement — xem TODO trong routes/web.php.');
+        return 'Vận chuyển';
     }
 }

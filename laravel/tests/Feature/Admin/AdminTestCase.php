@@ -20,9 +20,8 @@ abstract class AdminTestCase extends LegacyMysqlTestCase
         $admin = Admin::query()->create([
             'name' => 'B8 Admin ' . $level,
             'email' => 'b8admin.' . Str::lower(Str::random(8)) . '@example.test',
-            'password' => LegacyPassword::hash(self::PASSWORD),
+            'password_hash' => LegacyPassword::hash(self::PASSWORD),
             'level' => $level,
-            'created' => time(),
         ]);
         $this->adminIds[] = (int) $admin->id;
 
@@ -32,7 +31,7 @@ abstract class AdminTestCase extends LegacyMysqlTestCase
     protected function tearDown(): void
     {
         if ($this->adminIds !== []) {
-            DB::table('admin')->whereIn('id', $this->adminIds)->delete();
+            DB::table('admins')->whereIn('id', $this->adminIds)->delete();
         }
         parent::tearDown();
     }

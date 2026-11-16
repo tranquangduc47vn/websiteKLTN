@@ -1,19 +1,14 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Webshop')</title>
+@php
+    $page_title = trim($__env->yieldContent('title'));
+@endphp
+	@include('layouts.storefront.head')
+	<link rel="stylesheet" type="text/css" href="{{ \App\Support\Storefront\Shop::assetUrl('css/responsive-2026.css') }}?v=16">
 </head>
-<body>
-    @if (session('message_success'))
-        <div class="alert alert-success">{{ session('message_success') }}</div>
-    @endif
-    @if (session('message_fail'))
-        <div class="alert alert-danger">{{ session('message_fail') }}</div>
-    @endif
-
-    @yield('content')
+<body class="@yield('body_class', 'jm-page-auth jm-page-auth-standalone')">
+	@yield('content')
+	@stack('scripts')
 </body>
 </html>

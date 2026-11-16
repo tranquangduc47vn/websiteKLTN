@@ -58,7 +58,7 @@ class PriorityCleanupTest extends LegacyMysqlTestCase
         $this->assertNotNull($product);
         $original = (string) $product->content;
         try {
-            DB::table('product')->where('id', $product->id)->update([
+            DB::table('products')->where('id', $product->id)->update([
                 'content' => '<p>B171-fmt</p><script>alert(1)</script><img src="/upload/news/a.jpg" onerror="alert(1)">',
             ]);
             $this->get(Urls::product($product))
@@ -67,7 +67,7 @@ class PriorityCleanupTest extends LegacyMysqlTestCase
                 ->assertDontSee('alert(1)', false)
                 ->assertDontSee('onerror="alert(1)"', false);
         } finally {
-            DB::table('product')->where('id', $product->id)->update(['content' => $original]);
+            DB::table('products')->where('id', $product->id)->update(['content' => $original]);
         }
 
         $id = (int) DB::table('content_pages')->insertGetId([

@@ -97,13 +97,13 @@ class AiAssistantController extends Controller
                 'category' => trim((string) $request->input('category', '')),
                 'sort_order' => (int) $request->input('sort_order', 0),
                 'is_active' => $request->boolean('is_active') ? 1 : 0,
-                'updated' => time(),
+                'updated_at' => now(),
             ];
             if ($faq) {
                 $faq->fill($data)->save();
                 $flash = 'Đã cập nhật FAQ.';
             } else {
-                $data['created'] = time();
+                $data['created_at'] = now();
                 AiFaq::query()->create($data);
                 $flash = 'Đã thêm FAQ.';
             }

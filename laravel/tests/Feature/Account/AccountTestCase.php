@@ -32,19 +32,27 @@ abstract class AccountTestCase extends OrderTestCase
      */
     protected function insertOrder(User $user, array $overrides = []): int
     {
-        return (int) DB::table('transaction')->insertGetId(array_merge([
-            'status' => 0,
+        $status = $overrides['status'] ?? 'pending';
+        $map = ['0' => 'pending', '1' => 'confirmed', '2' => 'packed', '3' => 'completed', '4' => 'cancelled'];
+        $status = $map[(string) $status] ?? $status;
+        $total = $overrides['total'] ?? $overrides['amount'] ?? 250000;
+        unset($overrides['status'], $overrides['amount'], $overrides['user_name'], $overrides['user_email'], $overrides['user_phone'], $overrides['user_address'], $overrides['message'], $overrides['payment'], $overrides['created']);
+
+        return (int) DB::table('orders')->insertGetId(array_merge([
+            'status' => $status,
             'user_id' => $user->id,
-            'user_name' => $user->name,
-            'user_email' => $user->email,
-            'user_phone' => $user->phone,
-            'user_address' => $user->address,
-            'message' => '',
-            'amount' => 250000,
-            'voucher_code' => '',
+            'customer_name' => $user->name,
+            'customer_email' => $user->email,
+            'customer_phone' => (string) ($overrides['customer_phone'] ?? $user->phone),
+            'shipping_address' => (string) $user->address,
+            'note' => '',
+            'subtotal' => $total,
             'discount_amount' => 0,
-            'payment' => 'COD',
-            'created' => time(),
+            'shipping_fee' => 0,
+            'total' => $total,
+            'voucher_code' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
         ], $overrides));
     }
 }

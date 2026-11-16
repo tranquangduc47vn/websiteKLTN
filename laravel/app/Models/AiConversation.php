@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\LegacyTimestamps;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -26,9 +25,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class AiConversation extends BaseModel
 {
-    use LegacyTimestamps;
 
-    protected $table = 'ai_conversation';
+    protected $table = 'ai_conversations';
 
     public const STATUS_OPEN = 'open';
     public const STATUS_STAFF_JOINED = 'staff_joined';
@@ -40,8 +38,8 @@ class AiConversation extends BaseModel
             'id' => 'int',
             'user_id' => 'int',
             'staff_id' => 'int',
-            'started' => 'int',
-            'last_message' => 'int',
+            'started_at' => 'datetime',
+            'last_message_at' => 'datetime',
             'unread_staff' => 'bool',
             'unread_customer' => 'bool',
         ];
@@ -93,13 +91,37 @@ class AiConversation extends BaseModel
         return $query->where('unread_staff', 1);
     }
 
-    public function startedAt(): ?\Illuminate\Support\Carbon
+    public function setUserIdAttribute(mixed $value): void
     {
-        return $this->legacyTimestamp('started');
+        $id = (int) $value;
+        $this->attributes['user_id'] = $id > 0 ? $id : null;
     }
 
-    public function lastMessageAt(): ?\Illuminate\Support\Carbon
+    public function setStaffIdAttribute(mixed $value): void
     {
-        return $this->legacyTimestamp('last_message');
+        $id = (int) $value;
+        $this->attributes['staff_id'] = $id > 0 ? $id : null;
+    }
+
+    public function setStartedAttribute(mixed $value): void
+    {
+        $this->attributes['started_at'] = is_numeric($value)
+            ? \Illuminate\Support\Carbon::createFromTimestamp((int) $value)
+            : $value;
+        unset($this->attributes['started']);
+    }
+
+    public function setLastMessageAttribute(mixed $value): void
+    {
+        $this->attributes['last_message_at'] = is_numeric($value)
+            ? \Illuminate\Support\Carbon::createFromTimestamp((int) $value)
+            : $value;
+        unset($this->attributes['last_message']);
+    }
+
+    public function setGuestTokenAttribute(mixed $value): void
+    {
+        $text = trim((string) $value);
+        $this->attributes['guest_token'] = $text === '' ? null : $text;
     }
 }

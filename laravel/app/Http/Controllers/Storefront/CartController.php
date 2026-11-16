@@ -67,11 +67,29 @@ class CartController extends Controller
         ]);
     }
 
-    /** GET|POST /gio-hang/them/{id} (alias /gio-hang/add/{id}) */
+    /**
+     * POST /gio-hang/them/{id} (alias /gio-hang/add/{id}).
+     * GET không đổi giỏ. Khách chưa đăng nhập được lưu lựa chọn để login thêm sau.
+     */
     public function add(Request $request, $id = null): RedirectResponse
     {
-        if ($redirect = $this->redirectGuest($request)) {
-            return $redirect;
+        if (! $request->isMethod('post')) {
+            abort(404);
+        }
+
+        if (! Auth::guard('web')->check()) {
+            $productId = $request->input('id') ?: $id;
+            $this->cart->rememberPendingAdd(
+                $request->session(),
+                (int) (is_scalar($productId) ? $productId : 0),
+                $request->integer('qty'),
+                $this->stringInput($request, 'size'),
+                $this->stringInput($request, 'color'),
+            );
+            $request->session()->put('redirect_back', Urls::cart());
+            Flash::auth(Flash::FAIL, self::MSG_LOGIN_TO_ADD);
+
+            return redirect()->to(Urls::login());
         }
 
         // CI3: ưu tiên POST id, rỗng thì lấy segment URL.
@@ -102,9 +120,12 @@ class CartController extends Controller
         return redirect()->to(url('/'));
     }
 
-    /** GET|POST /gio-hang/cap-nhat-thuoc-tinh */
+    /** POST /gio-hang/cap-nhat-thuoc-tinh */
     public function updateOptions(Request $request): JsonResponse|RedirectResponse
     {
+        if (! $request->isMethod('post')) {
+            abort(404);
+        }
         if ($denied = $this->denyGuest($request)) {
             return $denied;
         }

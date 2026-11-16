@@ -1,7 +1,7 @@
 @php
     $site_asset_url = \App\Support\Storefront\Shop::assetUrl("");
 @endphp
-<link rel="stylesheet" type="text/css" href="{{ $site_asset_url }}css/responsive-2026.css?v=16">
+<link rel="stylesheet" type="text/css" href="{{ $site_asset_url }}css/responsive-2026.css?v=17">
 {!! \App\Support\Storefront\Csrf::injectScript() !!}
 <script src="{{ $site_asset_url }}bootstrap/js/bootstrap.min.js"></script>
 <script src="{{ $site_asset_url }}js/header-icons.js"></script>

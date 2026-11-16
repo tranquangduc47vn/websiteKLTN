@@ -36,6 +36,15 @@ class CartSessionService
     /** Session key giỏ hàng của CI3 — giữ nguyên theo AGENTS.md. */
     public const SESSION_KEY = 'custom_cart';
 
+    /**
+     * Giỏ đang đặt dở khi khách bị chuyển sang đăng nhập.
+     * Middleware xóa custom_cart của guest; key này giữ lại để login nạp lại.
+     */
+    public const PENDING_CHECKOUT_KEY = 'checkout_pending_cart';
+
+    /** Lựa chọn thêm giỏ của khách, được hoàn tất sau khi đăng nhập. */
+    public const PENDING_ADD_KEY = 'pending_cart_add';
+
     /** CI3 Cart::_parse_product_variants(): giá trị hiển thị khi sản phẩm không khai báo màu/size. */
     public const DEFAULT_COLOR = 'Mặc định';
     public const DEFAULT_SIZE = 'Freesize';
@@ -131,10 +140,10 @@ class CartSessionService
             [[
                 'user_id' => $userId,
                 'cart_json' => json_encode($cart, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                'updated' => time(),
+                'updated_at' => now(),
             ]],
             ['user_id'],
-            ['cart_json', 'updated']
+            ['cart_json', 'updated_at']
         );
     }
 
@@ -194,8 +203,8 @@ class CartSessionService
      */
     public function variantOptions(Product $product): array
     {
-        $colors = $this->splitOptions($product->color);
-        $sizes = $this->splitOptions($product->size);
+        $colors = $product->colorList();
+        $sizes = $product->sizeList();
 
         return [
             'colors' => $colors !== [] ? $colors : [self::DEFAULT_COLOR],
@@ -224,16 +233,10 @@ class CartSessionService
         return ['size' => $size, 'color' => $color];
     }
 
-    /** CI3: giá bán = price - discount (khi discount > 0), <= 0 thì 1000. */
+    /** Giá bán = list_price - discount_amount, không âm. */
     public function unitPrice(Product $product): float
     {
-        $price = (float) $product->price;
-
-        if ((int) $product->discount > 0) {
-            $price = (float) $product->price - (int) $product->discount;
-        }
-
-        return $price > 0 ? $price : self::FALLBACK_PRICE;
+        return $product->finalPrice();
     }
 
     /**
@@ -366,6 +369,32 @@ class CartSessionService
      | Thao tác giỏ hàng
      |====================================================================*/
 
+    public function rememberPendingAdd(Session $session, int $productId, int $qty, string $size, string $color): void
+    {
+        $session->put(self::PENDING_ADD_KEY, [
+            'id' => $productId,
+            'qty' => $qty,
+            'size' => $size,
+            'color' => $color,
+        ]);
+    }
+
+    public function consumePendingAdd(Session $session): ?CartActionResult
+    {
+        $pending = $session->pull(self::PENDING_ADD_KEY);
+        if (! is_array($pending) || (int) ($pending['id'] ?? 0) < 1) {
+            return null;
+        }
+
+        return $this->add(
+            $session,
+            (int) $pending['id'],
+            (int) ($pending['qty'] ?? 0),
+            (string) ($pending['size'] ?? ''),
+            (string) ($pending['color'] ?? ''),
+        );
+    }
+
     /** CI3 Cart::add(). */
     public function add(Session $session, int $productId, int $qty, string $size, string $color): CartActionResult
     {
@@ -376,7 +405,7 @@ class CartSessionService
         if (! $product) {
             return CartActionResult::failure(CartActionResult::PRODUCT_MISSING, self::MSG_PRODUCT_MISSING, $cart);
         }
-        if ((int) $product->status !== 1) {
+        if ((string) $product->status !== Product::STATUS_ACTIVE) {
             return CartActionResult::failure(CartActionResult::PRODUCT_INACTIVE, self::MSG_PRODUCT_INACTIVE, $cart, [], $product);
         }
 
@@ -701,7 +730,7 @@ class CartSessionService
             }
 
             $product = $products->get($productId);
-            if (! $product || (int) $product->status !== 1) {
+            if (! $product || (string) $product->status !== Product::STATUS_ACTIVE) {
                 $removed[] = ! empty($item['name']) ? (string) $item['name'] : ('#' . $productId);
                 $changed = true;
                 continue;

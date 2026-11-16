@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\LegacyTimestamps;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -21,18 +20,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $total_qty
  * @property int $created_by
  * @property int $confirmed_by
- * @property int $confirmed_at
- * @property int $cancelled_at
- * @property int $created
- * @property int $updated
+ * @property \Illuminate\Support\Carbon|null $confirmed_at
+ * @property \Illuminate\Support\Carbon|null $cancelled_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  * @property string|null $receipt_date  // DATE
  * @property string $total_amount
  */
 class StockReceipt extends BaseModel
 {
-    use LegacyTimestamps;
-
     protected $table = 'stock_receipts';
+
+    public $timestamps = true;
 
     public const STATUS_DRAFT = 'draft';
     public const STATUS_CONFIRMED = 'confirmed';
@@ -46,10 +45,8 @@ class StockReceipt extends BaseModel
             'total_qty' => 'int',
             'created_by' => 'int',
             'confirmed_by' => 'int',
-            'confirmed_at' => 'int',
-            'cancelled_at' => 'int',
-            'created' => 'int',
-            'updated' => 'int',
+            'confirmed_at' => 'datetime',
+            'cancelled_at' => 'datetime',
             'receipt_date' => 'date',
             'total_amount' => 'decimal:2',
         ];
@@ -109,15 +106,5 @@ class StockReceipt extends BaseModel
     public function isCancelled(): bool
     {
         return $this->status === self::STATUS_CANCELLED;
-    }
-
-    public function createdAt(): ?\Illuminate\Support\Carbon
-    {
-        return $this->legacyTimestamp('created');
-    }
-
-    public function updatedAt(): ?\Illuminate\Support\Carbon
-    {
-        return $this->legacyTimestamp('updated');
     }
 }

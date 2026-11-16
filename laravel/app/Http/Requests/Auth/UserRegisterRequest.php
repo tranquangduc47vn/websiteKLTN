@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use App\Rules\StrongPassword;
 use App\Rules\ValidUserPhone;
 use App\Rules\ValidVnAddress;
@@ -33,7 +34,7 @@ class UserRegisterRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:100'],
-            'email' => ['required', 'email', 'max:50', Rule::unique('user', 'email')],
+            'email' => ['required', 'email', 'max:50', Rule::unique(User::class, 'email')],
             'password' => ['required', 'string', new StrongPassword()],
             're_password' => ['required', 'string', 'same:password'],
             'province_id' => ['required', 'string', 'max:20', new ValidVnAddress()],

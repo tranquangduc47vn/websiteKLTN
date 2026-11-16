@@ -2,11 +2,10 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\LegacyTimestamps;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Model cho bảng `ai_faq` (câu hỏi thường gặp, dùng cho FaqMatcher).
+ * FAQ trợ lý. `created_at` và `updated_at` là DATETIME.
  *
  * @property int $id
  * @property string $question
@@ -14,15 +13,15 @@ use Illuminate\Database\Eloquent\Builder;
  * @property string $keywords
  * @property string $category
  * @property int $sort_order
- * @property int $is_active
- * @property int $created
- * @property int $updated
+ * @property bool $is_active
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class AiFaq extends BaseModel
 {
-    use LegacyTimestamps;
+    protected $table = 'ai_faqs';
 
-    protected $table = 'ai_faq';
+    public $timestamps = true;
 
     protected function casts(): array
     {
@@ -30,8 +29,8 @@ class AiFaq extends BaseModel
             'id' => 'int',
             'sort_order' => 'int',
             'is_active' => 'bool',
-            'created' => 'int',
-            'updated' => 'int',
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
         ];
     }
 
@@ -52,15 +51,5 @@ class AiFaq extends BaseModel
         }
 
         return array_values(array_filter(array_map('trim', explode(',', (string) $this->keywords))));
-    }
-
-    public function createdAt(): ?\Illuminate\Support\Carbon
-    {
-        return $this->legacyTimestamp('created');
-    }
-
-    public function updatedAt(): ?\Illuminate\Support\Carbon
-    {
-        return $this->legacyTimestamp('updated');
     }
 }

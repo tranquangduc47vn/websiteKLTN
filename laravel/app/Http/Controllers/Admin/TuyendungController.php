@@ -2,26 +2,26 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Admin\Concerns\ManagesContentPages;
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Models\ContentPage;
 
-/**
- * TODO B8+: implement logic tu CI3 admin/Tuyendung.
- */
 class TuyendungController extends Controller
 {
-    public function index(Request $request)
+    use ManagesContentPages;
+
+    protected function contentType(): string
     {
-        abort(501, 'Chua implement — xem TODO trong routes/web.php.');
+        return ContentPage::TYPE_TUYENDUNG;
     }
 
-    public function handlePath(Request $request, string $path = '')
+    protected function contentBase(): string
     {
-        abort(501, 'Chua implement — xem TODO trong routes/web.php.');
+        return '/admin/tuyendung';
     }
 
-    public function __call(string $method, array $args)
+    protected function contentHeading(): string
     {
-        abort(501, 'Action $method chua implement — xem TODO trong routes/web.php.');
+        return 'Tuyển dụng';
     }
 }

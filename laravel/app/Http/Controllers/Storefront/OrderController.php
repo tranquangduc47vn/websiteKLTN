@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Storefront\CheckoutRequest;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\CartSessionService;
 use App\Services\Checkout\CheckoutResult;
 use App\Services\CheckoutService;
+use App\Support\Payment\BankTransfer;
 use App\Support\Storefront\Csrf;
 use App\Support\Storefront\Flash;
 use App\Support\Storefront\Urls;
@@ -21,7 +23,7 @@ use Illuminate\View\View;
  * B6 — Checkout / đặt hàng. Port CI3 application/controllers/Order.php.
  *
  * URL giữ nguyên: /thanh-toan, apply_voucher, checkout_qr/{id}, cancel/{id}.
- * Auth::guard('web') là nguồn user; khách vẫn xem form (CI3 không bắt login lúc checkout).
+ * Khách được xem form. POST đặt hàng yêu cầu guard web; service từ chối user null.
  */
 class OrderController extends Controller
 {
@@ -37,7 +39,7 @@ class OrderController extends Controller
     }
 
     /** GET|POST /thanh-toan */
-    public function index(Request $request): View|RedirectResponse
+    public function index(Request $request): View|RedirectResponse|JsonResponse
     {
         $session = $request->session();
         $user = Auth::guard('web')->user();
@@ -54,6 +56,12 @@ class OrderController extends Controller
         }
 
         if ($request->isMethod('post')) {
+            $pending = $session->get(CartSessionService::PENDING_CHECKOUT_KEY);
+            $hasCart = $sanitize['cart'] !== [] || (is_array($pending) && $pending !== []);
+            if (! $user instanceof User && $hasCart) {
+                return $this->denyGuestCheckout($request);
+            }
+
             if ($sanitize['cart'] === []) {
                 Flash::store(Flash::FAIL, CheckoutService::MSG_EMPTY_CART);
 
@@ -109,31 +117,52 @@ class OrderController extends Controller
         }
 
         $transaction = Transaction::query()->find($id);
-        if (! $transaction) {
-            return redirect()->to(url('/'));
-        }
-
         $user = Auth::guard('web')->user();
         $user = $user instanceof User ? $user : null;
 
-        if ($transaction->payment !== Transaction::PAYMENT_TRANSFER || (string) $transaction->status !== '0') {
+        if (! $transaction || ! $this->checkout->canAccess($request->session(), $transaction, $user)) {
+            return redirect()->to(url('/'));
+        }
+
+        if (! $transaction->isBankTransfer() || (string) $transaction->status !== Transaction::STATUS_NEW) {
             Flash::store(Flash::FAIL, CheckoutService::MSG_QR_DENIED);
 
             return redirect()->to(Urls::cart());
         }
 
-        if (! $this->checkout->canAccess($request->session(), $transaction, $user)) {
-            Flash::store(Flash::FAIL, CheckoutService::MSG_QR_FORBIDDEN);
-
-            return redirect()->to(url('/'));
-        }
-
         $this->checkout->clearCart($request->session());
+
+        $owns = $user && (int) $transaction->user_id === (int) $user->id;
 
         return view('site.order.checkout_qr', [
             'sf_temp' => 'site/order/checkout_qr',
             'qr_image_url' => $this->checkout->qrImageUrl($transaction),
+            'transfer' => $this->checkout->transferInstructions($transaction),
             'transaction' => $transaction,
+            'payment_poll' => $owns && (string) $transaction->payment_status !== BankTransfer::PAID,
+        ]);
+    }
+
+    /** GET /thanh-toan/payment-status/{id} — chỉ chủ đơn đã đăng nhập. */
+    public function paymentStatus(Request $request, $id = null): JsonResponse
+    {
+        $user = Auth::guard('web')->user();
+        if (! $user instanceof User) {
+            return response()->json(['ok' => false], 401);
+        }
+
+        $id = (int) ($id ?: $request->route('id'));
+        $transaction = $id > 0 ? Transaction::query()->find($id) : null;
+        if (! $transaction || (int) $transaction->user_id !== (int) $user->id) {
+            return response()->json(['ok' => false], 403);
+        }
+
+        $paymentStatus = trim((string) $transaction->payment_status);
+
+        return response()->json([
+            'ok' => true,
+            'payment_status' => $paymentStatus !== '' ? $paymentStatus : null,
+            'order_status' => (string) $transaction->status,
         ]);
     }
 
@@ -185,6 +214,12 @@ class OrderController extends Controller
             }
         }
 
+        if ($result->redirect === CheckoutResult::REDIRECT_LOGIN) {
+            request()->session()->put('redirect_back', Urls::checkout());
+
+            return redirect()->to(Urls::login());
+        }
+
         return redirect()->to(match ($result->redirect) {
             CheckoutResult::REDIRECT_CART => Urls::cart(),
             CheckoutResult::REDIRECT_QR => Urls::checkoutQr((int) $result->transaction?->id),
@@ -192,6 +227,23 @@ class OrderController extends Controller
             CheckoutResult::REDIRECT_USER => Urls::account(),
             default => Urls::checkout(),
         });
+    }
+
+    private function denyGuestCheckout(Request $request): JsonResponse|RedirectResponse
+    {
+        $request->session()->put('redirect_back', Urls::checkout());
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => false,
+                'login_required' => true,
+                'message' => CheckoutService::MSG_LOGIN_REQUIRED,
+            ], 401);
+        }
+
+        Flash::auth(Flash::FAIL, CheckoutService::MSG_LOGIN_REQUIRED);
+
+        return redirect()->to(Urls::login());
     }
 
     private function stringInput(Request $request, string $key): string

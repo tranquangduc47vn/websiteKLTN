@@ -38,7 +38,7 @@ class StockReceiptController extends Controller
             ->leftJoin('suppliers', 'suppliers.id', '=', 'stock_receipts.supplier_id')
             ->select('stock_receipts.*', 'suppliers.name as supplier_name')
             ->selectRaw(
-                '(SELECT COALESCE(SUM(IF(sri.subtotal > 0, sri.subtotal, sri.qty * sri.unit_cost)), 0)
+                '(SELECT COALESCE(SUM(IF(sri.line_total > 0, sri.line_total, sri.qty * sri.unit_cost)), 0)
                 FROM stock_receipt_items sri WHERE sri.receipt_id = stock_receipts.id) AS lines_total'
             );
         if (in_array($status, ['draft', 'confirmed', 'cancelled'], true)) {
@@ -220,15 +220,15 @@ class StockReceiptController extends Controller
      */
     private function form(?StockReceipt $receipt, $items): View
     {
-        $parents = DB::table('catalog')->where('parent_id', 1)->orderBy('sort_order')->get();
+        $parents = DB::table('categories')->where('parent_id', 1)->orderBy('sort_order')->get();
         foreach ($parents as $parent) {
-            $parent->sub = DB::table('catalog')->where('parent_id', $parent->id)->orderBy('sort_order')->get();
+            $parent->sub = DB::table('categories')->where('parent_id', $parent->id)->orderBy('sort_order')->get();
         }
 
         return view('admin.receipts.form', [
             'receipt' => $receipt,
             'items' => $items,
-            'suppliers' => Supplier::query()->where('status', 1)->orderBy('name')->get(),
+            'suppliers' => Supplier::query()->where('status', 'active')->orderBy('name')->get(),
             'catalogs' => $parents,
             'admin_header_title' => $receipt ? 'Sửa phiếu nháp' : 'Nhập kho',
         ]);
@@ -245,13 +245,13 @@ class StockReceiptController extends Controller
         $offset = ($page - 1) * $perPage;
         $query = $this->pickerQuery($request);
         $total = (int) (clone $query)->count('product_variants.id');
-        $rows = $query->orderBy('product.name')->orderBy('product_variants.id')
+        $rows = $query->orderBy('products.name')->orderBy('product_variants.id')
             ->offset($offset)->limit($perPage)
             ->get([
                 'product_variants.id', 'product_variants.product_id', 'product_variants.sku',
-                'product_variants.color', 'product_variants.size', 'product_variants.stock',
+                'product_variants.color_name as color', 'product_variants.size_name as size', 'product_variants.stock',
                 'product_variants.min_stock', 'product_variants.cost_price',
-                'product.name as product_name',
+                'products.name as product_name',
             ]);
 
         return response()->json([
@@ -274,9 +274,9 @@ class StockReceiptController extends Controller
         $catalogId = (int) $request->query('catalog_id', 0);
         $page = max(1, (int) $request->query('page', 1));
         $perPage = 20;
-        $query = DB::table('product')->where('status', 1)->orderBy('name');
+        $query = DB::table('products')->where('status', 'active')->orderBy('name');
         if ($catalogId > 0) {
-            $query->where('catalog_id', $catalogId);
+            $query->where('category_id', $catalogId);
         }
         if ($q !== '') {
             $like = '%' . addcslashes($q, '%_\\') . '%';
@@ -311,12 +311,12 @@ class StockReceiptController extends Controller
         }
 
         $base = DB::table('product_variants')
-            ->join('product', 'product.id', '=', 'product_variants.product_id')
-            ->where('product_variants.status', 1);
+            ->join('products', 'products.id', '=', 'product_variants.product_id')
+            ->where('product_variants.status', 'active');
         $catalogId = (int) $request->query('catalog_id', 0);
         $productId = (int) $request->query('product_id', 0);
         if ($catalogId > 0) {
-            $base->where('product.catalog_id', $catalogId);
+            $base->where('products.category_id', $catalogId);
         }
         if ($productId > 0) {
             $base->where('product_variants.product_id', $productId);
@@ -324,10 +324,10 @@ class StockReceiptController extends Controller
 
         return response()->json([
             'ok' => true,
-            'colors' => (clone $base)->where('product_variants.color', '!=', '')
-                ->distinct()->orderBy('product_variants.color')->pluck('product_variants.color')->all(),
-            'sizes' => (clone $base)->where('product_variants.size', '!=', '')
-                ->distinct()->orderBy('product_variants.size')->pluck('product_variants.size')->all(),
+            'colors' => (clone $base)->where('product_variants.color_name', '!=', '')
+                ->distinct()->orderBy('product_variants.color_name')->pluck('product_variants.color_name')->all(),
+            'sizes' => (clone $base)->where('product_variants.size_name', '!=', '')
+                ->distinct()->orderBy('product_variants.size_name')->pluck('product_variants.size_name')->all(),
         ]);
     }
 
@@ -339,14 +339,14 @@ class StockReceiptController extends Controller
 
         $adminId = (int) Auth::guard('admin')->id();
         $rows = DB::select('
-            SELECT pv.id, pv.product_id, pv.sku, pv.color, pv.size, pv.stock, pv.min_stock, pv.cost_price,
+            SELECT pv.id, pv.product_id, pv.sku, pv.color_name AS color, pv.size_name AS size, pv.stock, pv.min_stock, pv.cost_price,
                 p.name AS product_name, MAX(sri.id) AS last_used_at
             FROM stock_receipt_items sri
             INNER JOIN stock_receipts sr ON sr.id = sri.receipt_id
             INNER JOIN product_variants pv ON pv.id = sri.variant_id
-            INNER JOIN product p ON p.id = pv.product_id
-            WHERE sr.created_by = ? AND sri.variant_id > 0 AND pv.status = 1
-            GROUP BY pv.id, pv.product_id, pv.sku, pv.color, pv.size, pv.stock, pv.min_stock, pv.cost_price, p.name
+            INNER JOIN products p ON p.id = pv.product_id
+            WHERE sr.created_by = ? AND sri.variant_id > 0 AND pv.status = \'active\'
+            GROUP BY pv.id, pv.product_id, pv.sku, pv.color_name, pv.size_name, pv.stock, pv.min_stock, pv.cost_price, p.name
             ORDER BY last_used_at DESC
             LIMIT 10
         ', [$adminId]);
@@ -370,32 +370,32 @@ class StockReceiptController extends Controller
     private function pickerQuery(Request $request)
     {
         $query = DB::table('product_variants')
-            ->join('product', 'product.id', '=', 'product_variants.product_id')
-            ->where('product_variants.status', 1);
+            ->join('products', 'products.id', '=', 'product_variants.product_id')
+            ->where('product_variants.status', 'active');
         $catalogId = (int) $request->query('catalog_id', 0);
         $productId = (int) $request->query('product_id', 0);
         $color = trim((string) $request->query('color', ''));
         $size = trim((string) $request->query('size', ''));
         $q = trim((string) $request->query('q', ''));
         if ($catalogId > 0) {
-            $query->where('product.catalog_id', $catalogId);
+            $query->where('products.category_id', $catalogId);
         }
         if ($productId > 0) {
             $query->where('product_variants.product_id', $productId);
         }
         if ($color !== '') {
-            $query->where('product_variants.color', $color);
+            $query->where('product_variants.color_name', $color);
         }
         if ($size !== '') {
-            $query->where('product_variants.size', $size);
+            $query->where('product_variants.size_name', $size);
         }
         if ($q !== '') {
             $like = '%' . addcslashes($q, '%_\\') . '%';
             $query->where(function ($inner) use ($like) {
                 $inner->where('product_variants.sku', 'like', $like)
-                    ->orWhere('product.name', 'like', $like)
-                    ->orWhere('product_variants.color', 'like', $like)
-                    ->orWhere('product_variants.size', 'like', $like);
+                    ->orWhere('products.name', 'like', $like)
+                    ->orWhere('product_variants.color_name', 'like', $like)
+                    ->orWhere('product_variants.size_name', 'like', $like);
             });
         }
 
@@ -446,8 +446,8 @@ class StockReceiptController extends Controller
 
         return DB::table('stock_receipts')
             ->leftJoin('suppliers', 'suppliers.id', '=', 'stock_receipts.supplier_id')
-            ->leftJoin('admin as creator', 'creator.id', '=', 'stock_receipts.created_by')
-            ->leftJoin('admin as confirmer', 'confirmer.id', '=', 'stock_receipts.confirmed_by')
+            ->leftJoin('admins as creator', 'creator.id', '=', 'stock_receipts.created_by')
+            ->leftJoin('admins as confirmer', 'confirmer.id', '=', 'stock_receipts.confirmed_by')
             ->where('stock_receipts.id', $id)
             ->first([
                 'stock_receipts.*',
@@ -463,12 +463,17 @@ class StockReceiptController extends Controller
     private function items(int $id): array
     {
         return DB::table('stock_receipt_items')
-            ->leftJoin('product', 'product.id', '=', 'stock_receipt_items.product_id')
+            ->leftJoin('product_variants', 'product_variants.id', '=', 'stock_receipt_items.variant_id')
+            ->leftJoin('products', 'products.id', '=', 'product_variants.product_id')
             ->where('stock_receipt_items.receipt_id', $id)
             ->orderBy('stock_receipt_items.id')
             ->get([
                 'stock_receipt_items.*',
-                'product.name as product_name',
+                'stock_receipt_items.color_name as color',
+                'stock_receipt_items.size_name as size',
+                'stock_receipt_items.line_total as subtotal',
+                'products.name as product_name',
+                'product_variants.product_id as product_id',
             ])
             ->all();
     }

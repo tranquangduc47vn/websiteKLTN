@@ -17,15 +17,10 @@ class ProductCatalogTest extends AdminTestCase
     protected function tearDown(): void
     {
         $store = app(ProductImageStore::class);
-        $rows = DB::table('product')->where('name', 'like', 'B9 %')->get(['image_link', 'image_list']);
-        foreach ($rows as $row) {
-            $this->deleteGeneratedImage($store, (string) $row->image_link);
-            $list = json_decode((string) $row->image_list, true);
-            if (is_array($list)) {
-                foreach ($list as $name) {
-                    $this->deleteGeneratedImage($store, (string) $name);
-                }
-            }
+        $ids = DB::table('products')->where('name', 'like', 'B9 %')->pluck('id');
+        $paths = DB::table('product_images')->whereIn('product_id', $ids)->pluck('path');
+        foreach ($paths as $path) {
+            $this->deleteGeneratedImage($store, (string) $path);
         }
         parent::tearDown();
     }
@@ -65,7 +60,7 @@ class ProductCatalogTest extends AdminTestCase
             'sort_order' => 3,
         ])->assertRedirect(url('admin/catalog'));
 
-        $id = (int) DB::table('catalog')->where('name', $name)->value('id');
+        $id = (int) DB::table('categories')->where('name', $name)->value('id');
         $this->assertGreaterThan(0, $id);
         $this->get('/admin/catalog?q=' . urlencode($name))->assertOk()->assertSee($name);
         $this->get('/admin/catalog/edit/' . $id)->assertOk()->assertSee($name);
@@ -76,12 +71,12 @@ class ProductCatalogTest extends AdminTestCase
             'parent_id' => 1,
             'sort_order' => 4,
         ])->assertRedirect(url('admin/catalog'));
-        $this->assertSame($name . ' sua', DB::table('catalog')->where('id', $id)->value('name'));
+        $this->assertSame($name . ' sua', DB::table('categories')->where('id', $id)->value('name'));
 
         $this->post('/admin/catalog/del/' . $id)
             ->assertRedirect(url('admin/catalog'))
             ->assertSessionHas('message_fail', 'Bạn không có đủ quyền hạn để xóa danh mục sản phẩm!');
-        $this->assertNotNull(DB::table('catalog')->where('id', $id)->first());
+        $this->assertNotNull(DB::table('categories')->where('id', $id)->first());
         $this->get('/admin/catalog/del/' . $id)->assertNotFound();
     }
 
@@ -100,14 +95,14 @@ class ProductCatalogTest extends AdminTestCase
             'parent_id' => 1,
             'sort_order' => 2,
         ])->assertRedirect(url('admin/catalog'));
-        $id = (int) DB::table('catalog')->where('name', $name)->value('id');
+        $id = (int) DB::table('categories')->where('name', $name)->value('id');
 
         $this->post('/admin/catalog/add', [
             'name' => $name,
             'parent_id' => $id,
             'sort_order' => 2,
         ])->assertRedirect(url('admin/catalog'));
-        $this->assertSame(2, DB::table('catalog')->where('name', $name)->count());
+        $this->assertSame(2, DB::table('categories')->where('name', $name)->count());
 
         $this->post('/admin/catalog/edit/' . $id, [
             'name' => $name,
@@ -117,7 +112,7 @@ class ProductCatalogTest extends AdminTestCase
             ->assertSessionHas('message_fail');
 
         $this->post('/admin/catalog/del/' . $id)->assertRedirect(url('admin/catalog'));
-        $this->assertNull(DB::table('catalog')->where('id', $id)->first());
+        $this->assertNull(DB::table('categories')->where('id', $id)->first());
     }
 
     public function test_product_crud_variants_search_and_pagination(): void
@@ -148,11 +143,9 @@ class ProductCatalogTest extends AdminTestCase
         $this->assertNotNull($product);
         $this->assertSame(250000, (int) $product->price);
         $this->assertSame(25000, (int) $product->discount);
-        $this->assertSame(10, (int) $product->discount_percent);
-        $this->assertSame('percent', $product->discount_type);
         $this->assertSame('SP' . str_pad((string) $product->id, 5, '0', STR_PAD_LEFT), $product->code);
         $this->assertSame(0, (int) $product->quantity);
-        $variant = ProductVariant::query()->where('product_id', $product->id)->where('status', 1)->first();
+        $variant = ProductVariant::query()->where('product_id', $product->id)->where('status', 'active')->first();
         $this->assertNotNull($variant);
         $this->assertSame('Đen', $variant->color);
         $this->assertSame('M', $variant->size);
@@ -192,14 +185,13 @@ class ProductCatalogTest extends AdminTestCase
         $product->refresh();
         $variant->refresh();
         $this->assertSame($name . ' sua', $product->name);
-        $this->assertSame(0, (int) $product->status);
-        $this->assertSame(180000, (int) $variant->price);
+        $this->assertSame('inactive', (string) $product->status);
         $this->assertSame(90000, (int) $variant->cost_price);
-        $this->assertSame(2, ProductVariant::query()->where('product_id', $product->id)->where('status', 1)->count());
+        $this->assertSame(2, ProductVariant::query()->where('product_id', $product->id)->where('status', 'active')->count());
 
         $other = Product::query()->where('name', $name)->where('id', '!=', $product->id)->first();
         $otherVariant = ProductVariant::query()->where('product_id', $other->id)->first();
-        $otherPrice = (int) $otherVariant->price;
+        $otherPrice = (int) $otherVariant->cost_price;
         $this->post('/admin/products/edit/' . $product->id, [
             'name' => $product->name,
             'catalog_id' => $leaf,
@@ -213,7 +205,7 @@ class ProductCatalogTest extends AdminTestCase
                 $otherVariant->id => ['price' => '1', 'status' => 1],
             ],
         ])->assertRedirect(url('admin/products'));
-        $this->assertSame($otherPrice, (int) $otherVariant->fresh()->price);
+        $this->assertSame($otherPrice, (int) $otherVariant->fresh()->cost_price);
 
         $this->get('/admin/products/index?name=' . urlencode('B9 Product') . '&status=0')
             ->assertOk()
@@ -268,24 +260,20 @@ class ProductCatalogTest extends AdminTestCase
         $leaf = $this->leafCatalogId();
         $token = 'B9 Page ' . Str::lower(Str::random(5));
         for ($i = 1; $i <= 11; $i++) {
-            DB::table('product')->insert([
-                'catalog_id' => $leaf,
+            DB::table('products')->insert([
+                'category_id' => $leaf,
                 'name' => $token . ' ' . $i,
                 'content' => '',
-                'price' => 1000,
-                'discount' => 0,
-                'discount_type' => 'amount',
-                'discount_percent' => 0,
-                'image_link' => 'b9-page-placeholder.jpg',
-                'image_list' => '[]',
-                'view' => 0,
-                'buyed' => 0,
-                'quantity' => 0,
-                'rate_total' => 0,
-                'rate_count' => 0,
-                'created' => time(),
-                'code' => '',
-                'status' => 1,
+                'list_price' => 1000,
+                'discount_amount' => 0,
+                'code' => 'B9P' . $i . strtoupper(Str::random(4)),
+                'status' => 'active',
+                'view_count' => 0,
+                'sold_count' => 0,
+                'rating_total' => 0,
+                'rating_count' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
         }
 
@@ -311,7 +299,7 @@ class ProductCatalogTest extends AdminTestCase
         $this->actingAs($this->makeAdmin(Admin::ROLE_ADMIN), 'admin');
         $this->post('/admin/catalog/add', ['name' => 'B9 CSRF', 'parent_id' => 1, 'sort_order' => 1])->assertStatus(419);
         $this->post('/admin/products/del', ['id' => 1])->assertStatus(419);
-        $this->assertNull(DB::table('catalog')->where('name', 'B9 CSRF')->first());
+        $this->assertNull(DB::table('categories')->where('name', 'B9 CSRF')->first());
     }
 
     private function deleteGeneratedImage(ProductImageStore $store, string $filename): void
@@ -324,8 +312,8 @@ class ProductCatalogTest extends AdminTestCase
 
     private function leafCatalogId(): int
     {
-        $id = DB::table('catalog as child')
-            ->join('catalog as mid', 'mid.id', '=', 'child.parent_id')
+        $id = DB::table('categories as child')
+            ->join('categories as mid', 'mid.id', '=', 'child.parent_id')
             ->where('mid.parent_id', 1)
             ->value('child.id');
         $this->assertNotNull($id);

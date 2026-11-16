@@ -1,0 +1,121 @@
+/* Admin shell — scoped to .admin-app. Storefront does not load this file. */
+
+.admin-header-titles {
+	display: flex;
+	flex-direction: column;
+	gap: 0.1rem;
+	min-width: 0;
+}
+
+.admin-top-crumb {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: 0.72rem;
+	color: var(--admin-text-muted);
+	line-height: 1.2;
+}
+
+.admin-top-crumb a {
+	color: var(--admin-primary);
+	text-decoration: none;
+	font-weight: 600;
+}
+
+.admin-notify-btn {
+	position: relative;
+}
+
+.admin-notify-count {
+	position: absolute;
+	top: -4px;
+	right: -4px;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 4px;
+	border-radius: 999px;
+	background: #dc2626;
+	color: #fff;
+	font-size: 10px;
+	font-weight: 700;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.admin-notify-menu {
+	min-width: 240px;
+	border: 1px solid var(--admin-border);
+	border-radius: 12px;
+	box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+	padding: 0.35rem;
+}
+
+.admin-notify-menu .dropdown-item {
+	border-radius: 8px;
+	font-size: 0.875rem;
+}
+
+.admin-sidebar-logout {
+	margin-top: auto;
+	padding: 0.75rem;
+	border-top: 1px solid var(--admin-sidebar-border);
+}
+
+.admin-sidebar-logout .nav-link {
+	color: var(--admin-sidebar-text);
+}
+
+.admin-nav-sub .nav-link {
+	font-size: 0.8125rem;
+	padding: 0.45rem 0.75rem;
+}
+
+@media (min-width: 992px) {
+	.admin-app.admin-sidebar-collapsed {
+		--admin-sidebar-width: 84px;
+	}
+
+	.admin-app.admin-sidebar-collapsed .admin-sidebar-brand-title,
+	.admin-app.admin-sidebar-collapsed .admin-nav-section,
+	.admin-app.admin-sidebar-collapsed .admin-nav .nav-link > span,
+	.admin-app.admin-sidebar-collapsed .admin-nav-group-chevron,
+	.admin-app.admin-sidebar-collapsed .admin-sidebar-logout span {
+		display: none;
+	}
+
+	.admin-app.admin-sidebar-collapsed .admin-nav .nav-link,
+	.admin-app.admin-sidebar-collapsed .admin-sidebar-logout .nav-link {
+		justify-content: center;
+		padding-left: 0.5rem;
+		padding-right: 0.5rem;
+	}
+
+	.admin-app.admin-sidebar-collapsed .admin-nav-badge {
+		position: absolute;
+		top: 2px;
+		right: 6px;
+		margin-left: 0;
+	}
+}
+
+@media (max-width: 991.98px) {
+	.admin-header-inner {
+		padding-right: 0.75rem;
+	}
+
+	.admin-main-inner {
+		padding: 1rem 0.85rem 1.5rem;
+	}
+
+	.admin-top-crumb {
+		display: none;
+	}
+}
+
+@media (max-width: 390px) {
+	.admin-logout-btn {
+		padding-left: 0.65rem !important;
+		padding-right: 0.65rem !important;
+	}
+}

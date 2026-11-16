@@ -3,25 +3,31 @@
 namespace App\Http\Controllers\Storefront;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Support\Storefront\Loyalty;
+use Illuminate\View\View;
 
-/**
- * TODO B5+: implement logic tu CI3 $n.
- */
 class LoyaltyController extends Controller
 {
-    public function index(Request $request)
+    public function index(): View
     {
-        abort(501, 'Chua implement — xem TODO trong routes/web.php.');
+        return view('site.loyalty.index', [
+            'page_title' => 'Chính sách tích điểm & hạng thành viên',
+            'tiers' => [
+                [Loyalty::tierLabel('member'), 'Mặc định khi đăng ký'],
+                [Loyalty::tierLabel('silver'), '≥ 3 đơn hoàn thành hoặc tổng chi tiêu ≥ 5.000.000 ₫'],
+                [Loyalty::tierLabel('gold'), '≥ 10 đơn hoàn thành hoặc tổng chi tiêu ≥ 20.000.000 ₫'],
+                [Loyalty::tierLabel('diamond'), '≥ 25 đơn hoàn thành hoặc tổng chi tiêu ≥ 50.000.000 ₫'],
+            ],
+        ]);
     }
 
-    public function handlePath(Request $request, string $path = '')
+    public function handlePath(): never
     {
-        abort(501, 'Chua implement — xem TODO trong routes/web.php.');
+        abort(404);
     }
 
-    public function __call(string $method, array $args)
+    public function __call(string $method, array $parameters): never
     {
-        abort(501, 'Action $method chua implement — xem TODO trong routes/web.php.');
+        abort(404);
     }
 }

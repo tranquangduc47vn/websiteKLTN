@@ -167,11 +167,11 @@ final class AdminPermission
     public static function orderStatusText(mixed $status): string
     {
         return match ((string) $status) {
-            '0' => 'Mới đặt',
-            '1' => 'Đã xác nhận',
-            '2' => 'Đang giao hàng',
-            '3' => 'Hoàn thành',
-            '4' => 'Đã hủy',
+            '0', 'pending' => 'Mới đặt',
+            '1', 'confirmed' => 'Đã xác nhận',
+            '2', 'packed' => 'Đang giao hàng',
+            '3', 'completed' => 'Hoàn thành',
+            '4', 'cancelled' => 'Đã hủy',
             default => '—',
         };
     }

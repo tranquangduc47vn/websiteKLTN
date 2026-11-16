@@ -29,14 +29,21 @@ class OrderAdminService
     public function list(array $filters, int $offset): array
     {
         $offset = max(0, $offset);
-        $query = $this->filtered(DB::table('transaction'), $filters);
+        $query = $this->filtered(DB::table('orders')->leftJoin('payments', 'payments.order_id', '=', 'orders.id'), $filters);
         $total = (int) (clone $query)->count();
         $rows = $query
-            ->orderByDesc('id')
+            ->orderByDesc('orders.id')
             ->offset($offset)
             ->limit(self::PER_PAGE)
             ->get([
-                'id', 'user_name', 'user_phone', 'user_email', 'amount', 'payment', 'status', 'created',
+                'orders.id',
+                'orders.customer_name as user_name',
+                'orders.customer_phone as user_phone',
+                'orders.customer_email as user_email',
+                'orders.total as amount',
+                'orders.status',
+                'orders.created_at',
+                DB::raw("CASE WHEN payments.method = 'bank_transfer' THEN 'Chuyển khoản' ELSE 'COD' END as payment"),
             ])
             ->all();
 
@@ -46,20 +53,20 @@ class OrderAdminService
     /** @return list<object> */
     public function lines(int $transactionId): array
     {
-        return DB::table('order')
-            ->leftJoin('product', 'product.id', '=', 'order.product_id')
-            ->where('order.transaction_id', $transactionId)
-            ->orderBy('order.id')
+        return DB::table('order_items')
+            ->leftJoin('products', 'products.id', '=', 'order_items.product_id')
+            ->where('order_items.order_id', $transactionId)
+            ->orderBy('order_items.id')
             ->get([
-                'order.id as order_id',
-                'order.product_id',
-                'order.variant_id',
-                'order.qty',
-                'order.amount',
-                'order.size',
-                'order.color',
-                'product.name',
-                'product.image_link',
+                'order_items.id as order_id',
+                'order_items.product_id',
+                'order_items.variant_id',
+                'order_items.qty',
+                'order_items.line_subtotal as amount',
+                'order_items.size_name as size',
+                'order_items.color_name as color',
+                'products.name',
+                DB::raw('(SELECT path FROM product_images WHERE product_id = products.id AND variant_id IS NULL AND is_primary = 1 ORDER BY id LIMIT 1) as image_link'),
             ])
             ->all();
     }
@@ -68,7 +75,7 @@ class OrderAdminService
     public function accept(int $id): array
     {
         return $this->transition($id, function (Transaction $order) {
-            if ((string) $order->status !== '0') {
+            if ((string) $order->status !== Transaction::STATUS_NEW) {
                 return 'Chỉ có thể xác nhận đơn đang ở trạng thái chờ xử lý.';
             }
             $order->status = Transaction::STATUS_CONFIRMED;
@@ -82,7 +89,7 @@ class OrderAdminService
     public function ship(int $id): array
     {
         return $this->transition($id, function (Transaction $order) {
-            if ((string) $order->status !== '1') {
+            if ((string) $order->status !== Transaction::STATUS_CONFIRMED) {
                 return 'Chỉ có thể giao hàng khi đơn đã được xác nhận.';
             }
             $order->status = Transaction::STATUS_PACKED;
@@ -97,13 +104,13 @@ class OrderAdminService
     {
         return $this->transition($id, function (Transaction $order) {
             $status = (string) $order->status;
-            if ($status === '3') {
+            if ($status === Transaction::STATUS_COMPLETED) {
                 return 'Đơn hàng đã hoàn thành trước đó.';
             }
-            if ($status === '4') {
+            if ($status === Transaction::STATUS_CANCELLED) {
                 return 'Không thể hoàn thành đơn đã hủy.';
             }
-            if (! in_array($status, ['1', '2'], true)) {
+            if (! in_array($status, [Transaction::STATUS_CONFIRMED, Transaction::STATUS_PACKED], true)) {
                 return 'Đơn cần được xác nhận và chuyển giao trước khi hoàn thành.';
             }
             $this->applyBuyed((int) $order->id);
@@ -125,16 +132,16 @@ class OrderAdminService
 
         return $this->transition($id, function (Transaction $order) use ($reason) {
             $status = (string) $order->status;
-            if ($status === '4') {
+            if ($status === Transaction::STATUS_CANCELLED) {
                 return 'Đơn hàng đã được hủy trước đó.';
             }
-            if (in_array($status, ['2', '3'], true)) {
+            if (in_array($status, [Transaction::STATUS_PACKED, Transaction::STATUS_COMPLETED], true)) {
                 return 'Không thể hủy đơn hàng đã bàn giao cho shipper hoặc đã hoàn thành.';
             }
             $this->releaseStock($order, false);
             $this->loyalty->onOrderCancelled($order, false);
             $order->status = Transaction::STATUS_CANCELLED;
-            $order->reason = $reason;
+            $order->cancel_reason = $reason;
             $order->save();
 
             return null;
@@ -148,16 +155,18 @@ class OrderAdminService
         if (! $line) {
             return $this->fail('Dòng sản phẩm trong đơn không tồn tại', url('admin/orders'));
         }
-        $transactionId = (int) $line->transaction_id;
+        $transactionId = (int) $line->order_id;
 
         DB::transaction(function () use ($line, $transactionId) {
             $order = Transaction::query()->where('id', $transactionId)->lockForUpdate()->first();
             $line->delete();
-            if ($order && (string) $order->status === '0') {
+            if ($order && (string) $order->status === Transaction::STATUS_NEW) {
                 $this->releaseLine($line, false);
             }
             if ($order) {
-                $order->amount = (float) $order->amount - (float) $line->amount;
+                $lineAmount = (float) $line->line_subtotal;
+                $order->subtotal = max(0, (float) $order->subtotal - $lineAmount);
+                $order->total = max(0, (float) $order->subtotal - (float) $order->discount_amount);
                 $order->save();
             }
         });
@@ -171,7 +180,11 @@ class OrderAdminService
 
     public function pendingCount(): int
     {
-        return (int) Transaction::query()->whereIn('status', [0, 1, 2])->count();
+        return (int) Transaction::query()->whereIn('status', [
+            Transaction::STATUS_NEW,
+            Transaction::STATUS_CONFIRMED,
+            Transaction::STATUS_PACKED,
+        ])->count();
     }
 
     /**
@@ -184,28 +197,28 @@ class OrderAdminService
         if ($keyword !== '') {
             $like = '%' . addcslashes($keyword, '%_\\') . '%';
             $query->where(function ($inner) use ($like) {
-                $inner->where('user_name', 'like', $like)->orWhere('user_phone', 'like', $like);
+                $inner->where('orders.customer_name', 'like', $like)->orWhere('orders.customer_phone', 'like', $like);
             });
         }
-        $status = (string) ($filters['status'] ?? '');
-        if (in_array($status, ['0', '1', '2', '3', '4'], true)) {
-            $query->where('status', $status);
+        $status = self::statusFilter((string) ($filters['status'] ?? ''));
+        if ($status !== null) {
+            $query->where('orders.status', $status);
         }
         $payment = (string) ($filters['payment'] ?? '');
         if ($payment === 'transfer') {
-            $query->where('payment', 'Chuyển khoản');
+            $query->where('payments.method', Transaction::PAYMENT_TRANSFER);
         } elseif ($payment === 'cod') {
             $query->where(function ($inner) {
-                $inner->whereNull('payment')->orWhere('payment', '!=', 'Chuyển khoản');
+                $inner->whereNull('payments.method')->orWhere('payments.method', '!=', Transaction::PAYMENT_TRANSFER);
             });
         }
         $from = trim((string) ($filters['date_from'] ?? ''));
-        if ($from !== '' && ($ts = strtotime($from . ' 00:00:00'))) {
-            $query->where('created', '>=', $ts);
+        if ($from !== '' && strtotime($from . ' 00:00:00')) {
+            $query->where('orders.created_at', '>=', $from . ' 00:00:00');
         }
         $to = trim((string) ($filters['date_to'] ?? ''));
-        if ($to !== '' && ($ts = strtotime($to . ' 23:59:59'))) {
-            $query->where('created', '<=', $ts);
+        if ($to !== '' && strtotime($to . ' 23:59:59')) {
+            $query->where('orders.created_at', '<=', $to . ' 23:59:59');
         }
 
         return $query;
@@ -218,12 +231,20 @@ class OrderAdminService
      */
     public function rowsForExport(array $filters, ?int $limit, ?int $offset)
     {
-        $query = $this->filtered(DB::table('transaction'), $filters)->orderByDesc('id');
+        $query = $this->filtered(DB::table('orders')->leftJoin('payments', 'payments.order_id', '=', 'orders.id'), $filters)->orderByDesc('orders.id');
         if ($limit !== null) {
             $query->offset(max(0, (int) $offset))->limit($limit);
         }
 
-        return $query->get();
+        return $query->get([
+            'orders.id',
+            'orders.customer_name as user_name',
+            'orders.customer_phone as user_phone',
+            'orders.total as amount',
+            'orders.status',
+            'orders.created_at',
+            DB::raw("CASE WHEN payments.method = 'bank_transfer' THEN 'Chuyển khoản' ELSE 'COD' END as payment"),
+        ]);
     }
 
     /** @param  callable(Transaction): ?string  $apply  null = success */
@@ -254,21 +275,21 @@ class OrderAdminService
 
     private function applyBuyed(int $transactionId): void
     {
-        $lines = OrderItem::query()->where('transaction_id', $transactionId)->get();
+        $lines = OrderItem::query()->where('order_id', $transactionId)->get();
         foreach ($lines as $line) {
             $product = Product::query()->find((int) $line->product_id);
             if (! $product) {
                 continue;
             }
             Product::query()->where('id', $product->id)->update([
-                'buyed' => (int) $product->buyed + (int) $line->qty,
+                'sold_count' => (int) $product->sold_count + (int) $line->qty,
             ]);
         }
     }
 
     private function releaseStock(Transaction $order, bool $reverseBuyed): void
     {
-        $lines = OrderItem::query()->where('transaction_id', (int) $order->id)->get();
+        $lines = OrderItem::query()->where('order_id', (int) $order->id)->get();
         foreach ($lines as $line) {
             $this->releaseLine($line, $reverseBuyed);
         }
@@ -291,24 +312,15 @@ class OrderAdminService
             $result = $this->inventory->restoreForOrder(
                 $variantId,
                 $qty,
-                (int) $item->transaction_id,
+                (int) $item->order_id,
                 0,
-                'Hoàn kho đơn hàng #' . (int) $item->transaction_id
+                'Hoàn kho đơn hàng #' . (int) $item->order_id
             );
             $restored = ! empty($result['ok']);
         }
-        if (! $restored) {
-            $update = ['quantity' => (int) $product->quantity + $qty];
-            if ($reverseBuyed) {
-                $update['buyed'] = max(0, (int) $product->buyed - $qty);
-            }
-            Product::query()->where('id', $product->id)->update($update);
-
-            return;
-        }
         if ($reverseBuyed) {
             Product::query()->where('id', $product->id)->update([
-                'buyed' => max(0, (int) Product::query()->where('id', $product->id)->value('buyed') - $qty),
+                'sold_count' => max(0, (int) $product->sold_count - $qty),
             ]);
         }
     }
@@ -317,5 +329,17 @@ class OrderAdminService
     private function fail(string $message, string $to): array
     {
         return ['ok' => false, 'message' => $message, 'to' => $to];
+    }
+
+    private static function statusFilter(string $status): ?string
+    {
+        return match ($status) {
+            '0', Transaction::STATUS_NEW => Transaction::STATUS_NEW,
+            '1', Transaction::STATUS_CONFIRMED => Transaction::STATUS_CONFIRMED,
+            '2', Transaction::STATUS_PACKED => Transaction::STATUS_PACKED,
+            '3', Transaction::STATUS_COMPLETED => Transaction::STATUS_COMPLETED,
+            '4', Transaction::STATUS_CANCELLED => Transaction::STATUS_CANCELLED,
+            default => null,
+        };
     }
 }

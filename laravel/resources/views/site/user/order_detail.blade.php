@@ -33,7 +33,18 @@
 		@if (! empty($transaction->payment))
 		<div>
 			<dt>Thanh toán</dt>
-			<dd>{{ $transaction->payment }}</dd>
+			<dd>
+				{{ $transaction->payment }}
+				@if ((string) $transaction->payment === 'Chuyển khoản')
+					@php
+						$payState = (string) ($transaction->payment_status ?? '');
+					@endphp
+					— {{ $payState === 'paid' ? 'Đã thanh toán' : 'Đang chờ thanh toán' }}
+					@if (! empty($transaction->payment_ref))
+						<span>({{ $transaction->payment_ref }})</span>
+					@endif
+				@endif
+			</dd>
 		</div>
 		@endif
 		@if (! empty($transaction->message))
@@ -42,7 +53,7 @@
 			<dd>{!! nl2br(e($transaction->message)) !!}</dd>
 		</div>
 		@endif
-		@if ((string) $transaction->status === '4' && ! empty($transaction->reason))
+		@if ((string) $transaction->status === 'cancelled' && ! empty($transaction->reason))
 		<div class="jm-account-order-detail__meta--full">
 			<dt>Lý do hủy</dt>
 			<dd>{{ $transaction->reason }}</dd>

@@ -2,7 +2,6 @@
     // 1 the san pham trong luoi danh sach - port site/product/catalog.php
     $product_link = \App\Support\Storefront\Urls::product($value);
     $in_stock = \App\Support\Storefront\Product::isInStock($value);
-    $add_url = url("gio-hang/them/" . (int) $value->id);
 @endphp
 <div class="jm-grid-item">
     <article class="jm-product-card{{ $in_stock ? "" : " jm-product-card--out-of-stock" }}">
@@ -16,7 +15,7 @@
             </a>
 
             @if ($in_stock)
-            <a href="{{ $add_url }}" class="jm-catalog-add-cart">Thêm vào giỏ</a>
+            @include("site.partials.add-to-cart-form", ["productId" => (int) $value->id, "buttonClass" => "jm-catalog-add-cart", "label" => "Thêm vào giỏ"])
             @else
             <span class="jm-catalog-add-cart jm-catalog-add-cart--disabled">Hết hàng</span>
             @endif

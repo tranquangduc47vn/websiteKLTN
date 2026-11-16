@@ -39,14 +39,13 @@ abstract class OrderTestCase extends CartTestCase
             'min_order_amount' => 0,
             'max_discount' => 0,
             'tier_min' => 'member',
-            'user_id' => 0,
+            'user_id' => null,
             'usage_limit' => 100,
             'used_count' => 0,
             'per_user_limit' => 5,
-            'valid_from' => 0,
-            'valid_to' => 0,
+            'starts_at' => null,
+            'ends_at' => null,
             'is_active' => 1,
-            'created' => time(),
         ], $attributes));
     }
 
@@ -57,7 +56,7 @@ abstract class OrderTestCase extends CartTestCase
 
     protected function lastTransactionId(User $user): int
     {
-        return (int) DB::table('transaction')->where('user_id', $user->id)->orderByDesc('id')->value('id');
+        return (int) DB::table('orders')->where('user_id', $user->id)->orderByDesc('id')->value('id');
     }
 
     /**

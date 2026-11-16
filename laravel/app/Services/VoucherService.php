@@ -39,16 +39,13 @@ class VoucherService
         if (! $row) {
             return $fail('Mã voucher không tồn tại hoặc đã hết hiệu lực.');
         }
-        if ((int) $row->is_active !== 1) {
+        if (! (bool) $row->is_active) {
             return $fail('Mã voucher đang tạm khóa.');
         }
 
-        $now = time();
-        if ((int) $row->valid_from > 0 && $now < (int) $row->valid_from) {
-            return $fail('Mã voucher chưa đến thời gian áp dụng.');
-        }
-        if ((int) $row->valid_to > 0 && $now > (int) $row->valid_to) {
-            return $fail('Mã voucher đã hết hạn.');
+        $window = $this->windowError($row);
+        if ($window !== null) {
+            return $fail($window);
         }
         if ((int) $row->user_id > 0 && (int) $row->user_id !== $userId) {
             return $fail('Mã voucher không dành cho tài khoản của bạn.');
@@ -100,21 +97,17 @@ class VoucherService
 
         $user = User::query()->find($userId);
         $userTier = $user && isset($user->loyalty_tier) ? (string) $user->loyalty_tier : 'member';
-        $now = time();
 
         $rows = Voucher::query()
             ->where('is_active', 1)
             ->where(function ($q) use ($userId) {
-                $q->where('user_id', 0)->orWhere('user_id', $userId);
+                $q->whereNull('user_id')->orWhere('user_id', $userId);
             })
             ->orderByDesc('id')
             ->get();
 
-        return $rows->filter(function (Voucher $row) use ($now, $userTier) {
-            if ((int) $row->valid_from > 0 && $now < (int) $row->valid_from) {
-                return false;
-            }
-            if ((int) $row->valid_to > 0 && $now > (int) $row->valid_to) {
+        return $rows->filter(function (Voucher $row) use ($userTier) {
+            if ($this->windowError($row) !== null) {
                 return false;
             }
             $limit = (int) $row->usage_limit;
@@ -130,13 +123,12 @@ class VoucherService
     {
         VoucherUse::query()->create([
             'voucher_id' => $voucherId,
-            'user_id' => $userId,
-            'transaction_id' => $transactionId,
+            'user_id' => $userId > 0 ? $userId : null,
+            'order_id' => $transactionId,
             'discount_amount' => $discountAmount,
-            'created' => time(),
         ]);
 
-        DB::table('voucher')->where('id', $voucherId)->update([
+        DB::table('vouchers')->where('id', $voucherId)->update([
             'used_count' => DB::raw('used_count + 1'),
         ]);
     }
@@ -148,7 +140,7 @@ class VoucherService
             return;
         }
 
-        $uses = VoucherUse::query()->where('transaction_id', $transactionId)->get();
+        $uses = VoucherUse::query()->where('order_id', $transactionId)->get();
         foreach ($uses as $use) {
             $voucher = Voucher::query()->find((int) $use->voucher_id);
             if ($voucher) {
@@ -157,6 +149,18 @@ class VoucherService
             }
         }
 
-        VoucherUse::query()->where('transaction_id', $transactionId)->delete();
+        VoucherUse::query()->where('order_id', $transactionId)->delete();
+    }
+
+    private function windowError(Voucher $row): ?string
+    {
+        if ($row->starts_at !== null && now()->lt($row->starts_at)) {
+            return 'Mã voucher chưa đến thời gian áp dụng.';
+        }
+        if ($row->ends_at !== null && now()->gt($row->ends_at)) {
+            return 'Mã voucher đã hết hạn.';
+        }
+
+        return null;
     }
 }

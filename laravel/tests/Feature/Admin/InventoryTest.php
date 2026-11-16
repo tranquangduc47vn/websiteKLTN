@@ -38,20 +38,21 @@ class InventoryTest extends AdminTestCase
         }
         if ($this->orderIds !== []) {
             DB::table('stock_movements')->where('reference_type', 'order')->whereIn('reference_id', $this->orderIds)->delete();
-            DB::table('order')->whereIn('transaction_id', $this->orderIds)->delete();
-            DB::table('transaction')->whereIn('id', $this->orderIds)->delete();
+            DB::table('order_items')->whereIn('order_id', $this->orderIds)->delete();
+            DB::table('orders')->whereIn('id', $this->orderIds)->delete();
         }
         if ($this->productIds !== []) {
-            DB::table('stock_movements')->whereIn('product_id', $this->productIds)->delete();
+            $variantIds = DB::table('product_variants')->whereIn('product_id', $this->productIds)->pluck('id');
+            DB::table('stock_movements')->whereIn('variant_id', $variantIds)->delete();
             DB::table('product_variants')->whereIn('product_id', $this->productIds)->delete();
-            DB::table('product')->whereIn('id', $this->productIds)->delete();
+            DB::table('products')->whereIn('id', $this->productIds)->delete();
         }
         if ($this->supplierIds !== []) {
             DB::table('suppliers')->whereIn('id', $this->supplierIds)->delete();
         }
         if ($this->userIds !== []) {
-            DB::table('user_saved_cart')->whereIn('user_id', $this->userIds)->delete();
-            DB::table('user')->whereIn('id', $this->userIds)->delete();
+            DB::table('user_saved_carts')->whereIn('user_id', $this->userIds)->delete();
+            DB::table('users')->whereIn('id', $this->userIds)->delete();
         }
         parent::tearDown();
     }
@@ -65,10 +66,8 @@ class InventoryTest extends AdminTestCase
         $customer = User::query()->create([
             'name' => 'B11 Guard',
             'email' => 'b11guard.' . Str::lower(Str::random(6)) . '@example.test',
-            'password' => LegacyPassword::hash('CustomerPass1'),
-            'phone' => '0900000091',
-            'address' => 'HN',
-            'created' => time(),
+            'password_hash' => LegacyPassword::hash('CustomerPass1'),
+            'created_at' => now(),
         ]);
         $this->userIds[] = (int) $customer->id;
         $this->actingAs($customer, 'web');
@@ -231,23 +230,22 @@ class InventoryTest extends AdminTestCase
             'total_amount' => 5000,
             'receipt_date' => date('Y-m-d'),
             'created_by' => $admin->id,
-            'confirmed_by' => 0,
-            'confirmed_at' => 0,
-            'cancelled_at' => 0,
-            'created' => time(),
-            'updated' => time(),
+            'confirmed_by' => null,
+            'confirmed_at' => null,
+            'cancelled_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
         $this->receiptIds[] = $draftId;
         DB::table('stock_receipt_items')->insert([
             'receipt_id' => $draftId,
             'variant_id' => $variant->id,
-            'product_id' => $product->id,
-            'size' => 'M',
-            'color' => 'Đen',
+            'sku' => (string) $variant->sku,
+            'size_name' => 'M',
+            'color_name' => 'Đen',
             'qty' => 1,
             'unit_cost' => 5000,
-            'subtotal' => 5000,
-            'note' => '',
+            'line_total' => 5000,
         ]);
         $this->post('/admin/stock-receipts/confirm', ['receipt_id' => $draftId])->assertSessionHas('message_success');
         $this->assertSame(8, (int) $variant->fresh()->stock);
@@ -276,10 +274,8 @@ class InventoryTest extends AdminTestCase
         $buyer = User::query()->create([
             'name' => 'B11 Buyer',
             'email' => 'b11buyer.' . Str::lower(Str::random(6)) . '@example.test',
-            'password' => LegacyPassword::hash('BuyerPass1'),
-            'phone' => '0900222333',
-            'address' => 'Ha Noi',
-            'created' => time(),
+            'password_hash' => LegacyPassword::hash('BuyerPass1'),
+            'created_at' => now(),
         ]);
         $this->userIds[] = (int) $buyer->id;
         $product = $this->makeProduct('B11CHK' . Str::upper(Str::random(3)), 6, 5);
@@ -291,15 +287,15 @@ class InventoryTest extends AdminTestCase
         $this->post('/thanh-toan', [
             'name' => $buyer->name,
             'email' => $buyer->email,
-            'phone' => $buyer->phone,
-            'address' => $buyer->address,
+            'phone' => '0900111222',
+            'address' => '123 Duong Test',
             'payment' => 'COD',
             'price' => 1,
             'subtotal' => 1,
             'total' => 1,
         ])->assertRedirect();
 
-        $orderId = (int) DB::table('transaction')->where('user_id', $buyer->id)->orderByDesc('id')->value('id');
+        $orderId = (int) DB::table('orders')->where('user_id', $buyer->id)->orderByDesc('id')->value('id');
         $this->orderIds[] = $orderId;
         $this->assertSame(4, (int) $variant->fresh()->stock);
         $this->assertSame(4, (int) $product->fresh()->quantity);
@@ -309,11 +305,11 @@ class InventoryTest extends AdminTestCase
         $this->post('/thanh-toan', [
             'name' => $buyer->name,
             'email' => $buyer->email,
-            'phone' => $buyer->phone,
-            'address' => $buyer->address,
+            'phone' => '0900111222',
+            'address' => '123 Duong Test',
             'payment' => 'COD',
         ]);
-        $this->assertSame(1, DB::table('transaction')->where('user_id', $buyer->id)->count());
+        $this->assertSame(1, DB::table('orders')->where('user_id', $buyer->id)->count());
         $this->assertSame(4, (int) $variant->fresh()->stock);
 
         $this->actingAs($this->makeAdmin(Admin::ROLE_ADMIN), 'admin');
@@ -322,7 +318,7 @@ class InventoryTest extends AdminTestCase
         $this->assertSame(6, (int) $product->fresh()->quantity);
         $this->post('/admin/orders/cancel/' . $orderId, ['reason' => 'B11 lan 2']);
         $this->assertSame(6, (int) $variant->fresh()->stock);
-        $this->assertSame(4, (int) DB::table('transaction')->where('id', $orderId)->value('status'));
+        $this->assertSame('cancelled', DB::table('orders')->where('id', $orderId)->value('status'));
     }
 
     public function test_posts_without_csrf_are_rejected(): void
@@ -344,25 +340,17 @@ class InventoryTest extends AdminTestCase
     private function makeProduct(string $sku, int $stock, int $min): Product
     {
         $product = Product::query()->create([
-            'catalog_id' => (int) DB::table('catalog')->orderBy('id')->value('id'),
+            'category_id' => (int) DB::table('categories')->orderBy('id')->value('id'),
             'name' => 'B11 Product ' . $sku,
             'content' => '',
-            'price' => 100000,
-            'discount' => 0,
-            'discount_type' => 'amount',
-            'discount_percent' => 0,
-            'image_link' => 'b11-none.jpg',
-            'image_list' => '[]',
-            'view' => 0,
-            'buyed' => 0,
-            'quantity' => $stock,
-            'rate_total' => 0,
-            'rate_count' => 0,
-            'created' => time(),
-            'code' => '',
-            'status' => 1,
-            'color' => 'Đen',
-            'size' => 'M',
+            'list_price' => 100000,
+            'discount_amount' => 0,
+            'code' => 'B11' . strtoupper(Str::random(6)),
+            'status' => 'active',
+            'view_count' => 0,
+            'sold_count' => 0,
+            'rating_total' => 0,
+            'rating_count' => 0,
         ]);
         $this->addVariant($product, $sku, $stock, $min);
         $this->productIds[] = (int) $product->id;
@@ -375,16 +363,12 @@ class InventoryTest extends AdminTestCase
         return ProductVariant::query()->create([
             'product_id' => $product->id,
             'sku' => $sku,
-            'color' => 'Đen',
-            'size' => $size,
-            'price' => 100000,
+            'color_name' => 'Đen',
+            'size_name' => $size,
             'cost_price' => 0,
             'stock' => $stock,
             'min_stock' => $min,
-            'image' => '',
-            'status' => 1,
-            'created' => time(),
-            'updated' => time(),
+            'status' => 'active',
         ]);
     }
 }

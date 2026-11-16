@@ -366,9 +366,29 @@
 	box-shadow: none;
 }
 
+.wf-chrome-2026 .wf-chrome-popover--menu li form {
+	margin: 0;
+}
+
+.wf-chrome-2026 .wf-chrome-popover--menu li .wf-chrome-logout {
+	display: block;
+	width: 100%;
+	padding: 10px 16px;
+	color: var(--wf-muted);
+	background: transparent;
+	text-align: left;
+	font: inherit;
+	font-size: 13px;
+	border: none;
+	cursor: pointer;
+}
+
 .wf-chrome-2026 .wf-chrome-popover--menu li a:hover,
 .wf-chrome-2026 .wf-chrome-popover--menu li a:focus,
-.wf-chrome-2026 .wf-chrome-popover--menu li a:focus-visible {
+.wf-chrome-2026 .wf-chrome-popover--menu li a:focus-visible,
+.wf-chrome-2026 .wf-chrome-popover--menu li .wf-chrome-logout:hover,
+.wf-chrome-2026 .wf-chrome-popover--menu li .wf-chrome-logout:focus,
+.wf-chrome-2026 .wf-chrome-popover--menu li .wf-chrome-logout:focus-visible {
 	color: var(--wf-accent);
 	background: #f7f7f7;
 	text-decoration: none;
@@ -379,7 +399,10 @@
 
 .wf-chrome-2026 .jm-user-popover li a:hover,
 .wf-chrome-2026 .jm-user-popover li a:focus,
-.wf-chrome-2026 .jm-user-popover li a:focus-visible {
+.wf-chrome-2026 .jm-user-popover li a:focus-visible,
+.wf-chrome-2026 .jm-user-popover li .wf-chrome-logout:hover,
+.wf-chrome-2026 .jm-user-popover li .wf-chrome-logout:focus,
+.wf-chrome-2026 .jm-user-popover li .wf-chrome-logout:focus-visible {
 	color: var(--wf-accent);
 	background: #f7f7f7 !important;
 	text-decoration: none !important;

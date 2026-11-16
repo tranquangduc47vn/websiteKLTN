@@ -13,7 +13,7 @@ namespace App\Models;
  */
 class Banner extends BaseModel
 {
-    protected $table = 'banner';
+    protected $table = 'banners';
 
     protected function casts(): array
     {

@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\LegacyTimestamps;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -30,9 +29,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class StockMovement extends BaseModel
 {
-    use LegacyTimestamps;
 
     protected $table = 'stock_movements';
+
+    public const UPDATED_AT = null;
+
+    public $timestamps = true;
 
     public const TYPE_IN = 'in';
     public const TYPE_OUT = 'out';
@@ -46,21 +48,13 @@ class StockMovement extends BaseModel
     protected function casts(): array
     {
         return [
-            'id' => 'int',
-            'product_id' => 'int',
             'qty_change' => 'int',
             'before_qty' => 'int',
             'after_qty' => 'int',
             'reference_id' => 'int',
             'created_by' => 'int',
-            'created' => 'int',
             'variant_id' => 'int',
         ];
-    }
-
-    public function product(): BelongsTo
-    {
-        return $this->belongsTo(Product::class, 'product_id');
     }
 
     public function variant(): BelongsTo
@@ -88,8 +82,13 @@ class StockMovement extends BaseModel
         return $query->where('variant_id', $variantId);
     }
 
-    public function createdAt(): ?\Illuminate\Support\Carbon
+    public function getColorAttribute(): string
     {
-        return $this->legacyTimestamp('created');
+        return (string) ($this->attributes['color_name'] ?? '');
+    }
+
+    public function getSizeAttribute(): string
+    {
+        return (string) ($this->attributes['size_name'] ?? '');
     }
 }

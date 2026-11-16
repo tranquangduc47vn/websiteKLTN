@@ -28,10 +28,15 @@ class Shop
         return url($path);
     }
 
-    /** CI3 site_asset_url(): assets/site/... */
+    /** CI3 site_asset_url(): assets/site/... View nối thêm css/ nên URL rỗng phải có dấu / cuối. */
     public static function assetUrl(string $path = ''): string
     {
-        return url('assets/site/' . ltrim($path, '/'));
+        $url = url('assets/site/' . ltrim($path, '/'));
+        if ($path === '' && ! str_ends_with($url, '/')) {
+            $url .= '/';
+        }
+
+        return $url;
     }
 
     /** CI3 upload_image_url(). */

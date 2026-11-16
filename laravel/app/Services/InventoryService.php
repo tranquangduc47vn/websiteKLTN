@@ -5,14 +5,12 @@ namespace App\Services;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\StockMovement;
-use App\Services\VariantStockService;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Port application/libraries/Inventory_service.php (deduct_for_order / restore_for_order)
- * + Product_service::sync_product_quantity_cache().
- *
- * Luôn ghi stock_movements. Trừ kho dùng UPDATE ... WHERE stock >= qty (không tin stock client).
+ * Tồn kho chỉ nằm ở product_variants.stock.
+ * Checkout trừ stock và ghi stock_movements type out. Hủy đơn hoàn stock và ghi type in.
+ * Phiếu nhập ghi type in. Kiểm kê ghi type adjust. Không ghi products.quantity.
  */
 class InventoryService
 {
@@ -35,59 +33,42 @@ class InventoryService
         }
 
         $before = (int) $variant->stock;
-        $now = time();
+        if ($before < $qty) {
+            $product = Product::query()->find((int) $variant->product_id);
 
-        $affected = ProductVariant::query()
-            ->where('id', $variantId)
-            ->where('stock', '>=', $qty)
-            ->update([
-                'stock' => DB::raw('stock - ' . $qty),
-                'updated' => $now,
-            ]);
-
-        if ($affected <= 0) {
-            if (config('stock.allow_negative_stock')) {
-                $after = $before - $qty;
-                $variant->stock = $after;
-                $variant->updated = $now;
-                $variant->save();
-            } else {
-                $product = Product::query()->find((int) $variant->product_id);
-
-                return [
-                    'ok' => false,
-                    'message' => $this->stock->stockMessage(
-                        $product ? (string) $product->name : 'Sản phẩm',
-                        (string) $variant->size,
-                        (string) $variant->color,
-                        $before
-                    ),
-                    'stock' => $before,
-                    'variant_id' => $variantId,
-                ];
-            }
-        } else {
-            $after = $before - $qty;
+            return [
+                'ok' => false,
+                'message' => $this->stock->stockMessage(
+                    $product ? (string) $product->name : 'Sản phẩm',
+                    (string) $variant->size_name,
+                    (string) $variant->color_name,
+                    $before
+                ),
+                'stock' => $before,
+                'variant_id' => $variantId,
+            ];
         }
 
-        StockMovement::query()->create([
-            'variant_id' => $variantId,
-            'product_id' => (int) $variant->product_id,
-            'size' => (string) $variant->size,
-            'color' => (string) $variant->color,
-            'movement_type' => StockMovement::TYPE_OUT,
-            'qty_change' => -$qty,
-            'before_qty' => $before,
-            'after_qty' => $after,
-            'reference_type' => StockMovement::REFERENCE_ORDER,
-            'reference_id' => $referenceId,
-            'note' => $note !== '' ? $note : 'Xuất kho đơn hàng #' . $referenceId,
-            'created_by' => $actorId,
-            'created' => $now,
+        $after = $before - $qty;
+        ProductVariant::query()->where('id', $variantId)->update([
+            'stock' => $after,
         ]);
+
+        $this->writeMovement(
+            $variant,
+            StockMovement::TYPE_OUT,
+            -$qty,
+            $before,
+            $after,
+            StockMovement::REFERENCE_ORDER,
+            $referenceId,
+            $note !== '' ? $note : 'Xuất kho đơn hàng #' . $referenceId,
+            $actorId
+        );
 
         return [
             'ok' => true,
+            'message' => '',
             'product_id' => (int) $variant->product_id,
             'variant_id' => $variantId,
         ];
@@ -109,36 +90,25 @@ class InventoryService
 
         $before = (int) $variant->stock;
         $after = $before + $qty;
-        $now = time();
         $variant->stock = $after;
-        $variant->updated = $now;
         $variant->save();
 
-        StockMovement::query()->create([
-            'variant_id' => $variantId,
-            'product_id' => (int) $variant->product_id,
-            'size' => (string) $variant->size,
-            'color' => (string) $variant->color,
-            'movement_type' => StockMovement::TYPE_IN,
-            'qty_change' => $qty,
-            'before_qty' => $before,
-            'after_qty' => $after,
-            'reference_type' => StockMovement::REFERENCE_ORDER,
-            'reference_id' => $referenceId,
-            'note' => $note !== '' ? $note : 'Hoàn kho đơn hàng #' . $referenceId,
-            'created_by' => $actorId,
-            'created' => $now,
-        ]);
-
-        $this->syncProductQuantityCache((int) $variant->product_id);
+        $this->writeMovement(
+            $variant,
+            StockMovement::TYPE_IN,
+            $qty,
+            $before,
+            $after,
+            StockMovement::REFERENCE_ORDER,
+            $referenceId,
+            $note !== '' ? $note : 'Hoàn kho đơn hàng #' . $referenceId,
+            $actorId
+        );
 
         return ['ok' => true];
     }
 
     /**
-     * Kiểm kê: đặt tồn biến thể về một số mới và ghi movement adjust.
-     * CI3 Inventory_service::adjust_stock(). reference_type = adjustment.
-     *
      * @return array{ok: bool, message: string}
      */
     public function adjustStock(int $variantId, int $newQty, string $note, int $adminId): array
@@ -150,14 +120,13 @@ class InventoryService
         if ($note === '') {
             return ['ok' => false, 'message' => 'Vui lòng nhập lý do điều chỉnh.'];
         }
-        if ($newQty < 0 && ! config('stock.allow_negative_stock')) {
+        if ($newQty < 0) {
             return ['ok' => false, 'message' => 'Không cho phép tồn kho âm.'];
         }
 
         $result = ['ok' => false, 'message' => 'Điều chỉnh thất bại.'];
-        $productId = 0;
 
-        DB::transaction(function () use ($variantId, $newQty, $note, $adminId, &$result, &$productId) {
+        DB::transaction(function () use ($variantId, $newQty, $note, $adminId, &$result) {
             $variant = ProductVariant::query()->where('id', $variantId)->lockForUpdate()->first();
             if (! $variant) {
                 $result = ['ok' => false, 'message' => 'Biến thể không tồn tại.'];
@@ -173,41 +142,29 @@ class InventoryService
                 return;
             }
 
-            $now = time();
             $variant->stock = $newQty;
-            $variant->updated = $now;
             $variant->save();
 
-            StockMovement::query()->create([
-                'variant_id' => $variantId,
-                'product_id' => (int) $variant->product_id,
-                'size' => (string) $variant->size,
-                'color' => (string) $variant->color,
-                'movement_type' => StockMovement::TYPE_ADJUST,
-                'qty_change' => $delta,
-                'before_qty' => $before,
-                'after_qty' => $newQty,
-                'reference_type' => StockMovement::REFERENCE_ADJUSTMENT,
-                'reference_id' => 0,
-                'note' => $note,
-                'created_by' => $adminId,
-                'created' => $now,
-            ]);
+            $this->writeMovement(
+                $variant,
+                StockMovement::TYPE_ADJUST,
+                $delta,
+                $before,
+                $newQty,
+                StockMovement::REFERENCE_ADJUSTMENT,
+                null,
+                $note,
+                $adminId
+            );
 
-            $productId = (int) $variant->product_id;
             $result = ['ok' => true, 'message' => 'Đã điều chỉnh tồn kho biến thể ' . $variant->sku . '.'];
         });
-
-        if ($result['ok'] && $productId > 0) {
-            $this->syncProductQuantityCache($productId);
-        }
 
         return $result;
     }
 
     /**
-     * Cộng tồn theo một dòng phiếu nhập. Gọi trong transaction của phiếu.
-     * Ghi movement in / reference receipt. Cập nhật cost_price khi giá nhập > 0.
+     * Cộng tồn theo một dòng phiếu nhập. Ghi movement in.
      *
      * @return array{ok: bool, message?: string, product_id?: int, line_amount?: float}
      */
@@ -221,6 +178,8 @@ class InventoryService
         int $adminId,
         int $now
     ): array {
+        unset($now);
+
         $variant = ProductVariant::query()->where('id', $variantId)->lockForUpdate()->first();
         if (! $variant) {
             return ['ok' => false, 'message' => 'Biến thể không tồn tại trên phiếu.'];
@@ -229,27 +188,22 @@ class InventoryService
         $before = (int) $variant->stock;
         $after = $before + $qty;
         $variant->stock = $after;
-        $variant->updated = $now;
         if ($unitCost > 0) {
             $variant->cost_price = $unitCost;
         }
         $variant->save();
 
-        StockMovement::query()->create([
-            'variant_id' => $variantId,
-            'product_id' => (int) $variant->product_id,
-            'size' => (string) $variant->size,
-            'color' => (string) $variant->color,
-            'movement_type' => StockMovement::TYPE_IN,
-            'qty_change' => $qty,
-            'before_qty' => $before,
-            'after_qty' => $after,
-            'reference_type' => StockMovement::REFERENCE_RECEIPT,
-            'reference_id' => $receiptId,
-            'note' => 'Nhập kho ' . $receiptCode,
-            'created_by' => $adminId,
-            'created' => $now,
-        ]);
+        $this->writeMovement(
+            $variant,
+            StockMovement::TYPE_IN,
+            $qty,
+            $before,
+            $after,
+            StockMovement::REFERENCE_RECEIPT,
+            $receiptId,
+            'Nhập kho ' . $receiptCode,
+            $adminId
+        );
 
         $lineAmount = $subtotal > 0 ? $subtotal : ($unitCost * $qty);
 
@@ -260,16 +214,40 @@ class InventoryService
         ];
     }
 
-    /** CI3 Product_service::sync_product_quantity_cache(): tổng stock biến thể status=1. */
+    /**
+     * Tổng stock biến thể đang bán. Không ghi cột quantity.
+     */
     public function syncProductQuantityCache(int $productId): int
     {
-        $total = (int) ProductVariant::query()
+        return (int) ProductVariant::query()
             ->where('product_id', $productId)
-            ->where('status', 1)
+            ->where('status', ProductVariant::STATUS_ACTIVE)
             ->sum('stock');
+    }
 
-        Product::query()->where('id', $productId)->update(['quantity' => $total]);
-
-        return $total;
+    private function writeMovement(
+        ProductVariant $variant,
+        string $type,
+        int $qtyChange,
+        int $before,
+        int $after,
+        ?string $referenceType,
+        ?int $referenceId,
+        string $note,
+        int $actorId
+    ): void {
+        StockMovement::query()->create([
+            'variant_id' => (int) $variant->id,
+            'color_name' => (string) $variant->color_name,
+            'size_name' => (string) $variant->size_name,
+            'movement_type' => $type,
+            'qty_change' => $qtyChange,
+            'before_qty' => $before,
+            'after_qty' => $after,
+            'reference_type' => $referenceType,
+            'reference_id' => $referenceId,
+            'note' => $note,
+            'created_by' => $actorId > 0 ? $actorId : null,
+        ]);
     }
 }

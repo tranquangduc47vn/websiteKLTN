@@ -2,11 +2,8 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\LegacyTimestamps;
-
 /**
- * Model cho bảng `suppliers`.
- * Timestamp `created`, `updated` dạng INT Unix.
+ * Nhà cung cấp. `created_at` và `updated_at` là DATETIME.
  *
  * @property int $id
  * @property string $code
@@ -16,33 +13,23 @@ use App\Models\Concerns\LegacyTimestamps;
  * @property string $email
  * @property string $address
  * @property string|null $note
- * @property int $status
- * @property int $created
- * @property int $updated
+ * @property string $status
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class Supplier extends BaseModel
 {
-    use LegacyTimestamps;
-
     protected $table = 'suppliers';
+
+    public $timestamps = true;
 
     protected function casts(): array
     {
         return [
             'id' => 'int',
-            'status' => 'int',
-            'created' => 'int',
-            'updated' => 'int',
+            'status' => 'string',
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
         ];
-    }
-
-    public function createdAt(): ?\Illuminate\Support\Carbon
-    {
-        return $this->legacyTimestamp('created');
-    }
-
-    public function updatedAt(): ?\Illuminate\Support\Carbon
-    {
-        return $this->legacyTimestamp('updated');
     }
 }

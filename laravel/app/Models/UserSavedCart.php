@@ -2,39 +2,32 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\LegacyTimestamps;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Model cho bảng `user_saved_cart`.
- *
- * Khóa chính là `user_id` (không phải `id`), 1 dòng / 1 user.
- * `cart_json` chứa giỏ hàng đã lưu (đồng bộ từ session `custom_cart`).
+ * Giỏ đã lưu. Khóa chính `user_id`. Chỉ có `updated_at` DATETIME.
  *
  * @property int $user_id
  * @property string $cart_json
- * @property int $updated
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class UserSavedCart extends BaseModel
 {
-    use LegacyTimestamps;
-
-    protected $table = 'user_saved_cart';
+    protected $table = 'user_saved_carts';
 
     protected $primaryKey = 'user_id';
 
-    /**
-     * PK không phải auto-increment.
-     *
-     * @var bool
-     */
     public $incrementing = false;
+
+    public const CREATED_AT = null;
+
+    public $timestamps = true;
 
     protected function casts(): array
     {
         return [
             'user_id' => 'int',
-            'updated' => 'int',
+            'updated_at' => 'datetime',
         ];
     }
 
@@ -53,10 +46,5 @@ class UserSavedCart extends BaseModel
         $decoded = json_decode((string) $this->cart_json, true);
 
         return is_array($decoded) ? $decoded : [];
-    }
-
-    public function updatedAt(): ?\Illuminate\Support\Carbon
-    {
-        return $this->legacyTimestamp('updated');
     }
 }

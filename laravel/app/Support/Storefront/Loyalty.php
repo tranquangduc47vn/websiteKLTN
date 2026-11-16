@@ -10,7 +10,7 @@ final class Loyalty
     /** @return array<string, int> */
     public static function tierOrder(): array
     {
-        return ['member' => 0, 'silver' => 1, 'gold' => 2, 'vip' => 3];
+        return ['member' => 0, 'silver' => 1, 'gold' => 2, 'diamond' => 3];
     }
 
     public static function tierLabel(mixed $tier): string
@@ -19,7 +19,7 @@ final class Loyalty
             'member' => 'Thành viên',
             'silver' => 'Bạc',
             'gold' => 'Vàng',
-            'vip' => 'VIP',
+            'diamond' => 'Kim cương',
         ];
         $tier = strtolower((string) $tier);
 
@@ -29,7 +29,7 @@ final class Loyalty
     public static function computeTier(int $completedOrders, int $lifetimeSpend): string
     {
         if ($completedOrders >= 25 || $lifetimeSpend >= 50000000) {
-            return 'vip';
+            return 'diamond';
         }
         if ($completedOrders >= 10 || $lifetimeSpend >= 20000000) {
             return 'gold';
@@ -44,8 +44,10 @@ final class Loyalty
     public static function tierMeets(mixed $userTier, mixed $requiredTier): bool
     {
         $order = self::tierOrder();
-        $userTier = isset($order[$userTier]) ? (string) $userTier : 'member';
-        $requiredTier = isset($order[$requiredTier]) ? (string) $requiredTier : 'member';
+        $userTier = $userTier === 'vip' ? 'diamond' : (string) $userTier;
+        $requiredTier = $requiredTier === 'vip' ? 'diamond' : (string) $requiredTier;
+        $userTier = isset($order[$userTier]) ? $userTier : 'member';
+        $requiredTier = isset($order[$requiredTier]) ? $requiredTier : 'member';
 
         return $order[$userTier] >= $order[$requiredTier];
     }
@@ -61,7 +63,7 @@ final class Loyalty
         return match (strtolower((string) $tier)) {
             'silver' => 1.1,
             'gold' => 1.25,
-            'vip' => 1.5,
+            'diamond' => 1.5,
             default => 1.0,
         };
     }

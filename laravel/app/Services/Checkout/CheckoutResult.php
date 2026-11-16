@@ -11,6 +11,7 @@ final class CheckoutResult
     public const REDIRECT_QR = 'qr';
     public const REDIRECT_HOME = 'home';
     public const REDIRECT_USER = 'user';
+    public const REDIRECT_LOGIN = 'login';
 
     /**
      * @param  array<string, mixed>  $data

@@ -3,9 +3,10 @@
 namespace App\Services;
 
 use App\Models\Product;
-use App\Support\HtmlSanitizer;
+use App\Models\ProductImage;
 use App\Models\ProductVariant;
 use App\Support\Admin\ProductImageStore;
+use App\Support\HtmlSanitizer;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -29,39 +30,41 @@ class ProductAdminService
     public function list(array $filters, int $offset): array
     {
         $offset = max(0, $offset);
-        $query = DB::table('product')
-            ->join('catalog', 'catalog.id', '=', 'product.catalog_id');
+        $query = DB::table('products')
+            ->join('categories', 'categories.id', '=', 'products.category_id');
 
         $name = trim((string) ($filters['name'] ?? ''));
         if ($name !== '') {
             $like = '%' . addcslashes($name, '%_\\') . '%';
-            $query->where('product.name', 'like', $like);
+            $query->where('products.name', 'like', $like);
         }
         $catalogId = (int) ($filters['catalog_id'] ?? 0);
         if ($catalogId > 0) {
-            $query->where('product.catalog_id', $catalogId);
+            $query->where('products.category_id', $catalogId);
         }
         $status = (string) ($filters['status'] ?? '');
-        if ($status === '0' || $status === '1') {
-            $query->where('product.status', (int) $status);
+        if (in_array($status, ['0', 'inactive'], true)) {
+            $query->where('products.status', Product::STATUS_INACTIVE);
+        } elseif (in_array($status, ['1', 'active'], true)) {
+            $query->where('products.status', Product::STATUS_ACTIVE);
         }
 
         $total = (int) (clone $query)->count();
         $rows = $query
-            ->orderByDesc('product.id')
+            ->orderByDesc('products.id')
             ->offset($offset)
             ->limit(self::PER_PAGE)
             ->get([
-                'product.id',
-                'product.name',
-                'product.price',
-                'product.discount',
-                'product.image_link',
-                'product.quantity',
-                'product.status',
-                'product.view',
-                'product.buyed',
-                'catalog.name as namecatalog',
+                'products.id',
+                'products.name',
+                'products.list_price as price',
+                'products.discount_amount as discount',
+                'products.status',
+                'products.view_count as view',
+                'products.sold_count as buyed',
+                'categories.name as namecatalog',
+                DB::raw('(SELECT path FROM product_images WHERE product_id = products.id AND variant_id IS NULL AND is_primary = 1 ORDER BY id LIMIT 1) as image_link'),
+                DB::raw("(SELECT COALESCE(SUM(stock),0) FROM product_variants WHERE product_id = products.id AND status = 'active') as quantity"),
             ])
             ->all();
 
@@ -71,12 +74,12 @@ class ProductAdminService
     /** @return list<object> Nhóm parent_id = 1, kèm con. */
     public function catalogTree(): array
     {
-        $parents = DB::table('catalog')->where('parent_id', 1)->orderBy('sort_order')->orderBy('id')->get();
+        $parents = DB::table('categories')->where('parent_id', 1)->orderBy('sort_order')->orderBy('id')->get();
         if ($parents->isEmpty()) {
             return [];
         }
         $ids = $parents->pluck('id')->all();
-        $children = DB::table('catalog')->whereIn('parent_id', $ids)->orderBy('sort_order')->orderBy('id')->get()->groupBy('parent_id');
+        $children = DB::table('categories')->whereIn('parent_id', $ids)->orderBy('sort_order')->orderBy('id')->get()->groupBy('parent_id');
         foreach ($parents as $parent) {
             $parent->sub = ($children[$parent->id] ?? collect())->values()->all();
         }
@@ -87,7 +90,7 @@ class ProductAdminService
     /** @return array<string, string> name => hex */
     public function colors(array $extra = []): array
     {
-        $rows = DB::table('master_colors')->where('status', 1)->orderBy('sort_order')->orderBy('name')->get(['name', 'hex_code']);
+        $rows = DB::table('colors')->where('status', 'active')->orderBy('sort_order')->orderBy('name')->get(['name', 'hex_code']);
         $colors = [];
         if ($rows->isEmpty()) {
             $colors = [
@@ -113,7 +116,7 @@ class ProductAdminService
     /** @return list<string> */
     public function sizes(array $extra = []): array
     {
-        $rows = DB::table('master_sizes')->where('status', 1)->orderBy('sort_order')->orderBy('name')->pluck('name');
+        $rows = DB::table('sizes')->where('status', 'active')->orderBy('sort_order')->orderBy('name')->pluck('name');
         $sizes = $rows->isEmpty() ? ['S', 'M', 'L', 'XL', 'XXL'] : $rows->map(fn ($name) => (string) $name)->all();
         foreach ($extra as $name) {
             $name = trim((string) $name);
@@ -184,28 +187,21 @@ class ProductAdminService
             $product = DB::transaction(function () use ($input, $main, $galleryNames, $price, $discount, $colors, $sizes) {
                 $product = Product::query()->create([
                     'name' => (string) $input['name'],
-                    'image_link' => $main,
-                    'image_list' => json_encode($galleryNames),
                     'content' => HtmlSanitizer::clean((string) ($input['content'] ?? '')),
-                    'catalog_id' => (int) $input['catalog_id'],
-                    'price' => $price,
-                    'discount' => $discount['discount'],
-                    'discount_type' => $discount['discount_type'],
-                    'discount_percent' => $discount['discount_percent'],
-                    'color' => $this->csv($colors),
-                    'size' => $this->csv($sizes),
-                    'quantity' => 0,
-                    'status' => 1,
-                    'view' => 0,
-                    'buyed' => 0,
-                    'rate_total' => 0,
-                    'rate_count' => 0,
-                    'code' => '',
-                    'created' => time(),
+                    'category_id' => (int) $input['catalog_id'],
+                    'list_price' => $price,
+                    'discount_amount' => $discount['discount'],
+                    'status' => Product::STATUS_ACTIVE,
+                    'view_count' => 0,
+                    'sold_count' => 0,
+                    'rating_total' => 0,
+                    'rating_count' => 0,
+                    'code' => 'TMP' . bin2hex(random_bytes(6)),
                 ]);
                 $code = 'SP' . str_pad((string) $product->id, 5, '0', STR_PAD_LEFT);
                 $product->update(['code' => $code]);
-                $this->syncVariants($product->id, $colors, $sizes, $price, 0, $price);
+                $this->replaceImages((int) $product->id, $main, $galleryNames);
+                $this->syncVariants($product->id, $colors, $sizes, 0);
 
                 return $product->fresh();
             });
@@ -232,9 +228,12 @@ class ProductAdminService
         $sizes = $this->normalizeList($input['size'] ?? []);
 
         $main = $this->images->sanitize($input['product_image_main'] ?? $product->image_link);
-        $list = json_decode((string) ($input['product_image_list'] ?? $product->image_list), true);
+        $list = $input['product_image_list'] ?? null;
+        if (is_string($list)) {
+            $list = json_decode($list, true);
+        }
         if (! is_array($list)) {
-            $list = [];
+            $list = $product->imageList();
         }
         $list = array_values(array_unique(array_filter(array_map(fn ($name) => $this->images->sanitize($name), $list))));
         $list = array_values(array_filter($list, fn ($name) => $name !== '' && $name !== $main));
@@ -274,23 +273,20 @@ class ProductAdminService
 
         $data = [
             'name' => (string) $input['name'],
-            'catalog_id' => (int) $input['catalog_id'],
-            'price' => $price,
-            'discount' => $discount['discount'],
-            'discount_type' => $discount['discount_type'],
-            'discount_percent' => $discount['discount_percent'],
+            'category_id' => (int) $input['catalog_id'],
+            'list_price' => $price,
+            'discount_amount' => $discount['discount'],
             'content' => HtmlSanitizer::clean((string) ($input['content'] ?? '')),
-            'color' => $this->csv($colors),
-            'size' => $this->csv($sizes),
-            'status' => ((string) ($input['status'] ?? '1') === '0') ? 0 : 1,
-            'image_link' => $main !== '' ? $main : '',
-            'image_list' => json_encode($list),
+            'status' => in_array((string) ($input['status'] ?? '1'), ['0', 'inactive'], true)
+                ? Product::STATUS_INACTIVE
+                : Product::STATUS_ACTIVE,
         ];
 
         try {
-            DB::transaction(function () use ($product, $data, $colors, $sizes, $price, $oldPrice, $input) {
+            DB::transaction(function () use ($product, $data, $colors, $sizes, $main, $list, $input) {
                 $product->update($data);
-                $this->syncVariants($product->id, $colors, $sizes, $price, 0, $oldPrice);
+                $this->replaceImages((int) $product->id, $main, $list);
+                $this->syncVariants($product->id, $colors, $sizes, 0);
                 $this->saveVariantEdits($product->id, $input['variant'] ?? []);
             });
         } catch (\Throwable $e) {
@@ -326,19 +322,16 @@ class ProductAdminService
                 if ($id <= 0) {
                     continue;
                 }
-                $product = Product::query()->find($id);
+                $product = Product::query()->with('images')->find($id);
                 if (! $product) {
                     continue;
                 }
-                $files[] = (string) $product->image_link;
-                $list = json_decode((string) $product->image_list, true);
-                if (is_array($list)) {
-                    foreach ($list as $name) {
-                        $files[] = (string) $name;
-                    }
+                foreach ($product->images as $image) {
+                    $files[] = (string) $image->path;
                 }
-                DB::table('order')->where('product_id', $id)->delete();
-                DB::table('product_review')->where('product_id', $id)->delete();
+                DB::table('order_items')->where('product_id', $id)->delete();
+                DB::table('product_reviews')->where('product_id', $id)->delete();
+                DB::table('product_images')->where('product_id', $id)->delete();
                 DB::table('product_variants')->where('product_id', $id)->delete();
                 $product->delete();
                 $deleted++;
@@ -358,7 +351,7 @@ class ProductAdminService
      * @param  list<string>  $colors
      * @param  list<string>  $sizes
      */
-    public function syncVariants(int $productId, array $colors, array $sizes, float $basePrice, float $costPrice, float $oldBasePrice): void
+    public function syncVariants(int $productId, array $colors, array $sizes, float $costPrice): void
     {
         $colors = $this->normalizeList($colors);
         $sizes = $this->normalizeList($sizes);
@@ -370,7 +363,6 @@ class ProductAdminService
         }
 
         $minStock = (int) config('stock.default_min_stock', 5);
-        $now = time();
         $valid = [];
 
         foreach ($colors as $color) {
@@ -379,58 +371,40 @@ class ProductAdminService
                 $valid[$key] = true;
                 $existing = ProductVariant::query()
                     ->where('product_id', $productId)
-                    ->where('color', $color)
-                    ->where('size', $size)
+                    ->where('color_name', $color)
+                    ->where('size_name', $size)
                     ->first();
                 if ($existing) {
-                    $patch = ['updated' => $now];
-                    if (abs((float) $existing->price - $oldBasePrice) < 0.01) {
-                        $patch['price'] = $basePrice;
-                    }
-                    if ((int) $existing->status !== 1) {
-                        $patch['status'] = 1;
-                    }
-                    if (count($patch) > 1) {
-                        $existing->update($patch);
+                    if ((string) $existing->status !== ProductVariant::STATUS_ACTIVE) {
+                        $existing->update(['status' => ProductVariant::STATUS_ACTIVE]);
                     }
                     continue;
                 }
                 ProductVariant::query()->create([
                     'product_id' => $productId,
                     'sku' => $this->generateSku($productId, $color, $size),
-                    'color' => $color,
-                    'size' => $size,
-                    'price' => $basePrice,
+                    'color_name' => $color,
+                    'size_name' => $size,
                     'cost_price' => max(0, $costPrice),
                     'stock' => 0,
                     'min_stock' => $minStock,
-                    'image' => '',
-                    'status' => 1,
-                    'created' => $now,
-                    'updated' => $now,
+                    'status' => ProductVariant::STATUS_ACTIVE,
                 ]);
             }
         }
 
         $rows = ProductVariant::query()->where('product_id', $productId)->get();
         foreach ($rows as $row) {
-            $key = (string) $row->color . '||' . (string) $row->size;
-            if (! isset($valid[$key]) && (int) $row->status === 1) {
-                $row->update(['status' => 0, 'updated' => $now]);
+            $key = (string) $row->color_name . '||' . (string) $row->size_name;
+            if (! isset($valid[$key]) && (string) $row->status === ProductVariant::STATUS_ACTIVE) {
+                $row->update(['status' => ProductVariant::STATUS_INACTIVE]);
             }
         }
-
-        Product::query()->where('id', $productId)->update([
-            'color' => $this->csv($colors),
-            'size' => $this->csv($sizes),
-        ]);
-        $this->syncQuantity($productId);
     }
 
     /** @param  array<int|string, mixed>  $raw */
     private function saveVariantEdits(int $productId, array $raw): void
     {
-        $now = time();
         foreach ($raw as $variantId => $fields) {
             $variantId = (int) $variantId;
             if ($variantId <= 0 || ! is_array($fields)) {
@@ -440,13 +414,7 @@ class ProductAdminService
             if (! $variant || (int) $variant->product_id !== $productId) {
                 continue;
             }
-            $update = ['updated' => $now];
-            if (isset($fields['price'])) {
-                $price = self::parsePrice($fields['price']);
-                if ($price >= 0) {
-                    $update['price'] = $price;
-                }
-            }
+            $update = [];
             if (isset($fields['cost_price'])) {
                 $cost = self::parsePrice($fields['cost_price']);
                 if ($cost >= 0) {
@@ -457,22 +425,15 @@ class ProductAdminService
                 $update['min_stock'] = max(0, (int) $fields['min_stock']);
             }
             if (isset($fields['status'])) {
-                $update['status'] = ((string) $fields['status'] === '1') ? 1 : 0;
+                $status = (string) $fields['status'];
+                $update['status'] = in_array($status, ['0', 'inactive'], true)
+                    ? ProductVariant::STATUS_INACTIVE
+                    : ProductVariant::STATUS_ACTIVE;
             }
-            if (count($update) > 1) {
+            if ($update !== []) {
                 $variant->update($update);
             }
         }
-        $this->syncQuantity($productId);
-    }
-
-    private function syncQuantity(int $productId): void
-    {
-        $total = (int) ProductVariant::query()
-            ->where('product_id', $productId)
-            ->where('status', 1)
-            ->sum('stock');
-        Product::query()->where('id', $productId)->update(['quantity' => $total]);
     }
 
     private function generateSku(int $productId, string $color, string $size): string
@@ -530,12 +491,42 @@ class ProductAdminService
             return false;
         }
 
-        return DB::table('product')
-            ->where('id', '!=', $exceptProductId)
-            ->where(function ($query) use ($filename) {
-                $query->where('image_link', $filename)
-                    ->orWhere('image_list', 'like', '%' . addcslashes($filename, '%_\\') . '%');
-            })
+        return DB::table('product_images')
+            ->where('product_id', '!=', $exceptProductId)
+            ->where('path', $filename)
             ->exists();
+    }
+
+    /**
+     * @param  list<string>  $gallery
+     */
+    private function replaceImages(int $productId, string $main, array $gallery): void
+    {
+        ProductImage::query()->where('product_id', $productId)->whereNull('variant_id')->delete();
+        $sort = 0;
+        if ($main !== '') {
+            ProductImage::query()->create([
+                'product_id' => $productId,
+                'variant_id' => null,
+                'path' => $main,
+                'sort_order' => $sort,
+                'is_primary' => 1,
+            ]);
+            $sort++;
+        }
+        foreach ($gallery as $path) {
+            $path = (string) $path;
+            if ($path === '' || $path === $main) {
+                continue;
+            }
+            ProductImage::query()->create([
+                'product_id' => $productId,
+                'variant_id' => null,
+                'path' => $path,
+                'sort_order' => $sort,
+                'is_primary' => 0,
+            ]);
+            $sort++;
+        }
     }
 }

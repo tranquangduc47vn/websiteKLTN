@@ -56,12 +56,12 @@ class AccountService
 
     public function changePassword(User $user, string $oldPassword, string $newPassword): AccountResult
     {
-        $verified = LegacyPassword::verify($oldPassword, (string) $user->password);
+        $verified = LegacyPassword::verify($oldPassword, (string) $user->password_hash);
         if (! $verified['verified']) {
             return new AccountResult(false, 'Mật khẩu hiện tại không đúng.', '#jm-account-profile');
         }
 
-        $user->password = LegacyPassword::hash($newPassword);
+        $user->password_hash = LegacyPassword::hash($newPassword);
         $user->save();
 
         return new AccountResult(true, 'Đã đổi mật khẩu thành công.', '#jm-account-profile');
@@ -92,7 +92,6 @@ class AccountService
             'phone_label' => trim($label),
             'phone_number' => $number,
             'is_default' => $makeDefault ? 1 : 0,
-            'created' => time(),
         ]);
 
         $this->syncPrimaryPhone($userId);
@@ -176,7 +175,6 @@ class AccountService
             'ward_id' => trim($wardId),
             'address_line' => $addressLine,
             'is_default' => $makeDefault ? 1 : 0,
-            'created' => time(),
         ]);
 
         $this->syncPrimaryAddress($userId);
@@ -226,7 +224,16 @@ class AccountService
         return new AccountResult(true, 'Đã cập nhật địa chỉ mặc định.', '#addresses');
     }
 
-    public function ownedTransaction(User $user, int $transactionId): ?Transaction
+    /**
+     * Đơn đã có user_id chỉ thuộc đúng tài khoản đó.
+     * Email nhập lúc đặt hàng không phải bằng chứng sở hữu.
+     * Đơn lịch sử user_id NULL không được gán theo email. Chỉ session
+     * checkout (order_access_ids) của trình duyệt vừa đặt đơn mới mở được,
+     * và không ghi user_id vào dòng lịch sử.
+     *
+     * @param  array<int|string, mixed>|null  $sessionAccess
+     */
+    public function ownedTransaction(User $user, int $transactionId, ?array $sessionAccess = null): ?Transaction
     {
         if ($transactionId <= 0) {
             return null;
@@ -237,15 +244,29 @@ class AccountService
             return null;
         }
 
-        $userId = (int) $user->id;
-        if ($userId > 0 && (int) $transaction->user_id === $userId) {
+        $ownerId = (int) $transaction->user_id;
+        if ($ownerId > 0) {
+            return $ownerId === (int) $user->id ? $transaction : null;
+        }
+
+        if ($this->sessionOwnsUnassignedOrder($sessionAccess, $transactionId)) {
             return $transaction;
         }
 
-        $email = trim((string) $user->email);
-        $txEmail = trim((string) $transaction->user_email);
+        return null;
+    }
 
-        return ($email !== '' && strcasecmp($email, $txEmail) === 0) ? $transaction : null;
+    /**
+     * @param  array<int|string, mixed>|null  $sessionAccess
+     */
+    private function sessionOwnsUnassignedOrder(?array $sessionAccess, int $transactionId): bool
+    {
+        if (! is_array($sessionAccess)) {
+            return false;
+        }
+
+        return array_key_exists($transactionId, $sessionAccess)
+            || array_key_exists((string) $transactionId, $sessionAccess);
     }
 
     /**
@@ -254,6 +275,7 @@ class AccountService
     public function paginateOrders(User $user, string $status, int $page): LengthAwarePaginator
     {
         $query = Transaction::query()->where('user_id', (int) $user->id);
+        $status = self::orderStatus($status);
         if ($status !== '') {
             $query->where('status', $status);
         }
@@ -267,7 +289,6 @@ class AccountService
 
         return $query
             ->orderByDesc('id')
-            ->select(['id', 'created', 'user_phone', 'amount', 'status', 'reason'])
             ->paginate(self::ORDERS_PER_PAGE, ['*'], 'order_page', $page)
             ->withQueryString()
             ->setPath(url('user'));
@@ -279,8 +300,8 @@ class AccountService
     public function orderLines(int $transactionId): array
     {
         $lines = OrderItem::query()
-            ->with('product:id,name,image_link')
-            ->where('transaction_id', $transactionId)
+            ->with('product')
+            ->where('order_id', $transactionId)
             ->get();
 
         $items = [];
@@ -290,7 +311,7 @@ class AccountService
                 'order_id' => (int) $line->id,
                 'product_id' => (int) $line->product_id,
                 'product' => $product,
-                'name' => $product ? (string) $product->name : ('Sản phẩm #' . (int) $line->product_id),
+                'name' => $product ? (string) $product->name : ((string) ($line->product_name !== '' ? $line->product_name : ('Sản phẩm #' . (int) $line->product_id))),
                 'image_link' => $product ? (string) $product->image_link : '',
                 'qty' => (int) $line->qty,
                 'amount' => (float) $line->amount,
@@ -341,7 +362,6 @@ class AccountService
             'ward_id' => '',
             'address_line' => $line,
             'is_default' => 1,
-            'created' => time(),
         ]);
     }
 
@@ -360,7 +380,6 @@ class AccountService
             'phone_label' => '',
             'phone_number' => $phone,
             'is_default' => 1,
-            'created' => time(),
         ]);
     }
 
@@ -415,8 +434,6 @@ class AccountService
                 UserPhone::query()->where('id', $list->first()->id)->update(['is_default' => 1]);
             }
         }
-        User::query()->whereKey($userId)->update(['phone' => $phone]);
-
         return $phone;
     }
 
@@ -434,8 +451,18 @@ class AccountService
                 UserAddress::query()->where('id', $list->first()->id)->update(['is_default' => 1]);
             }
         }
-        User::query()->whereKey($userId)->update(['address' => $line]);
-
         return $line;
+    }
+
+    private static function orderStatus(string $status): string
+    {
+        return match ($status) {
+            '0', 'pending' => Transaction::STATUS_NEW,
+            '1', 'confirmed' => Transaction::STATUS_CONFIRMED,
+            '2', 'packed' => Transaction::STATUS_PACKED,
+            '3', 'completed' => Transaction::STATUS_COMPLETED,
+            '4', 'cancelled' => Transaction::STATUS_CANCELLED,
+            default => '',
+        };
     }
 }

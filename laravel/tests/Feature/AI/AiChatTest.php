@@ -27,7 +27,7 @@ class AiChatTest extends LegacyMysqlTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->settings = DB::table('ai_setting')->get()->map(fn ($row) => (array) $row)->all();
+        $this->settings = DB::table('ai_settings')->get()->map(fn ($row) => (array) $row)->all();
         config(['ai.gemini_api_key' => self::KEY]);
         AiSetting::setValue('ai_enabled', '1');
         AiSetting::setValue('staff_support_enabled', '1');
@@ -43,24 +43,24 @@ class AiChatTest extends LegacyMysqlTestCase
             }
         }
         if ($this->userIds !== []) {
-            $conversationIds = DB::table('ai_conversation')->whereIn('user_id', $this->userIds)->pluck('id');
-            DB::table('ai_message')->whereIn('conversation_id', $conversationIds)->delete();
-            DB::table('ai_conversation')->whereIn('user_id', $this->userIds)->delete();
-            DB::table('transaction')->whereIn('user_id', $this->userIds)->delete();
-            DB::table('user')->whereIn('id', $this->userIds)->delete();
+            $conversationIds = DB::table('ai_conversations')->whereIn('user_id', $this->userIds)->pluck('id');
+            DB::table('ai_messages')->whereIn('conversation_id', $conversationIds)->delete();
+            DB::table('ai_conversations')->whereIn('user_id', $this->userIds)->delete();
+            DB::table('orders')->whereIn('user_id', $this->userIds)->delete();
+            DB::table('users')->whereIn('id', $this->userIds)->delete();
         }
-        DB::table('ai_faq')->where('question', 'like', 'B15-%')->delete();
+        DB::table('ai_faqs')->where('question', 'like', 'B15-%')->delete();
         parent::tearDown();
     }
 
     public function test_guest_and_fake_session_cannot_chat(): void
     {
-        $before = (int) DB::table('ai_conversation')->where('user_id', 10)->count();
+        $before = (int) DB::table('ai_conversations')->where('user_id', 10)->count();
         $this->postJson('/ai-assistant/send', ['message' => 'xin chao'])->assertOk()
             ->assertJson(['ok' => false, 'login_required' => true, 'message' => 'Bạn cần đăng nhập tài khoản để sử dụng hỗ trợ khách hàng.']);
         $this->withSession(['user' => ['id' => 10, 'name' => 'Fake']])->postJson('/ai-assistant/send', ['message' => 'xin chao'])
             ->assertJson(['login_required' => true]);
-        $this->assertSame($before, (int) DB::table('ai_conversation')->where('user_id', 10)->count());
+        $this->assertSame($before, (int) DB::table('ai_conversations')->where('user_id', 10)->count());
         Http::assertNothingSent();
     }
 
@@ -121,8 +121,8 @@ class AiChatTest extends LegacyMysqlTestCase
             'category' => 'b15',
             'sort_order' => 0,
             'is_active' => 1,
-            'created' => time(),
-            'updated' => time(),
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
         $this->postJson('/ai-assistant/send', ['message' => 'zzb15faqphrase'])->assertOk()
             ->assertJsonPath('content', 'B15-FAQ-ANSWER');
@@ -200,10 +200,8 @@ class AiChatTest extends LegacyMysqlTestCase
         $user = User::query()->create([
             'name' => 'B15 Chat',
             'email' => 'b15chat.' . Str::lower(Str::random(6)) . '@example.test',
-            'password' => LegacyPassword::hash('B15-Secret#1'),
-            'phone' => '0900151500',
-            'address' => 'HN',
-            'created' => time(),
+            'password_hash' => LegacyPassword::hash('B15-Secret#1'),
+            'created_at' => now(),
         ]);
         $this->userIds[] = (int) $user->id;
 
@@ -212,19 +210,21 @@ class AiChatTest extends LegacyMysqlTestCase
 
     private function insertOrder(User $user, int $amount): void
     {
-        DB::table('transaction')->insert([
-            'status' => 0,
+        DB::table('orders')->insert([
+            'status' => 'pending',
             'user_id' => $user->id,
-            'user_name' => $user->name,
-            'user_email' => $user->email,
-            'user_phone' => $user->phone,
-            'user_address' => $user->address,
-            'message' => '',
-            'amount' => $amount,
-            'voucher_code' => '',
+            'customer_name' => $user->name,
+            'customer_email' => $user->email,
+            'customer_phone' => (string) $user->phone,
+            'shipping_address' => (string) $user->address,
+            'note' => '',
+            'subtotal' => $amount,
             'discount_amount' => 0,
-            'payment' => 'COD',
-            'created' => time(),
+            'shipping_fee' => 0,
+            'total' => $amount,
+            'voucher_code' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 }

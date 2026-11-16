@@ -64,9 +64,8 @@ class CatalogController extends Controller
         Catalog::query()->create([
             'name' => $request->string('name')->toString(),
             'description' => $request->input('description') ?: null,
-            'parent_id' => (int) $request->input('parent_id', 0),
+            'parent_id' => ((int) $request->input('parent_id', 0)) > 0 ? (int) $request->input('parent_id') : null,
             'sort_order' => (int) $request->input('sort_order', 1),
-            'created' => now(),
         ]);
 
         return redirect()->to(url('admin/catalog'))->with('message_success', 'Thêm danh mục thành công');
@@ -101,7 +100,7 @@ class CatalogController extends Controller
         $catalog->update([
             'name' => $request->string('name')->toString(),
             'description' => $request->input('description') ?: null,
-            'parent_id' => $parentId,
+            'parent_id' => $parentId > 0 ? $parentId : null,
             'sort_order' => (int) $request->input('sort_order', $catalog->sort_order),
         ]);
 
@@ -121,6 +120,11 @@ class CatalogController extends Controller
         if (! $catalog) {
             return redirect()->to(url('admin/catalog'))->with('message_fail', 'Danh mục không tồn tại');
         }
+        if (DB::table('products')->where('category_id', $id)->exists()) {
+            return redirect()->to(url('admin/catalog'))
+                ->with('message_fail', 'Không thể xóa danh mục đang có sản phẩm.');
+        }
+        Catalog::query()->where('parent_id', $id)->update(['parent_id' => $catalog->parent_id]);
         $catalog->delete();
 
         return redirect()->to(url('admin/catalog'))->with('message_success', 'Xóa danh mục thành công');
@@ -129,7 +133,17 @@ class CatalogController extends Controller
     /** @return \Illuminate\Support\Collection<int, object> */
     private function parentChoices()
     {
-        return DB::table('catalog')->where('parent_id', '<', 2)->orderBy('id')->get(['id', 'name', 'parent_id']);
+        $rootIds = DB::table('categories')->whereNull('parent_id')->pluck('id');
+
+        return DB::table('categories')
+            ->where(function ($query) use ($rootIds) {
+                $query->whereNull('parent_id');
+                if ($rootIds->isNotEmpty()) {
+                    $query->orWhereIn('parent_id', $rootIds->all());
+                }
+            })
+            ->orderBy('id')
+            ->get(['id', 'name', 'parent_id']);
     }
 
     private function isDescendant(int $catalogId, int $maybeChild): bool
@@ -139,7 +153,7 @@ class CatalogController extends Controller
             if ($current === $catalogId) {
                 return true;
             }
-            $current = (int) DB::table('catalog')->where('id', $current)->value('parent_id');
+            $current = (int) DB::table('categories')->where('id', $current)->value('parent_id');
         }
 
         return false;

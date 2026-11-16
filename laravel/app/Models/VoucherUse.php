@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\LegacyTimestamps;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
@@ -17,9 +16,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class VoucherUse extends BaseModel
 {
-    use LegacyTimestamps;
+    protected $table = 'voucher_uses';
 
-    protected $table = 'voucher_use';
+    public const UPDATED_AT = null;
+
+    public $timestamps = true;
 
     protected function casts(): array
     {
@@ -27,9 +28,8 @@ class VoucherUse extends BaseModel
             'id' => 'int',
             'voucher_id' => 'int',
             'user_id' => 'int',
-            'transaction_id' => 'int',
-            'discount_amount' => 'int',
-            'created' => 'int',
+            'order_id' => 'int',
+            'discount_amount' => 'decimal:2',
         ];
     }
 
@@ -45,11 +45,11 @@ class VoucherUse extends BaseModel
 
     public function transaction(): BelongsTo
     {
-        return $this->belongsTo(Transaction::class, 'transaction_id');
+        return $this->belongsTo(Transaction::class, 'order_id');
     }
 
-    public function createdAt(): ?\Illuminate\Support\Carbon
+    public function getTransactionIdAttribute(): int
     {
-        return $this->legacyTimestamp('created');
+        return (int) ($this->attributes['order_id'] ?? 0);
     }
 }

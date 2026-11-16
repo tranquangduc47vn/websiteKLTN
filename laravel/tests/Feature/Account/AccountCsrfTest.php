@@ -50,7 +50,7 @@ class AccountCsrfTest extends AccountTestCase
             ->assertRedirect(url('user') . '#jm-account-profile');
         $this->assertSame('B7 Token Name', $user->fresh()->name);
 
-        $phone = DB::table('user_phone')->where('user_id', $user->id)->orderByDesc('id')->value('id');
+        $phone = DB::table('user_phones')->where('user_id', $user->id)->orderByDesc('id')->value('id');
         $this->post('/user/phone_delete/' . $phone, ['_token' => $token])
             ->assertRedirect(url('user') . '#phones');
     }

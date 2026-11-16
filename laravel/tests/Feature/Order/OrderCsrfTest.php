@@ -30,7 +30,7 @@ class OrderCsrfTest extends OrderTestCase
         $this->post('/thanh-toan/apply_voucher', ['voucher_code' => 'X'])->assertStatus(419);
         $this->post('/thanh-toan/cancel/1')->assertStatus(419);
 
-        $this->assertSame(0, (int) \Illuminate\Support\Facades\DB::table('transaction')->where('user_id', $user->id)->count());
+        $this->assertSame(0, (int) \Illuminate\Support\Facades\DB::table('orders')->where('user_id', $user->id)->count());
         $this->assertNotSame([], $this->sessionCart());
     }
 
@@ -47,6 +47,6 @@ class OrderCsrfTest extends OrderTestCase
         $this->post('/thanh-toan', $this->checkoutPayload($user) + ['_token' => $token])
             ->assertRedirect(url('gio-hang'));
 
-        $this->assertSame(1, (int) \Illuminate\Support\Facades\DB::table('transaction')->where('user_id', $user->id)->count());
+        $this->assertSame(1, (int) \Illuminate\Support\Facades\DB::table('orders')->where('user_id', $user->id)->count());
     }
 }

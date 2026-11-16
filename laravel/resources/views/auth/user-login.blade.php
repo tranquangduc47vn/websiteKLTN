@@ -3,39 +3,62 @@
 @section('title', 'Đăng nhập')
 
 @section('content')
-<div class="wrap" style="max-width:440px;margin:40px auto;">
-    <h1>Đăng nhập</h1>
+	<div class="jm-auth-standalone-wrap">
+		<a href="{{ url('/') }}" class="jm-auth-back" title="Về trang chủ">
+			<span class="jm-auth-back-icon" aria-hidden="true">←</span>
+			Quay lại
+		</a>
 
-    @if (session('message_success'))
-        <div class="alert alert-success">{{ session('message_success') }}</div>
-    @endif
-    @if (session('message_fail'))
-        <div class="alert alert-danger">{{ session('message_fail') }}</div>
-    @endif
+		<div class="jm-auth-card">
+			<div class="jm-auth-card-head">
+				<h1 class="jm-auth-title">Đăng nhập</h1>
+				<p class="jm-auth-subtitle">Chào mừng bạn quay lại {{ \App\Support\Storefront\Shop::name() }}</p>
+			</div>
 
-    <form method="POST" action="{{ route('storefront.user.login.post') }}">
-        @csrf
+			@if (session('message_success'))
+				<div class="jm-auth-alert jm-auth-alert-success">{{ session('message_success') }}</div>
+			@endif
+			@if (session('message_fail'))
+				<div class="jm-auth-alert jm-auth-alert-error">{{ session('message_fail') }}</div>
+			@endif
 
-        <div>
-            <label for="email">Email đăng nhập</label>
-            <input id="email" name="email" type="email" value="{{ old('email') }}" required autofocus autocomplete="username">
-            @error('email')<span class="error">{{ $message }}</span>@enderror
-        </div>
+			<form class="jm-auth-form" method="POST" action="{{ route('storefront.user.login.post') }}" novalidate>
+				@csrf
 
-        <div>
-            <label for="password">Mật khẩu</label>
-            <input id="password" name="password" type="password" required autocomplete="current-password">
-            @error('password')<span class="error">{{ $message }}</span>@enderror
-        </div>
+				<div class="jm-auth-field">
+					<label for="inputEmail3">Email</label>
+					<input type="email" class="jm-auth-input" id="inputEmail3" name="email"
+						placeholder="email@example.com"
+						value="{{ old('email') }}"
+						autocomplete="email" required autofocus>
+					@error('email')<span class="jm-auth-field-error">{{ $message }}</span>@enderror
+				</div>
 
-        <label>
-            <input type="checkbox" name="remember" value="1"> Ghi nhớ đăng nhập
-        </label>
+				<div class="jm-auth-field">
+					<label for="inputPassword3">Mật khẩu</label>
+					<input type="password" class="jm-auth-input" id="inputPassword3" name="password"
+						placeholder="••••••••" autocomplete="current-password" required>
+					@error('password')<span class="jm-auth-field-error">{{ $message }}</span>@enderror
+				</div>
 
-        <button type="submit">Đăng nhập</button>
-    </form>
+				<div class="jm-auth-field">
+					<label>
+						<input type="checkbox" name="remember" value="1" @checked(old('remember'))>
+						Ghi nhớ đăng nhập
+					</label>
+				</div>
 
-    <p><a href="{{ route('storefront.user.register') }}">Tạo tài khoản mới</a> ·
-       <a href="{{ route('storefront.user.forgot_password') }}">Quên mật khẩu?</a></p>
-</div>
+				<p class="jm-auth-forgot">
+					<a href="{{ route('storefront.user.forgot_password') }}">Quên mật khẩu?</a>
+				</p>
+
+				<button type="submit" class="jm-auth-submit">Đăng nhập</button>
+			</form>
+
+			<p class="jm-auth-footer-link">
+				Chưa có tài khoản?
+				<a href="{{ route('storefront.user.register') }}">Đăng ký ngay</a>
+			</p>
+		</div>
+	</div>
 @endsection

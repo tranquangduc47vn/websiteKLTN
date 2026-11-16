@@ -38,6 +38,18 @@ class StorefrontRegressionTest extends CartTestCase
 
         $this->get('/dang-nhap')->assertOk()->assertSee('name="_token"', false);
         $this->get('/dang-ky')->assertOk()->assertSee('name="_token"', false);
+
+        $this->withSession([
+            'user' => (object) ['id' => 10, 'name' => 'Fake Legacy User', 'email' => 'fake-legacy@example.test'],
+        ])->get('/')->assertOk()->assertDontSee('Fake Legacy User');
+        $this->assertFalse(auth('web')->check());
+
+        $this->get('/')
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('X-Frame-Options', 'SAMEORIGIN')
+            ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+            ->assertHeaderMissing('Content-Security-Policy')
+            ->assertHeaderMissing('Strict-Transport-Security');
     }
 
     public function test_storefront_pages_render_for_logged_in_user_with_cart(): void
@@ -58,13 +70,14 @@ class StorefrontRegressionTest extends CartTestCase
     {
         $user = $this->makeUser();
         $other = $this->makeUser();
-        $base = ['amount' => 100000, 'payment' => 'cod', 'message' => '', 'user_address' => 'Test', 'created' => time()];
-        $insert = fn (int $uid, int $status) => \Illuminate\Support\Facades\DB::table('transaction')->insert(array_merge($base, [
+        $base = ['subtotal' => 100000, 'discount_amount' => 0, 'shipping_fee' => 0, 'total' => 100000, 'note' => '', 'shipping_address' => 'Test', 'created_at' => now(), 'updated_at' => now()];
+        $labels = [0 => 'pending', 1 => 'confirmed', 2 => 'packed', 3 => 'completed', 4 => 'cancelled'];
+        $insert = fn (int $uid, int $status) => \Illuminate\Support\Facades\DB::table('orders')->insert(array_merge($base, [
             'user_id' => $uid,
-            'user_name' => 'B5',
-            'user_email' => 'b5badge@example.test',
-            'user_phone' => '0900000000',
-            'status' => $status,
+            'customer_name' => 'B5',
+            'customer_email' => 'b5badge@example.test',
+            'customer_phone' => '0900000000',
+            'status' => $labels[$status] ?? 'pending',
         ]));
         $insert($user->id, 0);
         $insert($user->id, 2);

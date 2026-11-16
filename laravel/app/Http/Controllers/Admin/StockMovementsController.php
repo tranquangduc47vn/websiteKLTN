@@ -31,7 +31,7 @@ class StockMovementsController extends Controller
         $rows = $query->orderByDesc('stock_movements.id')->offset($offset)->limit(self::PER_PAGE)->get([
             'stock_movements.*',
             'product_variants.sku',
-            'product.name as product_name',
+            'products.name as product_name',
         ]);
 
         return view('admin.movements.index', [
@@ -59,7 +59,7 @@ class StockMovementsController extends Controller
     {
         $query = DB::table('stock_movements')
             ->leftJoin('product_variants', 'product_variants.id', '=', 'stock_movements.variant_id')
-            ->leftJoin('product', 'product.id', '=', 'stock_movements.product_id');
+            ->leftJoin('products', 'products.id', '=', 'product_variants.product_id');
         if ($sku !== '') {
             $query->where('product_variants.sku', 'like', '%' . addcslashes($sku, '%_\\') . '%');
         }

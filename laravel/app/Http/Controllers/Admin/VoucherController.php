@@ -45,7 +45,6 @@ class VoucherController extends Controller
     public function store(StoreVoucherRequest $request): RedirectResponse
     {
         $data = $request->voucherAttributes();
-        $data['created'] = time();
         $data['used_count'] = 0;
         Voucher::query()->create($data);
 
@@ -121,7 +120,7 @@ class VoucherController extends Controller
                 'member' => Loyalty::tierLabel('member'),
                 'silver' => Loyalty::tierLabel('silver'),
                 'gold' => Loyalty::tierLabel('gold'),
-                'vip' => Loyalty::tierLabel('vip'),
+                'diamond' => Loyalty::tierLabel('diamond'),
             ],
             'admin_header_title' => $voucher ? 'Sửa voucher' : 'Thêm voucher',
         ]);
