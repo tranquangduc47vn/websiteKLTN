@@ -141,9 +141,36 @@
 		</div>
 	</div>
 	<div class="admin-card">
-		<div class="admin-card-header"><span class="adm-section-title">Chi tiết</span></div>
+		<div class="admin-card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+			<span class="adm-section-title">Chi tiết</span>
+			<span class="adm-ai-tags">
+				<span class="badge text-bg-success">AI hỗ trợ</span>
+				<span class="badge text-bg-primary">AI Writer</span>
+			</span>
+		</div>
 		<div class="admin-card-body">
-			<label for="content" class="form-label">Mô tả</label>
+			<div class="adm-ai-desc-panel" id="admAiDescPanel" data-ai-url="{{ url('admin/products/ai-description') }}" data-product-id="{{ $isEdit ? (int) $product->id : 0 }}">
+				<div class="adm-ai-desc-panel__head">
+					<div class="adm-ai-desc-panel__title"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Tạo mô tả bằng AI</div>
+					<p class="adm-ai-desc-panel__hint mb-0">AI dùng thông tin trên form và tối đa 2 ảnh (tự nén). Có thể mất 1–2 phút; nếu quá tải sẽ thử lại không ảnh.</p>
+				</div>
+				<button type="button" class="btn adm-ai-desc-generate" id="admAiDescGenerate">
+					<i class="fa-solid fa-sparkles" aria-hidden="true"></i>
+					<span class="adm-ai-desc-generate__label">Tạo mô tả tự động</span>
+				</button>
+				<div class="adm-ai-desc-alert d-none" id="admAiDescAlert" role="status"></div>
+				<div class="adm-ai-desc-preview d-none" id="admAiDescPreview">
+					<div class="adm-ai-desc-preview__label">Xem trước &amp; chỉnh sửa</div>
+					<textarea class="form-control adm-ai-desc-preview__editor" id="admAiDescPreviewHtml" rows="10" aria-label="Nội dung mô tả do AI tạo"></textarea>
+					<div class="adm-ai-desc-preview__render" id="admAiDescPreviewRender" aria-hidden="true"></div>
+					<div class="adm-ai-desc-preview__actions">
+						<button type="button" class="btn btn-success btn-sm" id="admAiDescInsert">Chèn vào mô tả</button>
+						<button type="button" class="btn btn-outline-primary btn-sm" id="admAiDescRegenerate">Tạo lại</button>
+						<button type="button" class="btn btn-outline-secondary btn-sm" id="admAiDescDismiss">Đóng</button>
+					</div>
+				</div>
+			</div>
+			<label for="content" class="form-label mt-3">Mô tả</label>
 			<textarea name="content" id="content" class="form-control" rows="6">{{ old('content', $product->content ?? '') }}</textarea>
 		</div>
 	</div>
@@ -181,6 +208,9 @@
 		<a class="btn btn-outline-secondary" href="{{ url('admin/products') }}">Hủy</a>
 	</div>
 </form>
+<link href="{{ url('assets/admin/css/product-ai-description.css') }}?v=1" rel="stylesheet">
 <script src="{{ url('assets/admin/vendor/ckeditor/ckeditor.js') }}"></script>
+<script>window.PRODUCT_AI_DESC = { ckeditorField: 'content' };</script>
+<script src="{{ url('assets/admin/js/product-ai-description.js') }}?v=2" defer></script>
 <script>if (window.CKEDITOR) { CKEDITOR.replace('content'); }</script>
 @endsection

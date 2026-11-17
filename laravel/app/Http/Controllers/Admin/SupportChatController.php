@@ -29,6 +29,7 @@ class SupportChatController extends Controller
             'list' => $this->chat->inbox($status, trim((string) $request->query('q', '')), $request->boolean('unread')),
             'filter_status' => $status,
             'keyword' => trim((string) $request->query('q', '')),
+            'unread_filter' => $request->boolean('unread'),
             'isAdmin' => (int) auth('admin')->user()?->level === Admin::ROLE_ADMIN,
         ]);
     }

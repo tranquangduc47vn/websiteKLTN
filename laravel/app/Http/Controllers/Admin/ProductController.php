@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\GenerateProductDescriptionRequest;
 use App\Http\Requests\Admin\StoreProductRequest;
 use App\Http\Requests\Admin\UpdateProductRequest;
 use App\Models\Product;
+use App\Services\Ai\ProductDescriptionService;
 use App\Services\ProductAdminService;
 use App\Support\Admin\AdminPermission;
 use App\Support\Storefront\Csrf;
@@ -22,8 +24,39 @@ use RuntimeException;
  */
 class ProductController extends Controller
 {
-    public function __construct(private readonly ProductAdminService $products)
+    public function __construct(
+        private readonly ProductAdminService $products,
+        private readonly ProductDescriptionService $productDescriptions,
+    ) {}
+
+    public function generateDescription(GenerateProductDescriptionRequest $request): JsonResponse
     {
+        $product = null;
+        $productId = (int) $request->input('product_id', 0);
+        if ($productId > 0) {
+            $product = Product::query()->find($productId);
+            if (! $product) {
+                return response()->json(array_merge([
+                    'ok' => false,
+                    'message' => 'Không tìm thấy sản phẩm.',
+                ], Csrf::jsonMeta()), 404);
+            }
+        }
+
+        $input = $request->validated();
+        $input['image_upload'] = $request->file('image');
+        $input['gallery_uploads'] = $request->file('list_image', []);
+
+        $result = $this->productDescriptions->generate($input, $product);
+
+        $status = $result['ok'] ? 200 : ($result['error'] === 'rate_limited' ? 429 : 422);
+
+        return response()->json(array_merge([
+            'ok' => $result['ok'],
+            'html' => $result['html'],
+            'message' => $result['message'],
+            'error' => $result['error'],
+        ], Csrf::jsonMeta()), $status);
     }
 
     public function index(Request $request, int $offset = 0): View

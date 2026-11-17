@@ -225,9 +225,23 @@ class StockReceiptController extends Controller
             $parent->sub = DB::table('categories')->where('parent_id', $parent->id)->orderBy('sort_order')->get();
         }
 
+        $initialLines = [];
+        foreach ($items as $item) {
+            $initialLines[] = [
+                'variant_id' => (int) $item->variant_id,
+                'sku' => (string) ($item->sku ?? ''),
+                'product_name' => (string) ($item->product_name ?? ''),
+                'color' => (string) ($item->color ?? ''),
+                'size' => (string) ($item->size ?? ''),
+                'qty' => (int) ($item->qty ?? 0),
+                'unit_cost' => (float) ($item->unit_cost ?? 0),
+            ];
+        }
+
         return view('admin.receipts.form', [
             'receipt' => $receipt,
             'items' => $items,
+            'initialLines' => $initialLines,
             'suppliers' => Supplier::query()->where('status', 'active')->orderBy('name')->get(),
             'catalogs' => $parents,
             'admin_header_title' => $receipt ? 'Sửa phiếu nháp' : 'Nhập kho',
@@ -474,6 +488,7 @@ class StockReceiptController extends Controller
                 'stock_receipt_items.line_total as subtotal',
                 'products.name as product_name',
                 'product_variants.product_id as product_id',
+                'product_variants.sku as sku',
             ])
             ->all();
     }

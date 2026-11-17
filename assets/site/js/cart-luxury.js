@@ -81,6 +81,12 @@
 		flash.textContent = message;
 		flash.classList.toggle('jm-cart-flash--error', !!isError);
 		flash.hidden = !message;
+		if (message) {
+			flash.removeAttribute('data-auto-dismiss-scheduled');
+			if (typeof window.jmScheduleFlashDismiss === 'function') {
+				window.jmScheduleFlashDismiss(flash);
+			}
+		}
 	}
 
 	function showStockNotice(data) {
@@ -92,6 +98,17 @@
 
 	function findRow(rowid) {
 		return document.querySelector('.jm-cart-row[data-rowid="' + CSS.escape(rowid) + '"]');
+	}
+
+	/** Đồng bộ rowid trên dòng giỏ: data-rowid, input ẩn, nút xóa. */
+	function setRowRowid(row, rowid) {
+		if (!row || !rowid) return;
+		row.setAttribute('data-rowid', rowid);
+		var hidden = row.querySelector('input[name="rowid"]');
+		if (hidden) hidden.value = rowid;
+		row.querySelectorAll('.jm-cart-remove[data-rowid]').forEach(function (btn) {
+			btn.setAttribute('data-rowid', rowid);
+		});
 	}
 
 	function updateRowNumbers() {
@@ -123,29 +140,51 @@
 		});
 	}
 
+	/**
+	 * @returns {{ needsReload: boolean }}
+	 */
 	function applyOptionsUpdate(data) {
-		var row = findRow(data.old_rowid || data.rowid);
-		if (!row) return;
+		var newRowid = data.rowid;
+		var oldRowid = data.old_rowid || newRowid;
+		var sourceRow = findRow(oldRowid);
 
-		if (data.old_rowid && data.rowid && data.old_rowid !== data.rowid) {
-			row.setAttribute('data-rowid', data.rowid);
-			var hidden = row.querySelector('input[name="rowid"]');
-			if (hidden) hidden.value = data.rowid;
+		if (!newRowid) {
+			return { needsReload: false };
 		}
 
-		var sizeSelect = row.querySelector('select[name="size"]');
-		var colorSelect = row.querySelector('select[name="color"]');
+		if (oldRowid && newRowid && oldRowid !== newRowid) {
+			var existingTarget = findRow(newRowid);
+			if (existingTarget && (!sourceRow || existingTarget !== sourceRow)) {
+				return { needsReload: true };
+			}
+		}
+
+		if (!sourceRow) {
+			sourceRow = findRow(newRowid);
+			if (!sourceRow) {
+				return { needsReload: true };
+			}
+		}
+
+		if (newRowid) {
+			setRowRowid(sourceRow, newRowid);
+		}
+
+		var sizeSelect = sourceRow.querySelector('select[name="size"]');
+		var colorSelect = sourceRow.querySelector('select[name="color"]');
 		if (sizeSelect && data.size) sizeSelect.value = data.size;
 		if (colorSelect && data.color) colorSelect.value = data.color;
 
-		var qtyEls = row.querySelectorAll('.jm-cart-qty__val');
-		var priceEls = row.querySelectorAll('.jm-cart-line-price');
+		var qtyEls = sourceRow.querySelectorAll('.jm-cart-qty__val');
+		var priceEls = sourceRow.querySelectorAll('.jm-cart-line-price');
 		qtyEls.forEach(function (qtyEl) {
 			qtyEl.textContent = String(data.qty);
 		});
 		priceEls.forEach(function (priceEl) {
 			priceEl.textContent = formatMoney(data.subtotal);
 		});
+
+		return { needsReload: false };
 	}
 
 	function handleResponse(data, rollback) {
@@ -170,7 +209,11 @@
 		if (data.action === 'qty') {
 			applyQtyUpdate(data);
 		} else if (data.action === 'options') {
-			applyOptionsUpdate(data);
+			var optionsResult = applyOptionsUpdate(data);
+			if (optionsResult.needsReload) {
+				window.location.reload();
+				return;
+			}
 		} else if (data.action === 'delete') {
 			if (data.empty) {
 				window.location.reload();

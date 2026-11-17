@@ -4,7 +4,7 @@
 @php
     $siteAssetUrl = \App\Support\Storefront\Shop::assetUrl("");
 @endphp
-<link rel="stylesheet" href="{{ $siteAssetUrl }}css/home-bestsellers.css?v=10">
+<link rel="stylesheet" href="{{ $siteAssetUrl }}css/home-bestsellers.css?v=11">
 
 <div class="row home-collection-banners" style="margin-top: 20px; margin-bottom: 40px;">
     @if (!empty($list_banner) && count($list_banner) > 0)

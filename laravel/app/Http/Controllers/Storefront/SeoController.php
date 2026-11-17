@@ -53,7 +53,7 @@ class SeoController extends Controller
         foreach (Catalog::query()->orderBy('id')->get(['id', 'name']) as $catalog) {
             $urls[] = Urls::category($catalog);
         }
-        foreach (Product::query()->where('status', 'active')->orderBy('id')->get(['id', 'name']) as $product) {
+        foreach (Product::query()->active()->inStock()->orderBy('id')->get(['id', 'name']) as $product) {
             $urls[] = Urls::product($product);
         }
         foreach (ContentPage::query()->where('type', ContentPage::TYPE_NEWS)->orderBy('id')->get(['id', 'title']) as $post) {

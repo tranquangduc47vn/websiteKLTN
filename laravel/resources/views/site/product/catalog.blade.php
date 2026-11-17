@@ -17,7 +17,7 @@
     $sortOptions = $sort_options ?? ["new" => "Mới nhất", "price_asc" => "Giá tăng dần", "price_desc" => "Giá giảm dần"];
     $isHotList = ! empty($is_hot_list);
 @endphp
-<link rel="stylesheet" href="{{ $siteAssetUrl }}css/catalog-luxury.css?v=30">
+<link rel="stylesheet" href="{{ $siteAssetUrl }}css/catalog-luxury.css?v=32">
 <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12 jm-catalog-wrapper jm-catalog-lux jm-catalog-lux--sidebar-pinned">
 
     <div class="jm-toolbar jm-catalog-header">
@@ -274,5 +274,5 @@
     </div>
 </div>
 
-<script src="{{ $siteAssetUrl }}js/catalog-luxury.js?v=12"></script>
+<script src="{{ $siteAssetUrl }}js/catalog-luxury.js?v=13"></script>
 @endsection

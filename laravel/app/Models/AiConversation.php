@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Model cho bảng `ai_conversation` (cuộc trò chuyện AI + nhân viên).
@@ -69,6 +70,11 @@ class AiConversation extends BaseModel
     public function latestMessages(): HasMany
     {
         return $this->hasMany(AiMessage::class, 'conversation_id')->orderByDesc('id');
+    }
+
+    public function lastMessage(): HasOne
+    {
+        return $this->hasOne(AiMessage::class, 'conversation_id')->latestOfMany('id');
     }
 
     public function scopeOpen($query)

@@ -71,13 +71,20 @@ class CartController extends Controller
      * POST /gio-hang/them/{id} (alias /gio-hang/add/{id}).
      * GET không đổi giỏ. Khách chưa đăng nhập được lưu lựa chọn để login thêm sau.
      */
-    public function add(Request $request, $id = null): RedirectResponse
+    public function add(Request $request, $id = null): JsonResponse|RedirectResponse
     {
         if (! $request->isMethod('post')) {
             abort(404);
         }
 
         if (! Auth::guard('web')->check()) {
+            if ($request->ajax()) {
+                return $this->json([
+                    'ok' => false,
+                    'login_required' => true,
+                    'message' => self::MSG_LOGIN_TO_ADD,
+                ], 401);
+            }
             $productId = $request->input('id') ?: $id;
             $this->cart->rememberPendingAdd(
                 $request->session(),
@@ -102,6 +109,23 @@ class CartController extends Controller
             $this->stringInput($request, 'size'),
             $this->stringInput($request, 'color'),
         );
+
+        if ($request->ajax()) {
+            $totals = $this->cart->totals($result->cart);
+            $payload = array_merge([
+                'ok' => $result->ok,
+                'code' => $result->code,
+                'message' => $result->message,
+                'total_items' => $totals['total_items'],
+                'total_price' => $totals['total_price'],
+            ], $result->data);
+
+            if (! $result->ok && $result->product) {
+                $payload['product_url'] = Urls::product($result->product);
+            }
+
+            return $this->json($payload, $result->ok ? 200 : 422);
+        }
 
         if ($result->ok) {
             Flash::store(Flash::SUCCESS, $result->message);

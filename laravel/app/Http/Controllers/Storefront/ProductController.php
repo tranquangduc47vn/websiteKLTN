@@ -109,7 +109,7 @@ class ProductController extends Controller
 
         $finalCatalogIds = $this->resolveFinalCatalogIds($request, (int) $catalogModel->id);
 
-        $builder = $this->applyFilters(Product::query(), $finalCatalogIds, $priceRange);
+        $builder = $this->applyFilters(Product::query()->active()->inStock(), $finalCatalogIds, $priceRange);
         $total = (clone $builder)->count();
 
         $hasFilters = $request->filled("category") || $request->filled("size")
@@ -171,7 +171,7 @@ class ProductController extends Controller
 
         $priceRange = $request->query("price_range");
         $builder = $this->applyFilters(
-            Product::query()->active()->where("sold_count", ">", 0),
+            Product::query()->active()->inStock()->where("sold_count", ">", 0),
             $this->resolveFinalCatalogIds($request, 0),
             $priceRange
         );
@@ -216,7 +216,7 @@ class ProductController extends Controller
         }
         $offset = (int) $offset;
 
-        $builder = Product::query()->active();
+        $builder = Product::query()->active()->inStock();
         $total = (clone $builder)->count();
         $page = (int) floor(max(0, $offset) / self::PER_PAGE) + 1;
 
@@ -252,7 +252,7 @@ class ProductController extends Controller
 
         $priceRange = $request->query("price_range");
         $builder = $this->applyFilters(
-            Product::query()->active(),
+            Product::query()->active()->inStock(),
             $this->resolveFinalCatalogIds($request, 0),
             $priceRange
         );
@@ -301,7 +301,7 @@ class ProductController extends Controller
 
         $priceRange = $request->query("price_range");
         $builder = $this->applyFilters(
-            Product::query()->active()->where('discount_amount', '>', 0),
+            Product::query()->active()->inStock()->where('discount_amount', '>', 0),
             $this->resolveFinalCatalogIds($request, 0),
             $priceRange
         );
@@ -388,7 +388,7 @@ class ProductController extends Controller
 
         $finalCatalogIds = $this->resolveFinalCatalogIds($request, 0);
 
-        $builder = $this->applyFilters(Product::query()->active(), $finalCatalogIds, $priceRange)
+        $builder = $this->applyFilters(Product::query()->active()->inStock(), $finalCatalogIds, $priceRange)
             ->search($keyword !== "" ? $keyword : null, true);
         $total = (clone $builder)->count();
 
@@ -459,6 +459,12 @@ class ProductController extends Controller
             return redirect(url("/"));
         }
 
+        if ($product->totalStock() <= 0) {
+            Flash::store('fail', 'Sản phẩm đã hết hàng.');
+
+            return redirect(url('/'));
+        }
+
         // Legacy /product/view/{id} hoac /product/detail/{id} -> 301 ve URL SEO
         if ($request->segment(1) === "product" && in_array($request->segment(2), ["view", "detail"], true)) {
             return redirect()->to(Urls::product($product), 301);
@@ -484,12 +490,12 @@ class ProductController extends Controller
 
         $variantStockMap = $this->variantStockMap($id);
 
-        $productSub = Product::query()->active()
+        $productSub = Product::query()->active()->inStock()
             ->where("category_id", $product->category_id)
             ->where("id", "!=", $id)
             ->limit(4)->get();
 
-        $productView = Product::query()->active()->orderByDesc("sold_count")->limit(4)->get();
+        $productView = Product::query()->active()->inStock()->orderByDesc("sold_count")->limit(4)->get();
 
         $reviewData = app(ReviewService::class)->forProduct($id, $this->ratingSessionToken($request));
         if ($reviewData["rate_count"] > 0) {

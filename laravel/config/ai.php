@@ -22,4 +22,16 @@ return [
         'Gặp nhân viên',
     ],
     'welcome_intro' => "Mình có thể hỗ trợ:\n• Tìm sản phẩm\n• Tư vấn size\n• Gợi ý theo ngân sách\n• Kiểm tra đơn hàng\n• Chính sách đổi trả\n• Voucher\n\nNếu cần mình sẽ kết nối bạn với nhân viên.",
+
+    'product_description' => [
+        'rate_limit_max' => 5,
+        'rate_limit_window' => 60,
+        'max_images' => (int) env('GEMINI_PRODUCT_DESC_MAX_IMAGES', 2),
+        'max_image_bytes' => 5 * 1024 * 1024,
+        'max_image_edge' => 1280,
+        'optimize_target_bytes' => 450_000,
+        'timeout' => (int) env('GEMINI_PRODUCT_DESC_TIMEOUT', 120),
+        'max_output_tokens' => 2048,
+        'temperature' => 0.45,
+    ],
 ];

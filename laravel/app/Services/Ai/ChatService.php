@@ -7,6 +7,8 @@ use App\Models\AiFaq;
 use App\Models\AiMessage;
 use App\Models\AiSetting;
 use App\Models\User;
+use App\Support\Storefront\AiChatCommerce;
+use App\Support\Storefront\AiProductCards;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -119,10 +121,12 @@ class ChatService
 
         $faq = (new FaqMatcher())->match($message, AiFaq::query()->where('is_active', 1)->get()->all(), (float) config('ai.faq_threshold'));
         if ($faq) {
-            $this->log((int) $conversation->id, 'ai', (string) $faq->answer);
+            $actions = AiChatCommerce::actionsForMessage($message, []);
+            $faqMeta = $actions !== [] ? ['actions' => $actions] : [];
+            $this->log((int) $conversation->id, 'ai', (string) $faq->answer, $faqMeta);
             $this->touch($conversation, 'ai_active', false);
 
-            return $this->customerPayload((int) $conversation->id, (string) $faq->answer, 'ai_active', false);
+            return $this->customerPayload((int) $conversation->id, (string) $faq->answer, 'ai_active', false, [], $actions);
         }
 
         [$context, $products] = $this->context((int) $user->id, $message);
@@ -170,7 +174,15 @@ class ChatService
                 $handoff = true;
             }
         }
-        $this->log((int) $conversation->id, 'ai', $content);
+        $actions = AiChatCommerce::actionsForMessage($message, $products);
+        $meta = [];
+        if ($products !== []) {
+            $meta['products'] = $products;
+        }
+        if ($actions !== []) {
+            $meta['actions'] = $actions;
+        }
+        $this->log((int) $conversation->id, 'ai', $content, $meta);
         if ($handoff) {
             $this->log((int) $conversation->id, 'system', 'Đang kết nối nhân viên...');
             $this->touch($conversation, 'waiting_staff', true);
@@ -178,7 +190,7 @@ class ChatService
             $this->touch($conversation, 'ai_active', false);
         }
 
-        return $this->customerPayload((int) $conversation->id, $content, $handoff ? 'waiting_staff' : 'ai_active', $handoff, $products);
+        return $this->customerPayload((int) $conversation->id, $content, $handoff ? 'waiting_staff' : 'ai_active', $handoff, $products, $actions);
     }
 
     /**
@@ -330,19 +342,12 @@ class ChatService
         }
         $parts[] = $this->orderContext($userId);
 
-        $products = [];
-        if ($this->mentions($normalized, ['sản phẩm', 'áo', 'quần', 'đầm', 'váy', 'giá', 'bán chạy', 'khuyến mãi'])) {
-            $rows = DB::table('products')->orderByDesc('sold_count')->limit(5)->get([
-                'id',
-                'name',
-                'list_price as price',
-                'discount_amount as discount',
-            ]);
-            $lines = ['Sản phẩm phù hợp câu hỏi:'];
-            foreach ($rows as $row) {
-                $price = max(0, (int) $row->price - (int) $row->discount);
-                $products[] = ['id' => (int) $row->id, 'name' => (string) $row->name, 'price' => $price];
-                $lines[] = $row->name . ' — ' . $price;
+        $products = AiProductCards::searchForChat($message);
+        if ($products !== []) {
+            $lines = ['Sản phẩm gợi ý (chỉ liệt kê những mục sau, không thêm sản phẩm khác):'];
+            foreach ($products as $card) {
+                $lines[] = '- ' . ($card['name'] ?? '') . ' — ' . ($card['price_fmt'] ?? '')
+                    . ' (' . ($card['stock_label'] ?? '') . ')';
             }
             $parts[] = implode("\n", $lines);
         }
@@ -461,7 +466,11 @@ class ChatService
     /**
      * @param  list<array<string, mixed>>  $products
      */
-    private function customerPayload(int $id, string $content, string $status, bool $connecting, array $products = []): array
+    /**
+     * @param  list<array<string, mixed>>  $products
+     * @param  list<array<string, string>>  $actions
+     */
+    private function customerPayload(int $id, string $content, string $status, bool $connecting, array $products = [], array $actions = []): array
     {
         return [
             'ok' => true,
@@ -471,6 +480,7 @@ class ChatService
             'connecting' => $connecting,
             'status' => $status,
             'products' => $products,
+            'actions' => $actions,
         ];
     }
 
@@ -553,13 +563,34 @@ class ChatService
             $query->where('unread_staff', 1);
         }
         if ($q !== '') {
-            $query->where(function ($inner) use ($q) {
-                $inner->where('staff_name', 'like', '%' . $q . '%')
-                    ->orWhere('id', $q);
+            $like = '%' . str_replace(['%', '_'], ['\%', '\_'], $q) . '%';
+            $query->where(function ($inner) use ($q, $like) {
+                $inner->where('staff_name', 'like', $like)
+                    ->orWhere('id', $q)
+                    ->orWhereIn('user_id', function ($sub) use ($like) {
+                        $sub->select('id')->from('users')
+                            ->where(function ($user) use ($like) {
+                                $user->where('name', 'like', $like)
+                                    ->orWhere('email', 'like', $like);
+                            });
+                    });
             });
         }
 
-        return $query->get();
+        return $query
+            ->with([
+                'user:id,name,email',
+                'lastMessage' => function ($message): void {
+                    $message->select(
+                        'ai_messages.id',
+                        'ai_messages.conversation_id',
+                        'ai_messages.content',
+                        'ai_messages.sender',
+                        'ai_messages.created_at'
+                    );
+                },
+            ])
+            ->get();
     }
 
     private function closeByStaff(int $conversationId, int $staffId, string $farewell): array
@@ -591,12 +622,24 @@ class ChatService
         $out = [];
         foreach ($query->get() as $row) {
             $meta = json_decode((string) $row->meta, true);
+            $products = [];
+            $actions = [];
+            if (is_array($meta)) {
+                if (isset($meta['products']) && is_array($meta['products'])) {
+                    $products = $meta['products'];
+                }
+                if (isset($meta['actions']) && is_array($meta['actions'])) {
+                    $actions = $meta['actions'];
+                }
+            }
             $out[] = [
                 'id' => (int) $row->id,
                 'sender_type' => (string) $row->sender,
                 'content' => (string) $row->content,
                 'created' => $row->created_at ? (int) strtotime((string) $row->created_at) : 0,
                 'staff_name' => is_array($meta) ? (string) ($meta['staff_name'] ?? '') : '',
+                'products' => $products,
+                'actions' => $actions,
             ];
         }
 

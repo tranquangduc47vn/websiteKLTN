@@ -262,6 +262,8 @@ Route::match(['get', 'post'], 'tintuc', [TintucController::class, 'index'])->nam
 Route::match(['get', 'post'], 'ai-assistant/send', [AiAssistantController::class, 'send'])->middleware('throttle:ai-send')->name('storefront.ai.send');
 Route::get('ai-assistant/history', [AiAssistantController::class, 'history'])->name('storefront.ai.history');
 Route::get('ai-assistant/poll', [AiAssistantController::class, 'poll'])->name('storefront.ai.poll');
+Route::get('ai-assistant/product/{id}/options', [AiAssistantController::class, 'productOptions'])
+    ->whereNumber('id')->name('storefront.ai.product_options');
 
 /*
 |--------------------------------------------------------------------------
@@ -426,6 +428,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         Route::middleware('admin.permission:product.manage')->group(function () {
             Route::get('products', [\App\Http\Controllers\Admin\ProductController::class, 'index'])->name('products.index');
+            Route::post('products/ai-description', [\App\Http\Controllers\Admin\ProductController::class, 'generateDescription'])
+                ->name('products.ai-description');
             Route::match(['get', 'post'], 'products/{path}', [\App\Http\Controllers\Admin\ProductController::class, 'handlePath'])
                 ->where('path', '.*')->name('products.path');
 

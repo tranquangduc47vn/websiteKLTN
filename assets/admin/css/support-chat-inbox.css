@@ -1,0 +1,63 @@
+.adm-support-inbox .adm-sc-badge {
+	display: inline-block;
+	padding: 0.2rem 0.55rem;
+	font-size: 0.78rem;
+	font-weight: 600;
+	border-radius: 999px;
+	white-space: nowrap;
+}
+
+.adm-sc-badge--ai {
+	background: rgba(13, 110, 253, 0.12);
+	color: #0a58ca;
+}
+
+.adm-sc-badge--waiting {
+	background: rgba(255, 193, 7, 0.2);
+	color: #997404;
+}
+
+.adm-sc-badge--staff {
+	background: rgba(25, 135, 84, 0.14);
+	color: #146c43;
+}
+
+.adm-sc-badge--closed {
+	background: rgba(108, 117, 125, 0.18);
+	color: #495057;
+}
+
+.adm-sc-badge--default {
+	background: rgba(108, 117, 125, 0.12);
+	color: #6c757d;
+}
+
+.adm-support-inbox .adm-sc-last-msg {
+	max-width: 16rem;
+	font-size: 0.875rem;
+	color: #555;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.adm-support-inbox .adm-sc-unread {
+	font-weight: 700;
+	color: #b02a37;
+}
+
+.adm-support-actions {
+	display: inline-flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.adm-support-actions form {
+	display: inline;
+	margin: 0;
+}
+
+body.admin-dark .adm-support-inbox .adm-sc-last-msg {
+	color: #adb5bd;
+}

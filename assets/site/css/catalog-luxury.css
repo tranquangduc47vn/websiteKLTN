@@ -568,6 +568,8 @@ body:has(.jm-catalog-lux) .jm-catalog-wrapper {
 }
 
 .jm-catalog-lux .jm-product-card {
+	position: relative;
+	cursor: pointer;
 	background: var(--cat-lux-surface);
 	border: 1px solid rgba(15, 15, 20, 0.07);
 	border-radius: 14px;
@@ -607,6 +609,7 @@ body:has(.jm-catalog-lux) .jm-catalog-wrapper {
 .jm-catalog-lux .jm-img-link {
 	position: absolute;
 	inset: 0;
+	z-index: 2;
 	display: block;
 }
 
@@ -637,6 +640,8 @@ body:has(.jm-catalog-lux) .jm-catalog-wrapper {
 	opacity: 1;
 	visibility: visible;
 	pointer-events: none;
+	transform-origin: center center;
+	animation: jm-discount-attention 2.2s ease-in-out infinite;
 }
 
 .jm-catalog-lux .jm-badge-out-of-stock {
@@ -998,6 +1003,8 @@ body:has(.jm-catalog-lux) .jm-catalog-wrapper {
 	.jm-catalog-lux .jm-catalog-add-cart,
 	.jm-catalog-lux .jm-badge-discount {
 		transition: none !important;
+		animation: none !important;
+		transform: none !important;
 	}
 
 	.jm-catalog-lux .jm-product-card:hover {

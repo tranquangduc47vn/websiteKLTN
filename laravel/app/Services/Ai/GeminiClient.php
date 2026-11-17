@@ -16,11 +16,6 @@ class GeminiClient
      */
     public function complete(array $messages): array
     {
-        $key = (string) config('ai.gemini_api_key');
-        if ($key === '') {
-            return ['ok' => false, 'content' => '', 'error' => 'missing_api_key'];
-        }
-
         $system = '';
         $contents = [];
         foreach ($messages as $message) {
@@ -55,12 +50,63 @@ class GeminiClient
             $payload['systemInstruction'] = ['parts' => [['text' => $system]]];
         }
 
-        $url = rtrim((string) config('ai.gemini_endpoint'), '/') . '/' . config('ai.gemini_model') . ':generateContent';
+        return $this->postGenerateContent($payload, max(1, (int) config('ai.timeout')));
+    }
+
+    /**
+     * Một lượt user + parts (text, inlineData ảnh, …).
+     *
+     * @param  list<array<string, mixed>>  $userParts
+     * @param  array<string, mixed>  $generationConfig
+     * @return array{ok: bool, content: string, error: string}
+     */
+    public function generateFromUserParts(
+        array $userParts,
+        string $system = '',
+        array $generationConfig = []
+    ): array {
+        if ($userParts === []) {
+            return ['ok' => false, 'content' => '', 'error' => 'empty_messages'];
+        }
+
+        $defaults = [
+            'temperature' => (float) config('ai.temperature'),
+            'maxOutputTokens' => (int) config('ai.max_tokens'),
+        ];
+        $payload = [
+            'contents' => [['role' => 'user', 'parts' => $userParts]],
+            'generationConfig' => array_merge($defaults, $generationConfig),
+        ];
+        if (trim($system) !== '') {
+            $payload['systemInstruction'] = ['parts' => [['text' => trim($system)]]];
+        }
+
         $timeout = max(1, (int) config('ai.timeout'));
+        $customTimeout = (int) ($generationConfig['timeout'] ?? 0);
+        if ($customTimeout > 0) {
+            $timeout = $customTimeout;
+        }
+        unset($payload['generationConfig']['timeout']);
+
+        return $this->postGenerateContent($payload, $timeout);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{ok: bool, content: string, error: string}
+     */
+    private function postGenerateContent(array $payload, int $timeout): array
+    {
+        $key = (string) config('ai.gemini_api_key');
+        if ($key === '') {
+            return ['ok' => false, 'content' => '', 'error' => 'missing_api_key'];
+        }
+
+        $url = rtrim((string) config('ai.gemini_endpoint'), '/') . '/' . config('ai.gemini_model') . ':generateContent';
 
         try {
             $response = Http::timeout($timeout)
-                ->connectTimeout(min(10, $timeout))
+                ->connectTimeout(min(25, $timeout))
                 ->withHeaders(['x-goog-api-key' => $key])
                 ->acceptJson()
                 ->post($url, $payload);

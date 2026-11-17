@@ -177,5 +177,5 @@ window.JM_CART_AJAX = {
 };
 </script>
 <script src="{{ $cartAsset }}js/stock-notice-modal.js?v=4"></script>
-<script src="{{ $cartAsset }}js/cart-luxury.js?v=5"></script>
+<script src="{{ $cartAsset }}js/cart-luxury.js?v=7"></script>
 @endsection

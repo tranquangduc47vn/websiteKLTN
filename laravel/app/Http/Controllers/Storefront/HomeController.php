@@ -32,7 +32,7 @@ class HomeController extends Controller
             "slider" => Slider::query()->orderByDesc("sort_order")->get(),
             "list_banner" => Banner::query()->orderBy("sort_order")->get(),
             "new_product" => $this->storefrontList("id"),
-            "hot_product" => Product::query()->active()->where("sold_count", ">", 0)
+            "hot_product" => Product::query()->active()->inStock()->where("sold_count", ">", 0)
                 ->orderByDesc("sold_count")->limit(6)->get(),
             "view_product" => $this->storefrontList("view_count"),
         ]);
@@ -55,6 +55,7 @@ class HomeController extends Controller
 
         return Product::query()
             ->active()
+            ->inStock()
             ->orderByDesc($orderColumn)
             ->limit(6)
             ->get();

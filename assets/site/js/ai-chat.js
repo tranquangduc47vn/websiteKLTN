@@ -18,6 +18,7 @@
 	var input = document.getElementById('support-chat-input');
 	var quickRepliesEl = document.getElementById('support-chat-quick-replies');
 	var statusTextEl = document.getElementById('support-chat-status-text');
+	var statusLabelEl = statusTextEl ? statusTextEl.querySelector('.support-chat-panel__status-label') : null;
 	var headerAvatar = document.querySelector('.support-chat-panel__avatar--status');
 
 	var STORAGE_KEY = 'support_chat_conversation_id';
@@ -50,7 +51,9 @@
 		if (form) {
 			form.hidden = true;
 		}
-		if (statusTextEl) {
+		if (statusLabelEl) {
+			statusLabelEl.textContent = 'Yêu cầu đăng nhập';
+		} else if (statusTextEl) {
 			statusTextEl.textContent = 'Yêu cầu đăng nhập';
 		}
 		stopPolling();
@@ -76,6 +79,294 @@
 		});
 	}
 
+	function formatChatText(text) {
+		var t = String(text == null ? '' : text);
+		t = t.replace(/\*\*([^*]+)\*\*/g, '$1');
+		t = t.replace(/__([^_]+)__/g, '$1');
+		t = t.replace(/\*([^*]+)\*/g, '$1');
+		t = t.replace(/^#{1,6}\s+/gm, '');
+		t = t.replace(/^\s*[-*]\s+/gm, '• ');
+		return t;
+	}
+
+	function buildActionsHtml(actions) {
+		if (!Array.isArray(actions) || !actions.length) {
+			return '';
+		}
+		var html = '<div class="support-chat-actions">';
+		actions.forEach(function (a) {
+			if (!a || !a.label) {
+				return;
+			}
+			if (a.kind === 'link' && a.url) {
+				html += '<a class="support-chat-act support-chat-act--link" href="' + escapeHtml(a.url) + '">'
+					+ escapeHtml(a.label) + '</a>';
+			} else if (a.kind === 'send' && a.text) {
+				html += '<button type="button" class="support-chat-act support-chat-act--send" data-text="'
+					+ escapeHtml(a.text) + '">' + escapeHtml(a.label) + '</button>';
+			}
+		});
+		html += '</div>';
+		return html;
+	}
+
+	function buildProductCardsHtml(products) {
+		if (!Array.isArray(products) || !products.length) {
+			return '';
+		}
+		var html = '<div class="support-chat-product-grid">';
+		products.forEach(function (p) {
+			var pid = parseInt(p.id, 10) || 0;
+			var img = p.image_url
+				? '<img class="support-chat-pcard__img" src="' + escapeHtml(p.image_url) + '" alt="" loading="lazy" decoding="async">'
+				: '<div class="support-chat-pcard__img support-chat-pcard__img--empty" aria-hidden="true"></div>';
+			var priceHtml = '<span class="support-chat-pcard__price">' + escapeHtml(p.price_fmt || '') + '</span>';
+			if (p.list_price_fmt) {
+				priceHtml += '<span class="support-chat-pcard__price-old">' + escapeHtml(p.list_price_fmt) + '</span>';
+			}
+			var stockCls = p.in_stock ? 'support-chat-pcard__stock--in' : 'support-chat-pcard__stock--out';
+			var meta = '';
+			if (p.colors) {
+				meta += '<span>Màu: ' + escapeHtml(p.colors) + '</span>';
+			}
+			if (p.sizes) {
+				meta += '<span>Size: ' + escapeHtml(p.sizes) + '</span>';
+			}
+			var buyBtn = '';
+			if (p.buyable && pid > 0) {
+				buyBtn = '<button type="button" class="support-chat-act support-chat-act--buy" data-product-id="'
+					+ pid + '">Thêm vào giỏ</button>';
+			}
+			html += '<article class="support-chat-pcard" data-product-id="' + pid + '">'
+				+ '<a class="support-chat-pcard__media" href="' + escapeHtml(p.url || '#') + '" target="_blank" rel="noopener">'
+				+ img + '</a>'
+				+ '<div class="support-chat-pcard__body">'
+				+ '<a class="support-chat-pcard__name" href="' + escapeHtml(p.url || '#') + '" target="_blank" rel="noopener">'
+				+ escapeHtml(p.name || '') + '</a>'
+				+ '<div class="support-chat-pcard__prices">' + priceHtml + '</div>'
+				+ (meta ? '<div class="support-chat-pcard__meta">' + meta + '</div>' : '')
+				+ '<span class="support-chat-pcard__stock ' + stockCls + '">' + escapeHtml(p.stock_label || '') + '</span>'
+				+ '<div class="support-chat-pcard__actions">'
+				+ '<a class="support-chat-act support-chat-act--view" href="' + escapeHtml(p.url || '#') + '" target="_blank" rel="noopener">Xem sản phẩm</a>'
+				+ buyBtn
+				+ '</div>'
+				+ '<div class="support-chat-pcard__picker" hidden></div>'
+				+ '</div></article>';
+		});
+		html += '</div>';
+		return html;
+	}
+
+	function updateHeaderCartBadge(totalItems) {
+		var n = parseInt(totalItems, 10);
+		if (isNaN(n) || n < 0) {
+			return;
+		}
+		var label = n > 99 ? '99+' : String(n);
+		document.querySelectorAll('.wf-chrome-cart-badge, .jm-cart-slot .jm-icon-dot').forEach(function (el) {
+			if (n > 0) {
+				el.textContent = label;
+				el.hidden = false;
+				el.style.display = '';
+			} else {
+				el.textContent = '';
+				el.hidden = true;
+			}
+		});
+	}
+
+	function variantStockLookup(variants, color, size) {
+		if (!Array.isArray(variants)) {
+			return null;
+		}
+		for (var i = 0; i < variants.length; i++) {
+			var v = variants[i];
+			if (v && v.color === color && v.size === size) {
+				return v;
+			}
+		}
+		return null;
+	}
+
+	function renderProductPicker(cardEl, data) {
+		var picker = cardEl.querySelector('.support-chat-pcard__picker');
+		if (!picker) {
+			return;
+		}
+		var colors = Array.isArray(data.colors) ? data.colors : [];
+		var sizes = Array.isArray(data.sizes) ? data.sizes : [];
+		var color = data.default_color || colors[0] || '';
+		var size = data.default_size || sizes[0] || '';
+		var colorOpts = colors.map(function (c) {
+			return '<option value="' + escapeHtml(c) + '"' + (c === color ? ' selected' : '') + '>' + escapeHtml(c || 'Mặc định') + '</option>';
+		}).join('');
+		var sizeOpts = sizes.map(function (s) {
+			return '<option value="' + escapeHtml(s) + '"' + (s === size ? ' selected' : '') + '>' + escapeHtml(s || 'Freesize') + '</option>';
+		}).join('');
+		picker.innerHTML = ''
+			+ '<div class="support-chat-picker">'
+			+ '<label class="support-chat-picker__field"><span>Màu</span><select class="support-chat-picker__color">' + colorOpts + '</select></label>'
+			+ '<label class="support-chat-picker__field"><span>Size</span><select class="support-chat-picker__size">' + sizeOpts + '</select></label>'
+			+ '<label class="support-chat-picker__field support-chat-picker__field--qty"><span>SL</span>'
+			+ '<input type="number" class="support-chat-picker__qty" min="1" max="99" value="1"></label>'
+			+ '<p class="support-chat-picker__stock" aria-live="polite"></p>'
+			+ '<p class="support-chat-picker__error" hidden></p>'
+			+ '<button type="button" class="support-chat-act support-chat-act--confirm">Xác nhận thêm giỏ</button>'
+			+ '<button type="button" class="support-chat-act support-chat-act--cancel">Huỷ</button>'
+			+ '</div>';
+		picker.hidden = false;
+		picker._variants = data.variants || [];
+		picker._productId = data.product_id;
+		syncPickerStock(picker);
+	}
+
+	function syncPickerStock(picker) {
+		if (!picker) {
+			return;
+		}
+		var colorSel = picker.querySelector('.support-chat-picker__color');
+		var sizeSel = picker.querySelector('.support-chat-picker__size');
+		var stockEl = picker.querySelector('.support-chat-picker__stock');
+		var confirmBtn = picker.querySelector('.support-chat-act--confirm');
+		var color = colorSel ? colorSel.value : '';
+		var size = sizeSel ? sizeSel.value : '';
+		var row = variantStockLookup(picker._variants, color, size);
+		var inStock = row && row.in_stock && row.stock > 0;
+		if (stockEl) {
+			stockEl.textContent = row
+				? (inStock ? 'Còn ' + row.stock + ' sản phẩm' : 'Hết hàng với lựa chọn này')
+				: 'Không có biến thể này';
+			stockEl.className = 'support-chat-picker__stock' + (inStock ? ' support-chat-picker__stock--in' : ' support-chat-picker__stock--out');
+		}
+		if (confirmBtn) {
+			confirmBtn.disabled = !inStock;
+		}
+	}
+
+	function openProductPicker(productId, cardEl) {
+		if (!ensureLoggedIn() || !cfg.productOptionsUrl || !productId) {
+			return;
+		}
+		var url = cfg.productOptionsUrl + encodeURIComponent(productId) + '/options';
+		cardEl.classList.add('support-chat-pcard--loading');
+		fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+			.then(parseJsonResponse)
+			.then(function (data) {
+				cardEl.classList.remove('support-chat-pcard--loading');
+				if (typeof window.applyCsrfResponse === 'function') {
+					window.applyCsrfResponse(data);
+				}
+				if (!data || !data.ok) {
+					appendMessage({
+						sender_type: 'system',
+						content: (data && data.message) ? data.message : 'Không tải được thông tin sản phẩm.',
+						created: Math.floor(Date.now() / 1000),
+					});
+					return;
+				}
+				renderProductPicker(cardEl, data);
+				scrollToBottom();
+			})
+			.catch(function () {
+				cardEl.classList.remove('support-chat-pcard--loading');
+				appendMessage({
+					sender_type: 'system',
+					content: 'Không tải được tùy chọn sản phẩm. Vui lòng thử lại.',
+					created: Math.floor(Date.now() / 1000),
+				});
+			});
+	}
+
+	function postCartAdd(productId, qty, size, color) {
+		if (!cfg.cartAddUrl || !productId) {
+			return Promise.resolve({ ok: false, message: 'Không thể thêm giỏ hàng.' });
+		}
+		var url = cfg.cartAddUrl + encodeURIComponent(productId);
+		var body = 'qty=' + encodeURIComponent(qty || 1)
+			+ '&size=' + encodeURIComponent(size || '')
+			+ '&color=' + encodeURIComponent(color || '');
+		if (window.CI_CSRF) {
+			body += '&' + encodeURIComponent(window.CI_CSRF.name) + '=' + encodeURIComponent(window.CI_CSRF.hash);
+		}
+		return fetch(url, {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				'X-Requested-With': 'XMLHttpRequest',
+			},
+			body: body,
+		}).then(parseJsonResponse);
+	}
+
+	function afterCartAddSuccess(data) {
+		if (typeof window.applyCsrfResponse === 'function') {
+			window.applyCsrfResponse(data);
+		}
+		updateHeaderCartBadge(data.total_items);
+		var actions = [
+			{ kind: 'link', label: 'Xem giỏ hàng', url: cfg.cartUrl || '/gio-hang' },
+		];
+		if (cfg.checkoutUrl) {
+			actions.push({ kind: 'link', label: 'Tiến hành thanh toán', url: cfg.checkoutUrl });
+		}
+		appendMessage({
+			sender_type: 'system',
+			content: data.message || 'Đã thêm vào giỏ hàng.',
+			actions: actions,
+			created: Math.floor(Date.now() / 1000),
+		});
+	}
+
+	function confirmPickerAdd(picker, cardEl) {
+		if (!picker || picker._busy) {
+			return;
+		}
+		var errEl = picker.querySelector('.support-chat-picker__error');
+		var qtyEl = picker.querySelector('.support-chat-picker__qty');
+		var colorSel = picker.querySelector('.support-chat-picker__color');
+		var sizeSel = picker.querySelector('.support-chat-picker__size');
+		var qty = qtyEl ? parseInt(qtyEl.value, 10) : 1;
+		if (!qty || qty < 1) {
+			qty = 1;
+		}
+		if (qty > 99) {
+			qty = 99;
+		}
+		picker._busy = true;
+		if (errEl) {
+			errEl.hidden = true;
+			errEl.textContent = '';
+		}
+		postCartAdd(picker._productId, qty, sizeSel ? sizeSel.value : '', colorSel ? colorSel.value : '')
+			.then(function (data) {
+				picker._busy = false;
+				if (data && data.login_required) {
+					customerLoggedIn = false;
+					showLoginRequiredMessage();
+					return;
+				}
+				if (!data || !data.ok) {
+					if (errEl) {
+						errEl.hidden = false;
+						errEl.textContent = (data && data.message) ? data.message : 'Không thêm được vào giỏ.';
+					}
+					return;
+				}
+				picker.hidden = true;
+				picker.innerHTML = '';
+				cardEl.classList.remove('support-chat-pcard--open');
+				afterCartAddSuccess(data);
+			})
+			.catch(function () {
+				picker._busy = false;
+				if (errEl) {
+					errEl.hidden = false;
+					errEl.textContent = 'Lỗi kết nối. Vui lòng thử lại.';
+				}
+			});
+	}
+
 	function formatTime(ts) {
 		if (!ts) {
 			return '';
@@ -86,6 +377,26 @@
 
 	function scrollToBottom() {
 		messagesEl.scrollTop = messagesEl.scrollHeight;
+	}
+
+	function appendToMessages(el) {
+		if (!el || !messagesEl) {
+			return;
+		}
+		var typingEl = document.getElementById('support-chat-typing');
+		if (typingEl && typingEl.parentNode === messagesEl) {
+			messagesEl.insertBefore(el, typingEl);
+		} else {
+			messagesEl.appendChild(el);
+		}
+	}
+
+	function pinTypingToBottom() {
+		var typingEl = document.getElementById('support-chat-typing');
+		if (typingEl && messagesEl && typingEl.parentNode === messagesEl) {
+			messagesEl.appendChild(typingEl);
+			scrollToBottom();
+		}
 	}
 
 	function parseJsonResponse(res) {
@@ -132,7 +443,7 @@
 	}
 
 	function appendMessage(msg) {
-		if (!msg || !msg.content) {
+		if (!msg || (!msg.content && !(msg.products && msg.products.length) && !(msg.actions && msg.actions.length))) {
 			return null;
 		}
 		if (msg.id && msg.id > lastMessageId) {
@@ -152,15 +463,23 @@
 			el.setAttribute('data-local', '1');
 		}
 
+		var bubbleInner = '';
+		if (msg.content) {
+			bubbleInner += '<div class="support-chat-msg__text">' + linkify(formatChatText(msg.content)).replace(/\n/g, '<br>') + '</div>';
+		}
+		bubbleInner += buildProductCardsHtml(msg.products);
+		bubbleInner += buildActionsHtml(msg.actions);
+
 		el.innerHTML = ''
 			+ '<div class="support-chat-msg__avatar" aria-hidden="true"><i class="fa-solid ' + meta.avatar + '"></i></div>'
 			+ '<div class="support-chat-msg__body">'
 			+ '<div class="support-chat-msg__label">' + escapeHtml(meta.label) + '</div>'
-			+ '<div class="support-chat-msg__bubble">' + linkify(msg.content).replace(/\n/g, '<br>') + '</div>'
+			+ '<div class="support-chat-msg__bubble">' + bubbleInner + '</div>'
 			+ '<div class="support-chat-msg__time">' + formatTime(msg.created) + '</div>'
 			+ '</div>';
 
-		messagesEl.appendChild(el);
+		appendToMessages(el);
+		pinTypingToBottom();
 		scrollToBottom();
 		return el;
 	}
@@ -174,7 +493,8 @@
 		el.id = 'support-chat-connecting';
 		el.className = 'support-chat-msg support-chat-msg--system';
 		el.innerHTML = '<div class="support-chat-msg__bubble support-chat-msg__bubble--connecting">🤝 Đang kết nối nhân viên...</div>';
-		messagesEl.appendChild(el);
+		appendToMessages(el);
+		pinTypingToBottom();
 		scrollToBottom();
 	}
 
@@ -183,24 +503,6 @@
 		if (el && el.parentNode) {
 			el.parentNode.removeChild(el);
 		}
-	}
-
-	function renderProducts(products) {
-		if (!Array.isArray(products) || !products.length) {
-			return;
-		}
-		var html = '';
-		products.forEach(function (p) {
-			html += '<div class="support-chat-product">'
-				+ '<a href="' + escapeHtml(p.url) + '" target="_blank" rel="noopener"><strong>' + escapeHtml(p.name) + '</strong></a>'
-				+ '<span>' + escapeHtml(p.price_fmt) + '</span></div>';
-		});
-		var wrap = document.createElement('div');
-		wrap.className = 'support-chat-msg support-chat-msg--ai';
-		wrap.innerHTML = '<div class="support-chat-msg__avatar" aria-hidden="true"><i class="fa-solid fa-robot"></i></div>'
-			+ '<div class="support-chat-msg__body"><div class="support-chat-msg__bubble">' + html + '</div></div>';
-		messagesEl.appendChild(wrap);
-		scrollToBottom();
 	}
 
 	function showTyping(label) {
@@ -227,15 +529,16 @@
 			staffName = name;
 		}
 
-		if (statusTextEl) {
+		var statusTarget = statusLabelEl || statusTextEl;
+		if (statusTarget) {
 			if (chatStatus === 'waiting_staff') {
-				statusTextEl.textContent = 'Đang chờ nhân viên';
+				statusTarget.textContent = 'Đang chờ nhân viên';
 			} else if (chatStatus === 'staff_joined') {
-				statusTextEl.textContent = (staffName || 'Nhân viên') + ' đang hỗ trợ';
+				statusTarget.textContent = (staffName || 'Nhân viên') + ' đang hỗ trợ';
 			} else if (chatStatus === 'closed') {
-				statusTextEl.textContent = 'Cuộc trò chuyện đã kết thúc';
+				statusTarget.textContent = 'Cuộc trò chuyện đã kết thúc';
 			} else {
-				statusTextEl.textContent = 'Trợ lý AI đang trực tuyến';
+				statusTarget.textContent = 'Trợ lý AI đang trực tuyến';
 			}
 		}
 
@@ -277,6 +580,7 @@
 		messages.forEach(function (m) {
 			appendMessage(m);
 		});
+		pinTypingToBottom();
 	}
 
 	function startPolling() {
@@ -386,6 +690,7 @@
 			return;
 		}
 
+		hideTyping();
 		appendMessage({ sender_type: 'customer', content: text, created: Math.floor(Date.now() / 1000), _local: true });
 		if (input) {
 			input.value = '';
@@ -450,11 +755,9 @@
 					updateStatus('waiting_staff');
 				}
 
-				if (Array.isArray(data.products) && data.products.length) {
-					renderProducts(data.products);
-				}
-
 				var replyContent = String(data.content || '').trim();
+				var replyProducts = Array.isArray(data.products) ? data.products : [];
+				var replyActions = Array.isArray(data.actions) ? data.actions : [];
 
 				return pollOnce().then(function (pollData) {
 					var gotMessages = pollData && Array.isArray(pollData.messages) && pollData.messages.length > 0;
@@ -462,8 +765,14 @@
 						ingestMessages(pollData.messages);
 						return;
 					}
-					if (replyContent) {
-						appendMessage({ sender_type: 'ai', content: replyContent, created: Math.floor(Date.now() / 1000) });
+					if (replyContent || replyProducts.length || replyActions.length) {
+						appendMessage({
+							sender_type: 'ai',
+							content: replyContent,
+							products: replyProducts,
+							actions: replyActions,
+							created: Math.floor(Date.now() / 1000),
+						});
 						return;
 					}
 					if (chatStatus === 'ai_active' && !data.handoff && !data.connecting) {
@@ -499,6 +808,60 @@
 			}
 			if (target && target.classList && target.classList.contains('support-chat-quick-reply')) {
 				sendMessage(target.getAttribute('data-text'));
+			}
+		});
+	}
+
+	if (messagesEl) {
+		messagesEl.addEventListener('click', function (e) {
+			var sendBtn = e.target.closest('.support-chat-act--send');
+			if (sendBtn && messagesEl.contains(sendBtn)) {
+				e.preventDefault();
+				sendMessage(sendBtn.getAttribute('data-text'));
+				return;
+			}
+			var buyBtn = e.target.closest('.support-chat-act--buy');
+			if (buyBtn && messagesEl.contains(buyBtn)) {
+				e.preventDefault();
+				var card = buyBtn.closest('.support-chat-pcard');
+				var productId = parseInt(buyBtn.getAttribute('data-product-id'), 10)
+					|| (card ? parseInt(card.getAttribute('data-product-id'), 10) : 0);
+				if (card && productId > 0) {
+					card.classList.add('support-chat-pcard--open');
+					openProductPicker(productId, card);
+				}
+				return;
+			}
+			var confirmBtn = e.target.closest('.support-chat-act--confirm');
+			if (confirmBtn && messagesEl.contains(confirmBtn)) {
+				e.preventDefault();
+				var picker = confirmBtn.closest('.support-chat-pcard__picker');
+				var cardEl = confirmBtn.closest('.support-chat-pcard');
+				if (picker && cardEl) {
+					confirmPickerAdd(picker, cardEl);
+				}
+				return;
+			}
+			var cancelBtn = e.target.closest('.support-chat-act--cancel');
+			if (cancelBtn && messagesEl.contains(cancelBtn)) {
+				e.preventDefault();
+				var pickerCancel = cancelBtn.closest('.support-chat-pcard__picker');
+				var cardCancel = cancelBtn.closest('.support-chat-pcard');
+				if (pickerCancel) {
+					pickerCancel.hidden = true;
+					pickerCancel.innerHTML = '';
+				}
+				if (cardCancel) {
+					cardCancel.classList.remove('support-chat-pcard--open');
+				}
+			}
+		});
+
+		messagesEl.addEventListener('change', function (e) {
+			var picker = e.target.closest('.support-chat-pcard__picker');
+			if (picker && (e.target.classList.contains('support-chat-picker__color')
+				|| e.target.classList.contains('support-chat-picker__size'))) {
+				syncPickerStock(picker);
 			}
 		});
 	}

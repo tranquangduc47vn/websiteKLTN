@@ -15,7 +15,7 @@
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 	<link rel="stylesheet" type="text/css" href="{{ $siteAssetUrl }}css/typography-luxury.css?v=1">
 	<link rel="stylesheet" type="text/css" href="{{ $siteAssetUrl }}bootstrap/css/bootstrap.css">
-	<link rel="stylesheet" type="text/css" href="{{ $siteAssetUrl }}css/style.css?v=20260724c">
+	<link rel="stylesheet" type="text/css" href="{{ $siteAssetUrl }}css/style.css?v=20260724d">
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
 	<link rel="stylesheet" type="text/css" href="{{ $siteAssetUrl }}css/layout-chrome-2026.css?v=22">
 	@if (!empty($canonical_url))

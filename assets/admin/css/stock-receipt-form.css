@@ -1,3 +1,32 @@
+.rc-section-title {
+	font-size: 1.05rem;
+	font-weight: 600;
+	margin: 0 0 1rem;
+}
+
+.rc-subsection-title {
+	font-size: 0.95rem;
+	font-weight: 600;
+	margin: 0 0 0.5rem;
+}
+
+.rc-product-spotlight__inner {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 0.85rem 1rem;
+	border: 1px solid var(--bs-border-color);
+	border-radius: 0.65rem;
+	background: var(--bs-tertiary-bg);
+}
+
+.rc-totals-row td {
+	border-top-width: 2px;
+	vertical-align: middle;
+}
+
 .receipt-picker-card .ts-wrapper.form-select-sm,
 .receipt-picker-card .ts-control {
 	min-height: calc(1.5em + 0.5rem + 2px);

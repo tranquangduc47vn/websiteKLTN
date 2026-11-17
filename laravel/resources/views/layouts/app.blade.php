@@ -9,6 +9,7 @@
 </head>
 <body class="@yield('body_class', 'jm-page-auth jm-page-auth-standalone')">
 	@yield('content')
+	<script src="{{ \App\Support\Storefront\Shop::assetUrl('js/store-flash-auto.js') }}?v=1"></script>
 	@stack('scripts')
 </body>
 </html>

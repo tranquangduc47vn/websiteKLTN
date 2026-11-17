@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Storefront;
 
 use App\Http\Controllers\Controller;
+use App\Models\Product;
 use App\Services\Ai\ChatService;
+use App\Support\Storefront\AiChatCommerce;
 use App\Support\Storefront\Csrf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -57,6 +59,27 @@ class AiAssistantController extends Controller
         return response()->json($this->chat->poll(
             (int) $request->query('conversation_id', 0),
             (int) $request->query('after_id', 0)
+        ));
+    }
+
+    public function productOptions(Request $request, int $id): JsonResponse
+    {
+        if ($denied = $this->loginRequired()) {
+            return $denied;
+        }
+        if ($id <= 0) {
+            return response()->json(['ok' => false, 'message' => 'Sản phẩm không hợp lệ.']);
+        }
+
+        $product = Product::query()->active()->find($id);
+        if (! $product) {
+            return response()->json(['ok' => false, 'message' => 'Sản phẩm không tồn tại hoặc đã ngừng kinh doanh.']);
+        }
+
+        return response()->json(array_merge(
+            ['ok' => true],
+            AiChatCommerce::productOptions($product),
+            Csrf::jsonMeta()
         ));
     }
 

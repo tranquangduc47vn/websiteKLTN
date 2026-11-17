@@ -192,6 +192,15 @@ class Product extends BaseModel
         return $query->where($this->getTable() . '.status', self::STATUS_ACTIVE);
     }
 
+    /** Storefront: có ít nhất một biến thể đang bán với tồn > 0. */
+    public function scopeInStock(Builder $query): Builder
+    {
+        return $query->whereHas('variants', function (Builder $variant): void {
+            $variant->where('status', ProductVariant::STATUS_ACTIVE)
+                ->where('stock', '>', 0);
+        });
+    }
+
     public function scopeSearch($query, ?string $keyword, bool $includeCatalogName = true): Builder
     {
         if ($keyword === null || trim($keyword) === '') {

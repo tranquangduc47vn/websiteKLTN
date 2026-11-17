@@ -13,6 +13,11 @@
 	var lastMessageId = cfg.lastMessageId || 0;
 	var pollTimer = null;
 
+	function formatStatus(code) {
+		var labels = cfg.statusLabels || {};
+		return labels[code] || code || '—';
+	}
+
 	function escapeHtml(str) {
 		var d = document.createElement('div');
 		d.textContent = str == null ? '' : String(str);
@@ -42,7 +47,7 @@
 			.then(function (data) {
 				if (!data || !data.ok) return;
 				if (data.conversation && data.conversation.status && statusEl) {
-					statusEl.textContent = data.conversation.status;
+					statusEl.textContent = formatStatus(data.conversation.status);
 					cfg.status = data.conversation.status;
 				}
 				if (Array.isArray(data.messages)) {
@@ -89,7 +94,7 @@
 		return postJson(cfg.takeUrl, '')
 			.then(function (data) {
 				if (data && data.ok) {
-					if (statusEl) statusEl.textContent = data.status;
+					if (statusEl) statusEl.textContent = formatStatus(data.status);
 					cfg.status = data.status;
 					if (takeBtn) takeBtn.disabled = true;
 				}
@@ -105,7 +110,7 @@
 			.then(function (data) {
 				if (data && data.ok) {
 					appendMsg({ id: data.message_id, sender_type: 'staff', content: data.content, created: data.created });
-					if (statusEl) statusEl.textContent = 'staff_joined';
+					if (statusEl) statusEl.textContent = formatStatus('staff_joined');
 					cfg.status = 'staff_joined';
 					if (takeBtn) takeBtn.disabled = true;
 					if (input) input.value = '';
@@ -156,7 +161,7 @@
 			postJson(cfg.endUrl, '')
 				.then(function (data) {
 					if (data && data.ok) {
-						if (statusEl) statusEl.textContent = data.status;
+						if (statusEl) statusEl.textContent = formatStatus(data.status);
 						pollOnce();
 					}
 				});
@@ -169,10 +174,12 @@
 			postJson(cfg.returnAiUrl, '')
 				.then(function (data) {
 					if (data && data.ok) {
-						if (statusEl) statusEl.textContent = data.status;
+						if (statusEl) statusEl.textContent = formatStatus(data.status);
 						cfg.status = data.status;
-						takeBtn.disabled = false;
+						if (takeBtn) takeBtn.disabled = false;
 						pollOnce();
+					} else {
+						alert((data && data.message) ? data.message : 'Không chuyển được về AI.');
 					}
 				});
 		});

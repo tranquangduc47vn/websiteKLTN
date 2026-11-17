@@ -297,6 +297,10 @@
 	opacity: 1;
 	visibility: visible;
 	pointer-events: none;
+	transform-origin: center center;
+	animation: jm-discount-attention 2.2s ease-in-out infinite;
+	transform-origin: center center;
+	animation: jm-discount-attention 2.2s ease-in-out infinite;
 }
 
 .jm-bs-card__body {

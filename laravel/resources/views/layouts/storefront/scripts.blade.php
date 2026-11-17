@@ -4,6 +4,7 @@
 <link rel="stylesheet" type="text/css" href="{{ $site_asset_url }}css/responsive-2026.css?v=17">
 {!! \App\Support\Storefront\Csrf::injectScript() !!}
 <script src="{{ $site_asset_url }}bootstrap/js/bootstrap.min.js"></script>
+<script src="{{ $site_asset_url }}js/store-flash-auto.js?v=1"></script>
 <script src="{{ $site_asset_url }}js/header-icons.js"></script>
 <script>
 (function () {

@@ -1408,6 +1408,17 @@ html, body {
     width: 100% !important; height: 100% !important; object-fit: cover !important; object-position: center top !important;
 }
 
+@keyframes jm-discount-attention {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 4px 14px rgba(224, 16, 16, 0.55), 0 0 0 2px rgba(255, 255, 255, 0.92);
+    }
+    50% {
+        transform: scale(1.09);
+        box-shadow: 0 8px 22px rgba(224, 16, 16, 0.72), 0 0 0 2px rgba(255, 255, 255, 1), 0 0 14px rgba(255, 66, 66, 0.45);
+    }
+}
+
 .jm-badge-discount {
     position: absolute; top: 10px; left: 10px; z-index: 5;
     background: linear-gradient(135deg, #ff4242 0%, #e01010 55%, #c80000 100%);
@@ -1415,6 +1426,16 @@ html, body {
     border-radius: 6px; letter-spacing: 0.03em; line-height: 1.15;
     box-shadow: 0 4px 14px rgba(224, 16, 16, 0.55), 0 0 0 2px rgba(255, 255, 255, 0.92);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    pointer-events: none;
+    transform-origin: center center;
+    animation: jm-discount-attention 2.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .jm-badge-discount {
+        animation: none !important;
+        transform: none !important;
+    }
 }
 .jm-product-info { padding: 15px 0 5px 0; }
 

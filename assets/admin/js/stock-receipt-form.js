@@ -113,12 +113,15 @@
 		window.__pickerItems = window.__pickerItems || {};
 		if (!items.length) {
 			els.pickerBody.innerHTML = '<tr class="picker-empty"><td colspan="9" class="text-center text-muted py-4">Không tìm thấy biến thể phù hợp.</td></tr>';
+			renderProductSpotlight([]);
 			return;
 		}
 
 		items.forEach(function (item) {
 			window.__pickerItems[item.id] = item;
 		});
+
+		renderProductSpotlight(items);
 
 		els.pickerBody.innerHTML = items.map(function (item) {
 			var cost = item.cost_price > 0 ? item.cost_price : '';
@@ -134,8 +137,8 @@
 				'<td>' + escHtml(item.color || '—') + '</td>' +
 				'<td>' + escHtml(item.size || '—') + '</td>' +
 				'<td class="text-end">' + stockCell(item) + '</td>' +
-				'<td><input type="number" class="form-control form-control-sm picker-cost" min="1" step="1000" placeholder="Bắt buộc" value="' + escHtml(cost) + '" tabindex="0"></td>' +
-				'<td><input type="number" class="form-control form-control-sm picker-qty" min="1" max="999999" value="1"></td>' +
+				'<td><input type="number" class="form-control form-control-sm picker-cost" min="0" step="1000" placeholder="Bắt buộc" value="' + escHtml(cost) + '" tabindex="0" data-validate="skip"></td>' +
+				'<td><input type="number" class="form-control form-control-sm picker-qty" min="1" max="999999" value="1" data-validate="skip"></td>' +
 				'<td class="text-end picker-subtotal small">' + formatMoney(sub) + '</td>' +
 				'<td><button type="button" class="btn btn-sm ' + btnClass + ' btn-picker-add"' + btnDisabled + '>' + btnLabel + '</button></td>' +
 				'</tr>';
@@ -219,20 +222,86 @@
 		row.querySelector('.line-subtotal').textContent = formatMoney(qty * cost);
 	}
 
+	function syncReceiptLinesFromDom() {
+		if (!els.linesBody) {
+			return;
+		}
+		els.linesBody.querySelectorAll('.receipt-line').forEach(function (row) {
+			var id = parseInt(row.getAttribute('data-variant-id'), 10);
+			if (!id || !state.lines[id]) {
+				return;
+			}
+			var qtyInput = row.querySelector('.line-qty');
+			var costInput = row.querySelector('.line-cost');
+			if (qtyInput) {
+				var qty = parseInt(qtyInput.value, 10);
+				state.lines[id].qty = isNaN(qty) || qty < 1 ? 1 : qty;
+			}
+			if (costInput) {
+				var cost = parseFloat(costInput.value);
+				state.lines[id].unit_cost = isNaN(cost) || cost < 0 ? 0 : cost;
+			}
+		});
+	}
+
 	function recalcTotal() {
 		var total = 0;
+		var qtySum = 0;
 		Object.keys(state.lines).forEach(function (id) {
 			var line = state.lines[id];
+			qtySum += line.qty || 0;
 			total += (line.qty || 0) * (line.unit_cost || 0);
 		});
 		els.total.textContent = formatMoney(total);
 		els.lineCount.textContent = Object.keys(state.lines).length + ' dòng';
+		if (els.totalQty) {
+			els.totalQty.textContent = formatMoney(qtySum);
+		}
+	}
+
+	function variantLineTitle(line) {
+		var parts = [line.product_name];
+		if (line.color || line.size) {
+			parts.push([(line.color || '—'), (line.size || '—')].join(' – '));
+		}
+		return parts.join(' · ');
+	}
+
+	function renderProductSpotlight(items) {
+		if (!els.spotlight) {
+			return;
+		}
+		if (!items || !items.length) {
+			els.spotlight.hidden = true;
+			els.spotlight.innerHTML = '';
+			return;
+		}
+		var first = items[0];
+		var pid = first.product_id;
+		var sameProduct = items.every(function (item) {
+			return item.product_id === pid;
+		});
+		if (!sameProduct || !els.product || !els.productTom.getValue()) {
+			els.spotlight.hidden = true;
+			els.spotlight.innerHTML = '';
+			return;
+		}
+		var statusClass = 'bg-success';
+		els.spotlight.hidden = false;
+		els.spotlight.innerHTML =
+			'<div class="rc-product-spotlight__inner">' +
+				'<div class="rc-product-spotlight__main">' +
+					'<strong class="rc-product-spotlight__name">' + escHtml(first.product_name) + '</strong>' +
+					'<span class="text-muted small ms-2"><code>' + escHtml(first.sku.split('-').slice(0, 1).join('-') || first.sku) + '</code></span>' +
+				'</div>' +
+				'<span class="badge ' + statusClass + '">Đang kinh doanh</span>' +
+			'</div>';
 	}
 
 	function renderReceiptLines() {
 		var ids = Object.keys(state.lines);
 		if (!ids.length) {
-			els.linesBody.innerHTML = '<tr class="receipt-empty" id="receipt-empty-row"><td colspan="8" class="text-center text-muted py-4">Chưa có dòng nhập. Thêm biến thể từ bảng phía trên.</td></tr>';
+			els.linesBody.innerHTML = '<tr class="receipt-empty" id="receipt-empty-row"><td colspan="5" class="text-center text-muted py-4">Chưa có dòng nhập. Chọn biến thể phía trên.</td></tr>';
 			recalcTotal();
 			return;
 		}
@@ -241,16 +310,13 @@
 			var line = state.lines[id];
 			var sub = (line.qty || 0) * (line.unit_cost || 0);
 			return '<tr class="receipt-line" data-variant-id="' + id + '">' +
-				'<td><code class="small">' + escHtml(line.sku) + '</code></td>' +
-				'<td>' + escHtml(line.product_name) + '</td>' +
-				'<td>' + escHtml(line.color || '—') + '</td>' +
-				'<td>' + escHtml(line.size || '—') + '</td>' +
+				'<td><div class="fw-medium">' + escHtml(variantLineTitle(line)) + '</div><code class="small text-muted">' + escHtml(line.sku) + '</code></td>' +
 				'<td><input type="number" name="qty[]" class="form-control form-control-sm line-qty" min="1" max="999999" value="' + line.qty + '" required></td>' +
-				'<td class="line-subtotal text-end small">' + formatMoney(sub) + '</td>' +
-				'<td><input type="number" name="unit_cost[]" class="form-control form-control-sm line-cost" min="1" step="1000" value="' + line.unit_cost + '"></td>' +
-				'<td>' +
+				'<td><input type="number" name="unit_cost[]" class="form-control form-control-sm line-cost" min="1" step="1000" value="' + line.unit_cost + '" required></td>' +
+				'<td class="line-subtotal text-end">' + formatMoney(sub) + ' ₫</td>' +
+				'<td class="text-end">' +
 					'<input type="hidden" name="variant_id[]" value="' + id + '">' +
-					'<button type="button" class="btn btn-sm btn-outline-danger btn-remove-line" title="Xóa">&times;</button>' +
+					'<button type="button" class="btn btn-sm btn-outline-danger btn-remove-line" title="Xóa" aria-label="Xóa">&times;</button>' +
 				'</td>' +
 				'</tr>';
 		}).join('');
@@ -487,11 +553,11 @@
 		});
 
 		els.form.addEventListener('submit', function (e) {
-			if (els.form.getAttribute('data-receipt-validated') === '1') {
-				els.form.removeAttribute('data-receipt-validated');
+			if (els.form.getAttribute('data-rc-submitting') === '1') {
 				return;
 			}
 			e.preventDefault();
+			syncReceiptLinesFromDom();
 			if (!requireSupplierSelected()) {
 				return;
 			}
@@ -507,15 +573,22 @@
 				alert('Mỗi dòng nhập phải có số lượng và giá nhập lớn hơn 0 (không được nhập số âm).');
 				var badRow = els.linesBody.querySelector('.receipt-line[data-variant-id="' + badLineId + '"]');
 				if (badRow) {
+					badRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
 					var costInput = badRow.querySelector('.line-cost');
 					if (costInput) {
-						costInput.focus();
+						costInput.focus({ preventScroll: true });
 					}
 				}
 				return;
 			}
-			els.form.setAttribute('data-receipt-validated', '1');
-			els.form.submit();
+			els.form.setAttribute('data-rc-submitting', '1');
+			els.form.classList.add('is-busy');
+			var submitBtn = els.form.querySelector('button[type="submit"]');
+			if (submitBtn) {
+				submitBtn.disabled = true;
+			}
+			// Gửi form thật (không kích hoạt lại submit listener).
+			HTMLFormElement.prototype.submit.call(els.form);
 		});
 	}
 
@@ -552,9 +625,17 @@
 		els.pageLabel = $('picker-page-label');
 		els.linesBody = $('receipt-lines-body');
 		els.total = $('receipt-total');
+		els.totalQty = $('receipt-total-qty');
 		els.lineCount = $('receipt-line-count');
 		els.recentWrap = $('recent-variants-wrap');
 		els.recentList = $('recent-variants-list');
+		els.spotlight = $('rc-product-spotlight');
+		els.product = $('filter-product');
+
+		if (typeof TomSelect === 'undefined') {
+			console.error('TomSelect is required for stock receipt form.');
+			return;
+		}
 
 		initTomSelect();
 		bindEvents();
